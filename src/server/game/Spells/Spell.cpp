@@ -3069,6 +3069,10 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
         {
             if (spellHitTarget->ToCreature()->IsAIEnabled)
                 spellHitTarget->ToCreature()->AI()->SpellHit(unitCaster ? unitCaster : m_originalCaster, m_spellInfo);
+
+            if (Player* player = unitCaster ? unitCaster->ToPlayer() : nullptr)
+                if (spellHitTarget->ToCreature()->GetAIName() != "SmartAI")
+                    player->SpellHitQuestCredit(spellHitTarget->ToCreature(), m_spellInfo->Id);
         }
 
         if (unitCaster && unitCaster->IsCreature() && unitCaster->ToCreature()->IsAIEnabled)

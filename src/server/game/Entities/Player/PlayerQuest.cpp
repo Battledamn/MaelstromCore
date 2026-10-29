@@ -2002,6 +2002,38 @@ void Player::KilledMonster(CreatureTemplate const* cInfo, ObjectGuid guid)
             KilledMonsterCredit(cInfo->KillCredit[i]);
 }
 
+// Cataclysm quests with RequiredSpell ("Practice Steady Shot", "Heal Injured Draenei", ...) count a
+// cast of that spell on a creature: on one listed as the objective (or crediting it), or on any
+// creature when the objective is the generic Spell Practice Credit. SmartAI creatures give these
+// credits from their own scripts and are skipped by the caller.
+void Player::SpellHitQuestCredit(Creature const* target, uint32 spellId)
+{
+    static constexpr int32 NPC_SPELL_PRACTICE_CREDIT = 44175;
+
+    for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 const questId = GetQuestSlotQuestId(slot);
+        Quest const* quest = questId ? sObjectMgr->GetQuestTemplate(questId) : nullptr;
+        if (!quest || quest->GetRequiredSpell() != spellId || GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+
+        CreatureTemplate const* info = target->GetCreatureTemplate();
+        for (uint8 j = 0; j < QUEST_OBJECTIVES_COUNT; ++j)
+        {
+            int32 const required = quest->RequiredNpcOrGo[j];
+            if (required <= 0)
+                continue;
+
+            if (required == NPC_SPELL_PRACTICE_CREDIT || uint32(required) == target->GetEntry() ||
+                uint32(required) == info->KillCredit[0] || uint32(required) == info->KillCredit[1])
+            {
+                KilledMonsterCredit(uint32(required));
+                return;
+            }
+        }
+    }
+}
+
 void Player::KilledMonsterCredit(uint32 entry, ObjectGuid guid)
 {
     uint16 addkillcount = 1;

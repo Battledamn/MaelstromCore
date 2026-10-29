@@ -1544,6 +1544,7 @@ public:
     void ItemRemovedQuestCheck(uint32 entry, uint32 count);
     void KilledMonster(CreatureTemplate const* cInfo, ObjectGuid guid);
     void KilledMonsterCredit(uint32 entry, ObjectGuid guid = ObjectGuid::Empty);
+    void SpellHitQuestCredit(Creature const* target, uint32 spellId);
     void KilledPlayerCredit(uint16 count = 1);
     void KilledPlayerCreditForQuest(uint16 count, Quest const* quest);
     void KillCreditGO(uint32 entry, ObjectGuid guid = ObjectGuid::Empty);
