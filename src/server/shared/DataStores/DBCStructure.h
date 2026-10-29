@@ -2058,6 +2058,7 @@ struct TalentTabEntry
     uint32  petTalentMask;                                  // 21
     uint32  tabpage;                                        // 22
     //char const* internalname;                             // 23
+    std::array<uint32, 2> MasterySpellID;                   // Cata 9-10: the tree's mastery passives
 };
 
 struct TaxiNodesEntry

@@ -3354,6 +3354,14 @@ bool Player::_addSpell(uint32 spellId, uint8 addSpecMask, bool temporary, bool l
 
 bool Player::IsNeedCastPassiveSpellAtLearn(SpellInfo const* spellInfo) const
 {
+    // Cataclysm mastery passives (TalentTab.dbc) belong to one specialization and are learned with
+    // the class skill by every character. Primary talent trees are not implemented yet, so none is
+    // active (CPP: only the current spec's mastery, IsCurrentSpecMasterySpell).
+    for (uint32 talentTabId = 1; talentTabId < sTalentTabStore.GetNumRows(); ++talentTabId)
+        if (TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(talentTabId))
+            if (spellInfo->Id == talentTab->MasterySpellID[0] || spellInfo->Id == talentTab->MasterySpellID[1])
+                return false;
+
     // note: form passives activated with shapeshift spells be implemented by HandleShapeshiftBoosts instead of spell_learn_spell
     // talent dependent passives activated at form apply have proper stance data
     ShapeshiftForm form = GetShapeshiftForm();
