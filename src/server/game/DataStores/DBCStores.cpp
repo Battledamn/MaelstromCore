@@ -38,6 +38,7 @@ DBCStorage <AreaPOIEntry> sAreaPOIStore(AreaPOIEntryfmt);
 
 static WMOAreaInfoByTripple sWMOAreaInfoByTripple;
 static std::unordered_map<uint32 /*phaseOrGroupId*/, std::vector<uint32> /*memberPhaseIds*/> sPhasesByGroup;
+static std::map<std::pair<uint8 /*race*/, uint8 /*sex*/>, std::vector<std::string>> sNamesByRaceAndSex;
 
 DBCStorage <AchievementEntry> sAchievementStore(Achievementfmt);
 DBCStorage <AchievementCategoryEntry> sAchievementCategoryStore(AchievementCategoryfmt);
@@ -134,6 +135,7 @@ DBCStorage <NamesProfanityEntry> sNamesProfanityStore(NamesProfanityfmt);
 
 DBCStorage <OverrideSpellDataEntry> sOverrideSpellDataStore(OverrideSpellDatafmt);
 
+static DBCStorage <NameGenEntry> sNameGenStore(NameGenfmt); // only read through GetRandomCharacterName
 DBCStorage <PhaseEntry> sPhaseStore(Phasefmt);
 DBCStorage <PhaseGroupEntry> sPhaseGroupStore(PhaseGroupfmt);
 DBCStorage <PowerDisplayEntry> sPowerDisplayStore(PowerDisplayfmt);
@@ -372,6 +374,7 @@ void LoadDBCStores(std::string const& dataPath)
     LOAD_DBC(sNamesReservedStore,                   "NamesReserved.dbc",                    "namesreserved_dbc");
     LOAD_DBC(sNamesProfanityStore,                  "NamesProfanity.dbc",                   "namesprofanity_dbc");
     LOAD_DBC(sOverrideSpellDataStore,               "OverrideSpellData.dbc",                "overridespelldata_dbc");
+    LOAD_DBC(sNameGenStore,                         "NameGen.dbc",                           nullptr);
     LOAD_DBC(sPhaseStore,                           "Phase.dbc",                             nullptr);
     LOAD_DBC(sPhaseGroupStore,                      "PhaseXPhaseGroup.dbc",                  nullptr);
     LOAD_DBC(sPowerDisplayStore,                    "PowerDisplay.dbc",                     "powerdisplay_dbc");
@@ -688,6 +691,9 @@ void LoadDBCStores(std::string const& dataPath)
     for (PhaseGroupEntry const* group : sPhaseGroupStore)
         sPhasesByGroup[group->PhaseGroupID].push_back(group->PhaseID);
 
+    for (NameGenEntry const* entry : sNameGenStore)
+        sNamesByRaceAndSex[{ uint8(entry->RaceID), uint8(entry->Sex) }].emplace_back(entry->Name);
+
     // error checks
     if (bad_dbc_files.size() >= DBCFileCount)
     {
@@ -910,6 +916,15 @@ std::vector<uint32> GetPhasesForGroup(uint32 phaseOrGroupId)
 bool IsValidPhaseOrPhaseGroupId(uint32 phaseOrGroupId)
 {
     return sPhaseStore.LookupEntry(phaseOrGroupId) || sPhasesByGroup.find(phaseOrGroupId) != sPhasesByGroup.end();
+}
+
+std::string GetRandomCharacterName(uint8 race, uint8 sex)
+{
+    auto itr = sNamesByRaceAndSex.find({ race, sex });
+    if (itr == sNamesByRaceAndSex.end() || itr->second.empty())
+        return {};
+
+    return Acore::Containers::SelectRandomContainerElement(itr->second);
 }
 
 uint32 GetVirtualMapForMapAndZone(uint32 mapid, uint32 zoneId)

@@ -780,6 +780,7 @@ enum OpcodeClient : uint16
     CMSG_LOG_DISCONNECT                             = 0x446D,
     CMSG_LOADING_SCREEN_NOTIFY                      = 0x2422,
     CMSG_VIOLENCE_LEVEL                             = 0x7816,
+    CMSG_GENERATE_RANDOM_CHARACTER_NAME             = 0x2413,
 };
 
 enum OpcodeServer : uint16
@@ -1380,6 +1381,7 @@ enum OpcodeServer : uint16
     SMSG_MULTIPLE_MOVES                             = 0x51E, // uncompressed version of SMSG_COMPRESSED_MOVES
     TC9_SMSG_READY_FOR_REDIRECT                     = 0x520,
     SMSG_PHASE_SHIFT_CHANGE                         = 0x70A0,
+    SMSG_GENERATE_RANDOM_CHARACTER_NAME_RESULT      = 0x38B1,
 };
 
 inline constexpr OpcodeServer MSG_MOVE_START_FORWARD_SERVER =

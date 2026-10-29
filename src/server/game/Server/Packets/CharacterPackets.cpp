@@ -166,6 +166,23 @@ WorldPacket const* WorldPackets::Character::PlayedTime::Write()
     return &_worldPacket;
 }
 
+void WorldPackets::Character::GenerateRandomCharacterName::Read()
+{
+    _worldPacket >> Race;
+    _worldPacket >> Sex;
+}
+
+// Success bit, 7-bit name length, then the name bytes without a terminator.
+WorldPacket const* WorldPackets::Character::GenerateRandomCharacterNameResult::Write()
+{
+    _worldPacket.WriteBit(Success);
+    _worldPacket.WriteBits(Name.size(), 7);
+    _worldPacket.FlushBits();
+    _worldPacket.WriteString(Name);
+
+    return &_worldPacket;
+}
+
 WorldPacket const* WorldPackets::Character::LoginVerifyWorld::Write()
 {
     _worldPacket << int32(MapID);

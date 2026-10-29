@@ -1193,6 +1193,15 @@ struct ItemEntry
     uint32 SheatheType;                                      // 7
 };
 
+// NameGen.dbc (build 15595): the whole names the character-creation dice button picks from.
+struct NameGenEntry
+{
+    uint32 ID;                                               // 0
+    char const* Name;                                        // 1
+    uint32 RaceID;                                           // 2
+    uint32 Sex;                                              // 3
+};
+
 struct PhaseEntry
 {
     uint32 ID;                                               // 0

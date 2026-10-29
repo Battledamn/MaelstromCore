@@ -95,6 +95,7 @@ namespace WorldPackets
         class PlayerLogin;
         class PlayerLogout;
         class PlayedTimeClient;
+        class GenerateRandomCharacterName;
     }
 
     namespace Totem
@@ -699,6 +700,7 @@ public:                                                 // opcodes handlers
     void HandleCharEnumOpcode(WorldPackets::Character::EnumCharacters& packet);
     void HandleCharDeleteOpcode(WorldPacket& recvPacket);
     void HandleCharCreateOpcode(WorldPacket& recvPacket);
+    void HandleRandomizeCharNameOpcode(WorldPackets::Character::GenerateRandomCharacterName& packet);
     void HandleLoadScreenOpcode(WorldPacket& recvPacket);
     void HandleViolenceLevel(WorldPacket& recvPacket);
 

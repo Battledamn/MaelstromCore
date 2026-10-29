@@ -74,6 +74,7 @@ char constexpr GtRegenHPPerSptfmt[] = "f";
 char constexpr GtRegenMPPerSptfmt[] = "f";
 char constexpr Holidaysfmt[] = "niiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiixxsiix";
 char constexpr Itemfmt[] = "niiiiiii";
+char constexpr NameGenfmt[] = "nsii";
 char constexpr Phasefmt[] = "nsi";
 char constexpr PhaseGroupfmt[] = "nii";
 char constexpr ItemBagFamilyfmt[] = "nx";

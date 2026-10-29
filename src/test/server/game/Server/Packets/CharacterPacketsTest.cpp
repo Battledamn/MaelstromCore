@@ -163,3 +163,26 @@ TEST(CharacterPacketsTest, Build15595PlayerLoginGuidRejectsWireMutations)
         }
     }
 }
+
+TEST(CharacterPacketsTest, RandomCharacterNameResultUsesBuild15595BitLayout)
+{
+    // One byte: the success bit, then the 7-bit name length (MSB first); then the bare name bytes.
+    WorldPackets::Character::GenerateRandomCharacterNameResult found;
+    found.Success = true;
+    found.Name = "Tilda";
+    EXPECT_EQ(found.GetOpcode(), SMSG_GENERATE_RANDOM_CHARACTER_NAME_RESULT);
+    EXPECT_EQ(PayloadHex(found.Write()), "8554696C6461");
+
+    WorldPackets::Character::GenerateRandomCharacterNameResult missing;
+    EXPECT_EQ(PayloadHex(missing.Write()), "00");
+}
+
+TEST(CharacterPacketsTest, RandomCharacterNameRequestReadsRaceThenSex)
+{
+    WorldPacket raw(CMSG_GENERATE_RANDOM_CHARACTER_NAME, 2);
+    raw << uint8(8) << uint8(1);
+    WorldPackets::Character::GenerateRandomCharacterName packet(std::move(raw));
+    packet.Read();
+    EXPECT_EQ(packet.Race, 8);
+    EXPECT_EQ(packet.Sex, 1);
+}

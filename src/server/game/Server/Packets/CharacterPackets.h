@@ -170,6 +170,29 @@ namespace WorldPackets
             void Read() override { }
         };
 
+        // The character-creation dice button (build 15595, pinned TrinityCore layout).
+        class GenerateRandomCharacterName final : public ClientPacket
+        {
+        public:
+            GenerateRandomCharacterName(WorldPacket&& packet) : ClientPacket(CMSG_GENERATE_RANDOM_CHARACTER_NAME, std::move(packet)) { }
+
+            void Read() override;
+
+            uint8 Race = 0;
+            uint8 Sex = 0;
+        };
+
+        class GenerateRandomCharacterNameResult final : public ServerPacket
+        {
+        public:
+            GenerateRandomCharacterNameResult() : ServerPacket(SMSG_GENERATE_RANDOM_CHARACTER_NAME_RESULT, 1 + 15) { }
+
+            WorldPacket const* Write() override;
+
+            bool Success = false;
+            std::string Name;
+        };
+
         class PlayedTimeClient final : public ClientPacket
         {
         public:

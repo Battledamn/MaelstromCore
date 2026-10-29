@@ -412,6 +412,23 @@ void WorldSession::HandleCharEnumOpcode(WorldPackets::Character::EnumCharacters&
     _queryProcessor.AddCallback(CharacterDatabase.AsyncQuery(stmt).WithPreparedCallback(std::bind(&WorldSession::HandleCharEnum, this, std::placeholders::_1)));
 }
 
+// Character-creation dice button: a whole name from NameGen.dbc for the chosen race and sex
+// (pinned TrinityCore HandleRandomizeCharNameOpcode).
+void WorldSession::HandleRandomizeCharNameOpcode(WorldPackets::Character::GenerateRandomCharacterName& packet)
+{
+    if (!sChrRacesStore.LookupEntry(packet.Race) || !Player::IsValidGender(packet.Sex))
+    {
+        LOG_ERROR("network", "Invalid race {} or sex {} for a random name, sent by account {}",
+            packet.Race, packet.Sex, GetAccountId());
+        return;
+    }
+
+    WorldPackets::Character::GenerateRandomCharacterNameResult result;
+    result.Name = GetRandomCharacterName(packet.Race, packet.Sex);
+    result.Success = !result.Name.empty();
+    SendPacket(result.Write());
+}
+
 void WorldSession::HandleCharCreateOpcode(WorldPacket& recvData)
 {
     std::shared_ptr<CharacterCreateInfo> createInfo = std::make_shared<CharacterCreateInfo>();
