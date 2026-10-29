@@ -1382,6 +1382,7 @@ enum OpcodeServer : uint16
     TC9_SMSG_READY_FOR_REDIRECT                     = 0x520,
     SMSG_PHASE_SHIFT_CHANGE                         = 0x70A0,
     SMSG_GENERATE_RANDOM_CHARACTER_NAME_RESULT      = 0x38B1,
+    SMSG_DB_REPLY                                   = 0x38A4,
 };
 
 inline constexpr OpcodeServer MSG_MOVE_START_FORWARD_SERVER =

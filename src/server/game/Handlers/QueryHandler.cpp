@@ -74,6 +74,60 @@ void WorldSession::HandleTimeQueryOpcode(WorldPackets::Query::TimeQuery& /*packe
     SendTimeQueryResponse();
 }
 
+// The client asks for DB2 rows it wants refreshed (Item/Item-sparse, e.g. the mail stationery items
+// at login). A negative record id means "this row does not exist" (deleted by hotfix), so it is only
+// sent for item ids the server does not know; real rows are not served yet, and leaving them
+// unanswered keeps the client on its own client-file data. Read order is the pinned TrinityCore
+// DBQueryBulk layout.
+void WorldSession::HandleDBQueryBulk(WorldPacket& recvData)
+{
+    static constexpr uint32 ITEM_DB2_HASH        = 0x919BE54E;   // Item.db2
+    static constexpr uint32 ITEM_SPARSE_DB2_HASH = 0x50238EC2;   // Item-sparse.db2
+
+    uint32 tableHash;
+    recvData >> tableHash;
+
+    uint32 count = recvData.ReadBits(23);
+    std::vector<ObjectGuid> guids(count);
+    for (ObjectGuid& guid : guids)
+    {
+        guid[0] = recvData.ReadBit();
+        guid[4] = recvData.ReadBit();
+        guid[7] = recvData.ReadBit();
+        guid[2] = recvData.ReadBit();
+        guid[5] = recvData.ReadBit();
+        guid[3] = recvData.ReadBit();
+        guid[6] = recvData.ReadBit();
+        guid[1] = recvData.ReadBit();
+    }
+
+    for (ObjectGuid& guid : guids)
+    {
+        recvData.ReadByteSeq(guid[5]);
+        recvData.ReadByteSeq(guid[6]);
+        recvData.ReadByteSeq(guid[7]);
+        recvData.ReadByteSeq(guid[0]);
+        recvData.ReadByteSeq(guid[1]);
+        recvData.ReadByteSeq(guid[3]);
+        recvData.ReadByteSeq(guid[4]);
+
+        uint32 recordId;
+        recvData >> recordId;
+        recvData.ReadByteSeq(guid[2]);
+
+        bool const itemTable = tableHash == ITEM_DB2_HASH || tableHash == ITEM_SPARSE_DB2_HASH;
+        if (!itemTable || sObjectMgr->GetItemTemplate(recordId))
+            continue;
+
+        WorldPacket reply(SMSG_DB_REPLY, 4 + 4 + 4 + 4);
+        reply << int32(-int32(recordId));
+        reply << uint32(tableHash);
+        reply << uint32(GameTime::GetGameTime().count());
+        reply << uint32(0);                                 // no row data
+        SendPacket(&reply);
+    }
+}
+
 void WorldSession::SendTimeQueryResponse()
 {
     auto timeResponse = sWorld->GetNextDailyQuestsResetTime() - GameTime::GetGameTime();

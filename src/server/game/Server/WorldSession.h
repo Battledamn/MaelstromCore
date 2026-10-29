@@ -804,6 +804,7 @@ public:                                                 // opcodes handlers
     void HandleNameQueryOpcode(WorldPackets::Query::NameQuery& packet);
 
     void HandleTimeQueryOpcode(WorldPackets::Query::TimeQuery& packet);
+    void HandleDBQueryBulk(WorldPacket& recvData);
 
     void HandleCreatureQueryOpcode(WorldPacket& recvPacket);
 
