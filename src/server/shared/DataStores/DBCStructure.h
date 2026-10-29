@@ -1128,6 +1128,12 @@ struct GtOCTRegenHPEntry
     float    ratio;
 };
 
+// Cata: 100 levels per scaling class; row (class - 1) * 100 + level - 1 (classes -1 and -2 are rows 12 and 13).
+struct GtSpellScalingEntry
+{
+    float value;
+};
+
 //struct GtOCTRegenMPEntry
 //{
 //    float    ratio;

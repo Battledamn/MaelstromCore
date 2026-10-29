@@ -69,6 +69,7 @@ char constexpr GtChanceToSpellCritfmt[] = "f";
 char constexpr GtNPCManaCostScalerfmt[] = "f";
 char constexpr GtOCTClassCombatRatingScalarfmt[] = "df";
 char constexpr GtOCTRegenHPfmt[] = "f";
+char constexpr GtSpellScalingfmt[] = "xf";
 //char constexpr GtOCTRegenMPfmt[] = "f";
 char constexpr GtRegenHPPerSptfmt[] = "f";
 char constexpr GtRegenMPPerSptfmt[] = "f";

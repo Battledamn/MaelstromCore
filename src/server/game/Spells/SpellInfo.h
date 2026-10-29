@@ -551,6 +551,11 @@ public:
     uint32 GetMaxTicks() const;
 
     uint32 CalcCastTime(WorldObject* caster = nullptr, Spell* spell = nullptr) const;
+
+    // Cataclysm SpellScaling.dbc: per-level values from gtSpellScaling, reduced below the
+    // cast-time and nerf levels.
+    float GetSpellScalingMultiplier(int32 level) const;
+    static float GetSpellScalingValue(int32 level, int32 scalingClass);
     uint32 GetRecoveryTime() const;
 
     int32 CalcPowerCost(WorldObject const* caster, SpellSchoolMask schoolMask, Spell* spell = nullptr) const;

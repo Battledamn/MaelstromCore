@@ -417,6 +417,47 @@ int32 SpellEffectInfo::CalcValue(WorldObject const* caster, int32 const* bp, Uni
 
     Unit const* casterUnit = caster ? caster->ToUnit() : nullptr;
 
+    // Cataclysm: most player spells take their amount from SpellScaling.dbc (coefficient times the
+    // caster level's gtSpellScaling value, +- variance) instead of the DBC base points. Ported from
+    // The Cataclysm Preservation Project's SpellEffectInfo::CalcBaseValue / CalcValue.
+    SpellScalingEntry const* scaling = _spellInfo->ScalingEntry;
+    if (scaling && scaling->Coefficient[EffectIndex] != 0.0f)
+    {
+        float value = 0.0f;
+        int32 const level = casterUnit ? int32(casterUnit->GetLevel()) : int32(_spellInfo->SpellLevel);
+        if (level > 0 && scaling->Class)
+            value = SpellInfo::GetSpellScalingValue(level, scaling->Class) * _spellInfo->GetSpellScalingMultiplier(level);
+        value *= scaling->Coefficient[EffectIndex];
+        if (value > 0.0f)
+            value = std::max(value, 1.0f);
+
+        // Spell::m_spellValue passes the DBC base points by default; only a value a script or
+        // trigger actually changed overrides the scaled amount (CPP fills SpellValue from the scaling).
+        bool const overridden = bp && *bp != BasePoints;
+        double amount = overridden ? double(*bp) : double(std::round(value));
+        if (!overridden && scaling->Variance[EffectIndex] != 0.0f)
+        {
+            float const delta = std::fabs(scaling->Variance[EffectIndex] * 0.5f);
+            amount += std::round(value) * frand(-delta, delta);
+        }
+
+        if (casterUnit)
+        {
+            if (uint8 comboPoints = casterUnit->GetComboPoints())
+            {
+                float perComboPoint = PointsPerComboPoint;
+                if (scaling->ComboPointsCoefficient[EffectIndex] != 0.0f && level > 0)
+                    perComboPoint = SpellInfo::GetSpellScalingValue(level, scaling->Class) *
+                        _spellInfo->GetSpellScalingMultiplier(level) * scaling->ComboPointsCoefficient[EffectIndex];
+                amount += perComboPoint * comboPoints;
+            }
+
+            amount = casterUnit->ApplyEffectModifiers(_spellInfo, EffectIndex, float(amount));
+        }
+
+        return int32(std::round(amount));
+    }
+
     // base amount modification based on spell lvl vs caster lvl
     // xinef: added basePointsPerLevel check
     if (casterUnit && basePointsPerLevel != 0.0f)
@@ -2819,18 +2860,62 @@ int32 SpellInfo::GetMaxDuration() const
 
 uint32 SpellInfo::CalcCastTime(WorldObject* caster, Spell* spell) const
 {
+    // Cataclysm: low-level casts are shorter, growing from CastTimeMin to CastTimeMax by
+    // CastTimeMaxLevel (SpellScaling.dbc), as in The Cataclysm Preservation Project.
+    Unit const* casterUnit = caster ? caster->ToUnit() : nullptr;
+    if (ScalingEntry && ScalingEntry->CastTimeMax > 0 && casterUnit)
+    {
+        int32 const level = int32(casterUnit->GetLevel());
+        int32 castTime = ScalingEntry->CastTimeMax;
+        if (ScalingEntry->CastTimeMaxLevel > level && ScalingEntry->CastTimeMaxLevel > 1)
+            castTime = ScalingEntry->CastTimeMin + (level - 1) * (ScalingEntry->CastTimeMax - ScalingEntry->CastTimeMin) /
+                (ScalingEntry->CastTimeMaxLevel - 1);
+        caster->ModSpellCastTime(this, castTime, spell);
+        return (castTime > 0) ? uint32(castTime) : 0;
+    }
+
     // not all spells have cast time index and this is all is pasiive abilities
     if (!CastTimeEntry)
         return 0;
 
+    // Cataclysm dropped the 3.3.5a extra 0.5 s on ranged-slot casts (Steady Shot is 2 s, not 2.5).
     int32 castTime = CastTimeEntry->CastTime;
-    if (HasAttribute(SPELL_ATTR0_USES_RANGED_SLOT) && (!IsAutoRepeatRangedSpell()))
-        castTime += 500;
 
     if (caster)
         caster->ModSpellCastTime(this, castTime, spell);
 
     return (castTime > 0) ? uint32(castTime) : 0;
+}
+
+float SpellInfo::GetSpellScalingMultiplier(int32 level) const
+{
+    if (!ScalingEntry || level <= 0 || !ScalingEntry->Class)
+        return 1.0f;
+
+    float multiplier = 1.0f;
+    if (level < ScalingEntry->CastTimeMaxLevel && ScalingEntry->CastTimeMax && ScalingEntry->CastTimeMaxLevel > 1)
+    {
+        int32 const castTime = ScalingEntry->CastTimeMin + ((level - 1) * (ScalingEntry->CastTimeMax - ScalingEntry->CastTimeMin)) /
+            (ScalingEntry->CastTimeMaxLevel - 1);
+        multiplier = castTime / float(ScalingEntry->CastTimeMax);
+    }
+
+    float scalingMultiplier = multiplier;
+    if (level < ScalingEntry->NerfMaxLevel && ScalingEntry->NerfMaxLevel > 1)
+        scalingMultiplier = ((((1.0f - ScalingEntry->NerfFactor) * (level - 1)) / (ScalingEntry->NerfMaxLevel - 1)) +
+            ScalingEntry->NerfFactor) * multiplier;
+
+    return scalingMultiplier;
+}
+
+float SpellInfo::GetSpellScalingValue(int32 level, int32 scalingClass)
+{
+    // Classes -1 and -2 (items, consumables) follow the 11 class rows.
+    int32 const row = scalingClass > 0 ? scalingClass : 11 - scalingClass;
+    level = std::clamp(level, 1, 100);
+    if (GtSpellScalingEntry const* entry = sGtSpellScalingStore.LookupEntry((row - 1) * 100 + level - 1))
+        return entry->value;
+    return 0.0f;
 }
 
 uint32 SpellInfo::GetMaxTicks() const
