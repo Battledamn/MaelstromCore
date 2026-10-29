@@ -693,9 +693,11 @@ WorldSocket::ReadDataHandlerResult WorldSocket::ReadDataHandler()
     OpcodeHandler const* handler = opcodeTable.GetIncomingOpcode(packetToQueue->GetOpcode());
     if (!handler)
     {
-        LOG_ERROR("network.opcode", "No defined handler for opcode {} sent by {}", GetOpcodeNameForLogging(static_cast<OpcodeClient>(packetToQueue->GetOpcode())), _worldSession->GetPlayerInfo());
+        // Build 15595 sends requests for Cataclysm features this core has not converted yet (e.g.
+        // the Guild Finder's 0x1230 when the guild tab opens). Drop them instead of disconnecting.
+        LOG_ERROR("network.opcode", "No defined handler for opcode {} sent by {}; ignored", GetOpcodeNameForLogging(static_cast<OpcodeClient>(packetToQueue->GetOpcode())), _worldSession->GetPlayerInfo());
         delete packetToQueue;
-        return ReadDataHandlerResult::Error;
+        return ReadDataHandlerResult::Ok;
     }
 
     // Our Idle timer will reset on any non PING opcodes on login screen, allowing us to catch people idling.
