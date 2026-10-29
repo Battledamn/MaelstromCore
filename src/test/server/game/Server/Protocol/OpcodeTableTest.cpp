@@ -18,10 +18,13 @@
 #include "GuildPackets.h"
 #include "Opcodes.h"
 #include "gtest/gtest.h"
+#include <memory>
 
 TEST(OpcodeTableTest, KeepsDirectionsIndependent)
 {
-    OpcodeTable table;
+    // The table holds two full-range handler arrays (~1 MB): heap, not the 1 MB Windows stack.
+    auto tableStorage = std::make_unique<OpcodeTable>();
+    OpcodeTable& table = *tableStorage;
     table.Initialize();
 
     OpcodeClient clientOverlap = static_cast<OpcodeClient>(0x0014);
@@ -51,7 +54,9 @@ TEST(OpcodeTableTest, KeepsDirectionsIndependent)
 
 TEST(OpcodeTableTest, AcceptsCataclysmGuildQueriesSentAfterWorldEntry)
 {
-    OpcodeTable table;
+    // The table holds two full-range handler arrays (~1 MB): heap, not the 1 MB Windows stack.
+    auto tableStorage = std::make_unique<OpcodeTable>();
+    OpcodeTable& table = *tableStorage;
     table.Initialize();
 
     OpcodeHandler const* moneyQuery = table.GetIncomingOpcode(0x1225);
@@ -86,7 +91,9 @@ TEST(OpcodeTableTest, UsesCataclysmMeleeAttackOpcodeValues)
     EXPECT_EQ(uint16(SMSG_ATTACKSTOP), 0x0934);
     EXPECT_EQ(uint16(SMSG_ATTACKERSTATEUPDATE), 0x0B25);
 
-    OpcodeTable table;
+    // The table holds two full-range handler arrays (~1 MB): heap, not the 1 MB Windows stack.
+    auto tableStorage = std::make_unique<OpcodeTable>();
+    OpcodeTable& table = *tableStorage;
     table.Initialize();
 
     OpcodeHandler const* attackSwing = table.GetIncomingOpcode(0x0926);
@@ -122,7 +129,9 @@ TEST(OpcodeTableTest, UsesCataclysmChatOpcodeValues)
     EXPECT_EQ(uint16(CMSG_MESSAGECHAT_ADDON_RAID), 0x1D56);
     EXPECT_EQ(uint16(CMSG_MESSAGECHAT_ADDON_WHISPER), 0x2146);
 
-    OpcodeTable table;
+    // The table holds two full-range handler arrays (~1 MB): heap, not the 1 MB Windows stack.
+    auto tableStorage = std::make_unique<OpcodeTable>();
+    OpcodeTable& table = *tableStorage;
     table.Initialize();
 
     OpcodeHandler const* say = table.GetIncomingOpcode(0x1154);
@@ -156,7 +165,9 @@ TEST(OpcodeTableTest, UsesCataclysmValuesForRenamedServerOpcodes)
     EXPECT_EQ(uint16(SMSG_REMOVED_SPELL), 0x4804);           // SMSG_UNLEARNED_SPELLS
     EXPECT_EQ(uint16(SMSG_CHAR_DELETE), 0x0304);             // SMSG_DELETE_CHAR
 
-    OpcodeTable table;
+    // The table holds two full-range handler arrays (~1 MB): heap, not the 1 MB Windows stack.
+    auto tableStorage = std::make_unique<OpcodeTable>();
+    OpcodeTable& table = *tableStorage;
     table.Initialize();
 
     ASSERT_NE(table[SMSG_LEVELUP_INFO], nullptr);

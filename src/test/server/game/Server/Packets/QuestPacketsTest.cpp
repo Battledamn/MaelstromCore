@@ -41,7 +41,9 @@ TEST(QuestPacketsTest, RewardChoiceRejectsEmptyAndOutOfRangeSlots)
 {
     auto originalWorld = std::move(sWorld);
     sWorld = std::make_unique<testing::NiceMock<WorldMock>>();
-    Field fields[108];
+    // One Field per column Quest::Quest reads: the required currencies are the last columns
+    // (117 + 2 per slot). A shorter array reads past its end, which crashes on MSVC.
+    Field fields[117 + 2 * QUEST_REQUIRED_CURRENCY_COUNT];
     Quest quest(fields);
     sWorld = std::move(originalWorld);
     EXPECT_TRUE(quest.IsValidRewardChoice(0));

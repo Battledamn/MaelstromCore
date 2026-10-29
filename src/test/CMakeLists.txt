@@ -35,6 +35,7 @@ target_include_directories(
 
 target_link_libraries(
         bytebuffer_tests
+        acore-core-interface
         common
         gtest_main
 )

@@ -20,22 +20,14 @@
 
 #include <string>
 
-#ifdef WIN32
-typedef __int64            int64;
-typedef __int32            int32;
-typedef __int16            int16;
-typedef __int8             int8;
-typedef unsigned __int64   uint64;
-typedef unsigned __int32   uint32;
-typedef unsigned __int16   uint16;
-typedef unsigned __int8    uint8;
-#else
 #include <cstdint>
 #ifndef uint64_t
 #ifdef __linux__
 #include <linux/types.h>
 #endif
 #endif
+// Same fixed-width types as Define.h on every platform: MSVC's __int8 is char, not signed char,
+// so the old WIN32 typedefs clashed with Define.h's int8 in files that include both.
 typedef int64_t            int64;
 typedef int32_t            int32;
 typedef int16_t            int16;
@@ -44,7 +36,6 @@ typedef uint64_t           uint64;
 typedef uint32_t           uint32;
 typedef uint16_t           uint16;
 typedef uint8_t            uint8;
-#endif
 
 #define FILE_FORMAT_VERSION    18
 
