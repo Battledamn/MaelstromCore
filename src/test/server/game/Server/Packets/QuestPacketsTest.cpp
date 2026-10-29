@@ -18,9 +18,6 @@
 #include "QuestPackets.h"
 #include "QueryPackets.h"
 #include "QuestDef.h"
-#include "Field.h"
-#include "World.h"
-#include "WorldMock.h"
 #include "gtest/gtest.h"
 
 TEST(QuestPacketsTest, NPCQueryResponseUsesCataBitCountsAndGameObjectMask)
@@ -39,13 +36,7 @@ TEST(QuestPacketsTest, NPCQueryResponseUsesCataBitCountsAndGameObjectMask)
 
 TEST(QuestPacketsTest, RewardChoiceRejectsEmptyAndOutOfRangeSlots)
 {
-    auto originalWorld = std::move(sWorld);
-    sWorld = std::make_unique<testing::NiceMock<WorldMock>>();
-    // One Field per column Quest::Quest reads: the required currencies are the last columns
-    // (117 + 2 per slot). A shorter array reads past its end, which crashes on MSVC.
-    Field fields[117 + 2 * QUEST_REQUIRED_CURRENCY_COUNT];
-    Quest quest(fields);
-    sWorld = std::move(originalWorld);
+    Quest quest{};
     EXPECT_TRUE(quest.IsValidRewardChoice(0));
     EXPECT_FALSE(quest.IsValidRewardChoice(1));
     EXPECT_FALSE(quest.IsValidRewardChoice(QUEST_REWARD_CHOICES_COUNT));
