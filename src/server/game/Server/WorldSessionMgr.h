@@ -25,6 +25,10 @@
 #include "ObjectGuid.h"
 #include <list>
 #include <map>
+#include <memory>
+#include <utility>
+
+class WorldSocket;
 #include <unordered_map>
 
 class Player;
@@ -55,6 +59,8 @@ public:
     void KickAll();
     void KickAllLess(AccountTypes sec);
     void AddSession(WorldSession* session);
+    /// Build 15595: an authenticated instance socket, linked to its session on the world thread.
+    void AddInstanceSocket(std::weak_ptr<WorldSocket> sock, uint64 connectToKey);
 
     void AddQueuedPlayer(WorldSession* session);
     bool RemoveQueuedPlayer(WorldSession* session);
@@ -96,6 +102,9 @@ public:
 private:
     LockedQueue<WorldSession*> _addSessQueue;
     void AddSession_(WorldSession* session);
+
+    LockedQueue<std::pair<std::weak_ptr<WorldSocket>, uint64>> _linkSocketQueue;
+    void ProcessLinkInstanceSocket(std::pair<std::weak_ptr<WorldSocket>, uint64> linkInfo);
 
     SessionMap _sessions;
     SessionMap _offlineSessions;

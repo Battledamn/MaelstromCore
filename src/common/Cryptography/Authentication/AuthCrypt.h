@@ -20,6 +20,7 @@
 
 #include "ARC4.h"
 #include "AuthDefines.h"
+#include <array>
 
 class AC_COMMON_API AuthCrypt
 {
@@ -27,6 +28,9 @@ public:
     AuthCrypt() = default;
 
     void Init(SessionKey const& K);
+    // Build 15595 instance connection: keyed with the 16-byte seeds the socket sent in its
+    // SMSG_AUTH_CHALLENGE instead of the fixed realm keys (pinned TrinityCore-Cata WorldPacketCrypt).
+    void Init(SessionKey const& K, std::array<uint8, 16> const& serverKey, std::array<uint8, 16> const& clientKey);
     void DecryptRecv(uint8* data, std::size_t len);
     void EncryptSend(uint8* data, std::size_t len);
 

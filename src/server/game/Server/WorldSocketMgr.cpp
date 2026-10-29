@@ -48,7 +48,7 @@ WorldSocketMgr& WorldSocketMgr::Instance()
     return instance;
 }
 
-bool WorldSocketMgr::StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int threadCount)
+bool WorldSocketMgr::StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, uint16 instancePort, int threadCount)
 {
     _tcpNoDelay = sConfigMgr->GetOption<bool>("Network.TcpNodelay", true);
 
@@ -68,7 +68,26 @@ bool WorldSocketMgr::StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::s
     if (!BaseSocketMgr::StartNetwork(ioContext, bindIp, port, threadCount))
         return false;
 
+    try
+    {
+        _instanceAcceptor = std::make_unique<AsyncAcceptor>(ioContext, bindIp, instancePort, false);
+    }
+    catch (boost::system::system_error const& err)
+    {
+        LOG_ERROR("network", "Exception caught in WorldSocketMgr.StartWorldNetwork ({}:{}): {}", bindIp, instancePort, err.what());
+        return false;
+    }
+
+    if (!_instanceAcceptor->Bind())
+    {
+        LOG_ERROR("network", "StartWorldNetwork failed to bind the instance socket acceptor ({}:{})", bindIp, instancePort);
+        return false;
+    }
+
+    _instanceAcceptor->SetSocketFactory([this]() { return GetSocketForAccept(); });
+
     _acceptor->AsyncAcceptWithCallback<&WorldSocketMgr::OnSocketAccept>();
+    _instanceAcceptor->AsyncAcceptWithCallback<&WorldSocketMgr::OnSocketAccept>();
 
     sScriptMgr->OnNetworkStart(ioContext);
     return true;
@@ -76,7 +95,12 @@ bool WorldSocketMgr::StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::s
 
 void WorldSocketMgr::StopNetwork()
 {
+    if (_instanceAcceptor)
+        _instanceAcceptor->Close();
+
     BaseSocketMgr::StopNetwork();
+
+    _instanceAcceptor.reset();
 
     sScriptMgr->OnNetworkStop();
 }

@@ -60,6 +60,7 @@ namespace WorldPackets
     namespace Auth
     {
         class AuthSession;
+        class AuthContinuedSession;
     }
 
     class ServerPacket;
@@ -103,6 +104,11 @@ public:
     bool IsLoggingPackets() const { return _loggingPackets; }
     void SetPacketLogging(bool state) { _loggingPackets = state; }
 
+    /// Build 15595 instance connection: attaches this socket to the session its ConnectTo key
+    /// named (world thread, WorldSessionMgr) and tells the client it may continue.
+    void LinkToSession(WorldSession* session);
+    void SendAuthResponseErrorAndClose(uint8 code);
+
 protected:
     void OnClose() override;
     SocketReadCallbackResult ReadHandler() final;
@@ -131,10 +137,15 @@ private:
     void HandleAuthSessionCallback(std::shared_ptr<WorldPackets::Auth::AuthSession> authSession, PreparedQueryResult result);
     void LoadSessionPermissionsCallback(PreparedQueryResult result);
     void SendAuthResponseError(uint8 code);
+    void HandleAuthContinuedSession(WorldPacket& recvPacket);
+    void HandleAuthContinuedSessionCallback(std::shared_ptr<WorldPackets::Auth::AuthContinuedSession> authSession, PreparedQueryResult result);
+    void HandleConnectToFailed(WorldPacket& recvPacket);
 
     bool HandlePing(WorldPacket& recvPacket);
 
     std::array<uint8, 4> _authSeed;
+    // The SMSG_AUTH_CHALLENGE DosChallenge: its two 16-byte halves key an instance socket's crypt.
+    std::array<uint8, 32> _dosChallenge;
     AuthCrypt _authCrypt;
 
     TimePoint _LastPingTime;

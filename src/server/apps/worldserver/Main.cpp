@@ -361,7 +361,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!sWorldSocketMgr.StartWorldNetwork(*ioContext, worldListener, worldPort, networkThreads))
+    uint16 instancePort = uint16(sWorld->getIntConfig(CONFIG_PORT_INSTANCE));
+    if (!sWorldSocketMgr.StartWorldNetwork(*ioContext, worldListener, worldPort, instancePort, networkThreads))
     {
         LOG_ERROR("server.worldserver", "Failed to initialize network");
         World::StopNow(ERROR_EXIT_CODE);

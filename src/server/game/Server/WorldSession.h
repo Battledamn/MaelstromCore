@@ -74,6 +74,11 @@ namespace lfg
 
 namespace WorldPackets
 {
+    namespace Auth
+    {
+        enum class ConnectToSerial : uint32;
+    }
+
     namespace LFG
     {
         class LFGJoin;
@@ -438,6 +443,33 @@ public:
         bool skipQueue, uint32 TotalTime);
     ~WorldSession();
 
+    // Build 15595 second world connection (pinned TrinityCore-Cata WorldSession::ConnectToKey):
+    // SMSG_CONNECT_TO carries this key and CMSG_AUTH_CONTINUED_SESSION returns it.
+    enum ConnectionType : uint8
+    {
+        CONNECTION_TYPE_REALM    = 0,
+        CONNECTION_TYPE_INSTANCE = 1,
+    };
+
+    union ConnectToKey
+    {
+        uint64 Raw;
+        struct
+        {
+            uint64 AccountId      : 32;
+            uint64 ConnectionType : 1;
+            uint64 Key            : 31;
+        } Fields;
+    };
+
+    uint64 GetConnectToInstanceKey() const { return _instanceConnectKey.Raw; }
+    void SendConnectToInstance(WorldPackets::Auth::ConnectToSerial serial);
+    void HandleConnectToFailed(WorldPackets::Auth::ConnectToSerial serial);
+    /// Called on the world thread once the instance socket is authenticated: links it and
+    /// continues the login CMSG_PLAYER_LOGIN started.
+    void AddInstanceConnection(std::shared_ptr<WorldSocket> sock);
+    bool HasInstanceConnection() const { return m_InstanceSocket != nullptr; }
+
     uint32 GetAccountFlags() const { return _accountFlags; }
     bool HasAccountFlag(uint32 flag) const { return (_accountFlags & flag) != 0; }
     void UpdateAccountFlag(uint32 flag, bool remove = false);
@@ -758,6 +790,7 @@ public:                                                 // opcodes handlers
     void HandleWhoOpcode(WorldPacket& recvPacket);
     void HandleLogoutRequestOpcode(WorldPackets::Character::LogoutRequest& logoutRequest);
     void HandlePlayerLoginOpcode(WorldPackets::Character::PlayerLogin& playerLogin);
+    void PlayerLoginWithGuid(ObjectGuid playerGuid);
     void HandlePlayerLogoutOpcode(WorldPackets::Character::PlayerLogout& playerLogout);
     void HandleLogoutCancelOpcode(WorldPackets::Character::LogoutCancel& logoutCancel);
 
@@ -1306,7 +1339,10 @@ private:
 
     ObjectGuid::LowType m_GUIDLow;                     // set logined or recently logout player (while m_playerRecentlyLogout set)
     Player* _player;
-    std::shared_ptr<WorldSocket> m_Socket;
+    std::shared_ptr<WorldSocket> m_Socket;              // realm connection
+    std::shared_ptr<WorldSocket> m_InstanceSocket;      // build 15595 instance connection, once linked
+    ConnectToKey _instanceConnectKey{};
+    ObjectGuid _pendingLoginGuid;                       // CMSG_PLAYER_LOGIN waiting for the instance connection
     std::string m_Address;
 
     AccountTypes _security;

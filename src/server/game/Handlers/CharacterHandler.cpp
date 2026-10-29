@@ -20,6 +20,7 @@
 #include "RBAC.h"
 #include "ArenaTeamMgr.h"
 #include "AuctionHouseMgr.h"
+#include "AuthenticationPackets.h"
 #include "Battleground.h"
 #include "CalendarMgr.h"
 #include "CharacterCache.h"
@@ -856,8 +857,22 @@ void WorldSession::HandlePlayerLoginOpcode(WorldPackets::Character::PlayerLogin&
         return;
     }
 
+    // Build 15595 keeps world traffic on a second (instance) connection: point the client at it
+    // first and continue this login once that socket is linked (pinned TrinityCore-Cata).
+    if (!sWorld->getBoolConfig(CONFIG_LEGACY_CONNECTION_MODE) && !HasInstanceConnection())
+    {
+        _pendingLoginGuid = packet.Guid;
+        m_playerLoading = true;
+        SendConnectToInstance(WorldPackets::Auth::ConnectToSerial::WorldAttempt1);
+        return;
+    }
+
+    PlayerLoginWithGuid(packet.Guid);
+}
+
+void WorldSession::PlayerLoginWithGuid(ObjectGuid playerGuid)
+{
     LOG_INFO("network", "Account ({}) is trying to login.", GetAccountId());
-    ObjectGuid playerGuid = packet.Guid;
     LOG_INFO("network", "Account ({}) is trying to login with character ({}).", GetAccountId(), playerGuid.ToString());
 
     // The ownership check is delegated to the gateway in cluster mode, but a

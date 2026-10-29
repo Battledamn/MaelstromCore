@@ -35,8 +35,9 @@ class AC_GAME_API WorldSocketMgr : public SocketMgr<WorldSocket>
 public:
     static WorldSocketMgr& Instance();
 
-    /// Start network, listen at address:port .
-    bool StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int networkThreads);
+    /// Start network, listen at address:port, and at address:instancePort for the build 15595
+    /// client's second (instance) world connection, which SMSG_CONNECT_TO points it to.
+    bool StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, uint16 instancePort, int networkThreads);
 
     /// Stops all network threads, It will wait for all running threads .
     void StopNetwork() override;
@@ -56,6 +57,9 @@ protected:
     }
 
 private:
+    // Sockets accepted here are identical to realm sockets until CMSG_AUTH_CONTINUED_SESSION names
+    // them as an instance connection (pinned TrinityCore-Cata WorldSocketMgr).
+    std::unique_ptr<AsyncAcceptor> _instanceAcceptor;
     int32 _socketSystemSendBufferSize;
     int32 _socketApplicationSendBufferSize;
     bool _tcpNoDelay;

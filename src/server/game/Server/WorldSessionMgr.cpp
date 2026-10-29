@@ -23,6 +23,7 @@
 #include "Player.h"
 #include "World.h"
 #include "WorldSession.h"
+#include "WorldSocket.h"
 #include "WorldSessionMgr.h"
 
 WorldSessionMgr* WorldSessionMgr::Instance()
@@ -131,6 +132,11 @@ void WorldSessionMgr::UpdateSessions(uint32 const diff)
         {
             AddSession_(sess);
         }
+
+        ///- Link authenticated build 15595 instance connections to their sessions
+        std::pair<std::weak_ptr<WorldSocket>, uint64> linkInfo;
+        while (_linkSocketQueue.next(linkInfo))
+            ProcessLinkInstanceSocket(std::move(linkInfo));
     }
 
     ///- Then send an update signal to remaining ones
@@ -258,6 +264,33 @@ void WorldSessionMgr::KickAllLess(AccountTypes sec)
 void WorldSessionMgr::AddSession(WorldSession* session)
 {
     _addSessQueue.add(session);
+}
+
+// Ported from the Cataclysm Preservation Project (World::AddInstanceSocket / ProcessLinkInstanceSocket).
+void WorldSessionMgr::AddInstanceSocket(std::weak_ptr<WorldSocket> sock, uint64 connectToKey)
+{
+    _linkSocketQueue.add(std::make_pair(std::move(sock), connectToKey));
+}
+
+void WorldSessionMgr::ProcessLinkInstanceSocket(std::pair<std::weak_ptr<WorldSocket>, uint64> linkInfo)
+{
+    std::shared_ptr<WorldSocket> sock = linkInfo.first.lock();
+    if (!sock || !sock->IsOpen())
+        return;
+
+    WorldSession::ConnectToKey key;
+    key.Raw = linkInfo.second;
+
+    // The key must be the one this session's latest SMSG_CONNECT_TO handed out.
+    WorldSession* session = FindSession(uint32(key.Fields.AccountId));
+    if (!session || session->GetConnectToInstanceKey() != linkInfo.second)
+    {
+        sock->SendAuthResponseErrorAndClose(AUTH_SESSION_EXPIRED);
+        return;
+    }
+
+    sock->LinkToSession(session);
+    session->AddInstanceConnection(std::move(sock));
 }
 
 void WorldSessionMgr::AddQueuedPlayer(WorldSession* session)

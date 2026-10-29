@@ -860,6 +860,10 @@ void OpcodeTable::Initialize()
     /*0x38A4*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_DB_REPLY,                                          STATUS_NEVER);
     // Second (instance) world connection, pinned TrinityCore-Cata; both client packets are read
     // by WorldSocket before any session exists for that socket.
+    /*0x044D*/ DEFINE_HANDLER(CMSG_AUTH_CONTINUED_SESSION,                                          STATUS_NEVER,      PROCESS_THREADUNSAFE,   &WorldSession::Handle_EarlyProccess                     );
+    /*0x2533*/ DEFINE_HANDLER(CMSG_CONNECT_TO_FAILED,                                               STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_EarlyProccess                     );
+    /*0x0942*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_CONNECT_TO,                                        STATUS_NEVER);
+    /*0x0140*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_RESUME_COMMS,                                      STATUS_NEVER);
     /*0x730E*/ DEFINE_HANDLER(CMSG_SAVE_CUF_PROFILES,                                               STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x7102*/ DEFINE_HANDLER(CMSG_REQUEST_CATEGORY_COOLDOWNS,                                      STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x0412*/ DEFINE_HANDLER(CMSG_LFG_LOCK_INFO_REQUEST,                                           STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleLfgPlayerLockInfoRequestOpcode     );
@@ -1388,7 +1392,6 @@ void OpcodeTable::Initialize()
     /*0x4904*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_NOTIFY_DANCE,                                       STATUS_NEVER);
     /*0x6914*/ DEFINE_HANDLER(CMSG_PLAY_DANCE,                                                       STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x4704*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_PLAY_DANCE,                                         STATUS_NEVER);
-    /*0x044D*/ DEFINE_HANDLER(CMSG_LOAD_DANCES,                                                      STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x2907*/ DEFINE_HANDLER(CMSG_STOP_DANCE,                                                       STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x4637*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_STOP_DANCE,                                         STATUS_NEVER);
     /*0x0036*/ DEFINE_HANDLER(CMSG_SYNC_DANCE,                                                       STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );

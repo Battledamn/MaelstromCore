@@ -22,10 +22,13 @@
 #include "TC9Sidecar.h"
 #include "WorldSession.h"
 #include "AccountMgr.h"
+#include "AuthenticationPackets.h"
 #include "BattlegroundMgr.h"
 #include "BanMgr.h"
 #include "CharacterPackets.h"
 #include "Common.h"
+#include "InstanceConnectionOpcodes.h"
+#include "Random.h"
 #include "DatabaseEnv.h"
 #include "GameTime.h"
 #include "GossipDef.h"
@@ -188,6 +191,12 @@ WorldSession::~WorldSession()
     {
         m_Socket->CloseSocket();
         m_Socket = nullptr;
+    }
+
+    if (m_InstanceSocket)
+    {
+        m_InstanceSocket->CloseSocket();
+        m_InstanceSocket = nullptr;
     }
 
     delete _RBACData;
@@ -361,7 +370,12 @@ void WorldSession::SendPacket(WorldPacket const* packet)
         return;
     }
 
-    m_Socket->SendPacketAndLogOpcode(*packet);
+    // Build 15595 expects most world traffic on the instance connection; until it is linked (and in
+    // legacy single-connection mode) everything goes on the realm connection.
+    if (m_InstanceSocket && IsInstanceConnectionOpcode(packet->GetOpcode()))
+        m_InstanceSocket->SendPacketAndLogOpcode(*packet);
+    else
+        m_Socket->SendPacketAndLogOpcode(*packet);
 }
 
 /// Add an incoming packet to the queue
@@ -627,10 +641,24 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
             LogoutPlayer(true);
         }
 
+        // Losing either world connection ends both (pinned TrinityCore-Cata).
+        if (m_InstanceSocket && !m_InstanceSocket->IsOpen())
+        {
+            if (m_Socket)
+                m_Socket->CloseSocket();
+            m_InstanceSocket = nullptr;
+        }
+
         if (m_Socket && !m_Socket->IsOpen())
         {
             if (GetPlayer() && _warden)
                 _warden->Update(diff);
+
+            if (m_InstanceSocket)
+            {
+                m_InstanceSocket->CloseSocket();
+                m_InstanceSocket = nullptr;
+            }
 
             m_Socket = nullptr;
         }
@@ -648,6 +676,11 @@ bool WorldSession::HandleSocketClosed()
 {
     if (m_Socket && !m_Socket->IsOpen() && !IsKicked() && GetPlayer() && !PlayerLogout() && GetPlayer()->m_taxi.empty() && GetPlayer()->IsInWorld() && !World::IsStopped())
     {
+        if (m_InstanceSocket)
+        {
+            m_InstanceSocket->CloseSocket();
+            m_InstanceSocket = nullptr;
+        }
         m_Socket = nullptr;
         GetPlayer()->TradeCancel(false);
         return true;
@@ -895,6 +928,14 @@ void WorldSession::LogoutPlayer(bool save, bool redirecting)
     m_playerSave = false;
     m_playerRecentlyLogout = true;
     SetLogoutStartTime(0);
+
+    // The instance connection belongs to the character in the world; the next CMSG_PLAYER_LOGIN
+    // opens a new one. Delayed so a queued SMSG_LOGOUT_COMPLETE still reaches the client.
+    if (m_InstanceSocket)
+    {
+        m_InstanceSocket->DelayedCloseSocket();
+        m_InstanceSocket = nullptr;
+    }
 }
 
 /// Kick a player out of the World
@@ -907,6 +948,9 @@ void WorldSession::KickPlayer(std::string const& reason, bool setKicked)
 
         m_Socket->CloseSocket();
     }
+
+    if (m_InstanceSocket)
+        m_InstanceSocket->CloseSocket();
 
     if (setKicked)
         SetKicked(true); // pussywizard: the session won't be left ingame for 60 seconds and to also kick offline session
@@ -1691,6 +1735,84 @@ void WorldSession::SetPacketLogging(bool state)
 {
     if (m_Socket)
         m_Socket->SetPacketLogging(state);
+    if (m_InstanceSocket)
+        m_InstanceSocket->SetPacketLogging(state);
+}
+
+// Build 15595 instance connection, ported from the Cataclysm Preservation Project
+// (WorldSession::SendConnectToInstance, WorldSocket::HandleConnectToFailed, World::ProcessLinkInstanceSocket).
+void WorldSession::SendConnectToInstance(WorldPackets::Auth::ConnectToSerial serial)
+{
+    boost::asio::ip::tcp_endpoint const realmEndpoint = realm.GetAddressForClient(m_Socket->GetRemoteIpAddress());
+
+    _instanceConnectKey.Fields.AccountId = GetAccountId();
+    _instanceConnectKey.Fields.ConnectionType = CONNECTION_TYPE_INSTANCE;
+    _instanceConnectKey.Fields.Key = urand(0, 0x7FFFFFFF);
+
+    WorldPackets::Auth::ConnectTo connectTo;
+    connectTo.Key = _instanceConnectKey.Raw;
+    connectTo.Serial = serial;
+    connectTo.Con = CONNECTION_TYPE_INSTANCE;
+    // Debug.InstanceConnectPort lets a capture relay sit in front of the instance port.
+    connectTo.Port = uint16(sConfigMgr->GetOption<uint32>("Debug.InstanceConnectPort", sWorld->getIntConfig(CONFIG_PORT_INSTANCE), false));
+    if (realmEndpoint.address().is_v4())
+    {
+        auto const bytes = realmEndpoint.address().to_v4().to_bytes();
+        std::copy(bytes.begin(), bytes.end(), connectTo.Address.begin());
+    }
+    else
+    {
+        auto const bytes = realmEndpoint.address().to_v6().to_bytes();
+        std::copy(bytes.begin(), bytes.end(), connectTo.Address.begin());
+        connectTo.AddressIsV6 = true;
+    }
+
+    SendPacket(connectTo.Write());
+}
+
+void WorldSession::HandleConnectToFailed(WorldPackets::Auth::ConnectToSerial serial)
+{
+    if (!PlayerLoading() || _pendingLoginGuid.IsEmpty())
+        return;
+
+    using WorldPackets::Auth::ConnectToSerial;
+    switch (serial)
+    {
+        case ConnectToSerial::WorldAttempt1: SendConnectToInstance(ConnectToSerial::WorldAttempt2); return;
+        case ConnectToSerial::WorldAttempt2: SendConnectToInstance(ConnectToSerial::WorldAttempt3); return;
+        case ConnectToSerial::WorldAttempt3: SendConnectToInstance(ConnectToSerial::WorldAttempt4); return;
+        case ConnectToSerial::WorldAttempt4: SendConnectToInstance(ConnectToSerial::WorldAttempt5); return;
+        case ConnectToSerial::WorldAttempt5:
+        {
+            // CPP aborts the login here. Continuing on the realm connection keeps clients that never
+            // open the instance socket (patched for a single connection) usable.
+            LOG_ERROR("network", "{} failed to open the instance connection 5 times; continuing the login on the realm connection only", GetPlayerInfo());
+            ObjectGuid guid = _pendingLoginGuid;
+            _pendingLoginGuid.Clear();
+            m_playerLoading = false;
+            PlayerLoginWithGuid(guid);
+            return;
+        }
+        default:
+            return;
+    }
+}
+
+void WorldSession::AddInstanceConnection(std::shared_ptr<WorldSocket> sock)
+{
+    m_InstanceSocket = std::move(sock);
+    m_InstanceSocket->SetPacketLogging(m_Socket && m_Socket->IsLoggingPackets());
+
+    if (_pendingLoginGuid.IsEmpty())
+        return;
+
+    ObjectGuid guid = _pendingLoginGuid;
+    _pendingLoginGuid.Clear();
+    m_playerLoading = false;                // PlayerLoginWithGuid sets it again while it loads
+
+    // Sent on the instance connection itself (CPP's ResumeComms(CONNECTION_TYPE_INSTANCE)).
+    m_InstanceSocket->SendPacketAndLogOpcode(*WorldPackets::Auth::ResumeComms().Write());
+    PlayerLoginWithGuid(guid);
 }
 
 std::unique_ptr<WorldPacket> WorldSession::NextQueuedPacket()
