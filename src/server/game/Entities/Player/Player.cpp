@@ -1882,11 +1882,11 @@ void Player::Regenerate(Powers power)
     {
         case POWER_MANA:
             {
-                bool recentCast = IsUnderLastManaUseEffect();
+                // Cataclysm dropped the 3.3.5a five-second rule: the client switches to the
+                // interrupted (combat) rate in combat, not after a cast, so the server must too.
+                bool recentCast = IsInCombat();
+                // No low-level boost: the client predicts regen from the regen fields alone.
                 float ManaIncreaseRate = sWorld->getRate(RATE_POWER_MANA);
-
-                if (sWorld->getBoolConfig(CONFIG_LOW_LEVEL_REGEN_BOOST) && GetLevel() < 15)
-                    ManaIncreaseRate = sWorld->getRate(RATE_POWER_MANA) * (2.066f - (GetLevel() * 0.066f));
 
                 if (recentCast) // Trinity Updates Mana in intervals of 2s, which is correct
                     addvalue += GetFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER + index) *
