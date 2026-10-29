@@ -153,7 +153,7 @@ char constexpr TransportRotationfmt[] = "diiffff";
 char constexpr VehicleEntryfmt[] = "niffffiiiiiiiifffffffffffffffssssfifiixx";
 char constexpr VehicleSeatEntryfmt[] = "niiffffffffffiiiiiifffffffiiifffiiiiiiiffiiiiixxxxxxxxxxxxxxxxxxxx";
 char constexpr WMOAreaTableEntryfmt[] = "niiixxxxxiixxxx";
-char constexpr WorldMapAreaEntryfmt[] = "xinxffffixx";
+char constexpr WorldMapAreaEntryfmt[] = "xinxffffixxxxx"; // build 15595: 14 fields
 char constexpr WorldMapOverlayEntryfmt[] = "nxiiiixxxxxxxxx";
 
 #endif

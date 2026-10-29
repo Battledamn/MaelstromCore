@@ -950,6 +950,16 @@ ContentLevels GetContentLevelsForMapAndZone(uint32 mapid, uint32 zoneId)
     if (!mapEntry)
         return CONTENT_1_60;
 
+    // The goblin and worgen starting zones (and their phase maps) are Cataclysm maps with 1-20 content.
+    switch (mapid)
+    {
+        case 648: case 659: case 661:            // Lost Isles and its phases
+        case 638: case 654: case 655: case 656:  // Gilneas and its phases
+            return CONTENT_1_60;
+        default:
+            break;
+    }
+
     switch (mapEntry->Expansion())
     {
         default:
@@ -958,6 +968,8 @@ ContentLevels GetContentLevelsForMapAndZone(uint32 mapid, uint32 zoneId)
             return CONTENT_61_70;
         case 2:
             return CONTENT_71_80;
+        case 3:
+            return CONTENT_81_85;
     }
 }
 
