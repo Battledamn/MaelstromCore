@@ -249,31 +249,24 @@ public:
         return { 0, 0 };
     }
 
+    // Build 15595 (TrinityCore's original 4.3.4 extractor): the uint16 after LiquidType is a flags
+    // field, not the later clients' vertex format; the liquid type is the header's own.
+    static constexpr uint16 ADT_LIQUID_HEADER_NO_HEIGHT = 0x02;
+
     uint16 GetLiquidType(adt_liquid_instance const* h) const
     {
-        if (h->LiquidVertexFormat == LiquidVertexFormatType::Depth)
-            return 2;
-
         return h->LiquidType;
     }
 
+    // Per-vertex heights when the instance has them, otherwise its flat MinHeightLevel. Returning
+    // 0 here (the later-client logic) put every 4.3.4 lake and river at height 0, below the
+    // ground, so the server found no water anywhere: no breath bar and no swimming state.
     float GetLiquidHeight(adt_liquid_instance const* h, int32 pos) const
     {
-        if (!h->OffsetVertexData)
-            return 0.0f;
+        if (!(uint16(h->LiquidVertexFormat) & ADT_LIQUID_HEADER_NO_HEIGHT) && h->OffsetVertexData)
+            return ((float const*)((uint8*)this + 8 + h->OffsetVertexData))[pos];
 
-        switch (h->LiquidVertexFormat)
-        {
-            case LiquidVertexFormatType::HeightDepth:
-            case LiquidVertexFormatType::HeightTextureCoord:
-                return ((float const*)((uint8*)this + 8 + h->OffsetVertexData))[pos];
-            case LiquidVertexFormatType::Depth:
-                return 0.0f;
-            default:
-                break;
-        }
-
-        return 0.0f;
+        return h->MinHeightLevel;
     }
 
     int8 GetLiquidDepth(adt_liquid_instance const* h, int32 pos) const

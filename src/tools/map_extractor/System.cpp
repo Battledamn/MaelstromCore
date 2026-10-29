@@ -744,6 +744,7 @@ bool ConvertADT(std::string const& inputPath, std::string const& outputPath, int
                 if (!h)
                     continue;
 
+
                 adt_liquid_attributes attrs = h2o->GetLiquidAttributes(i, j);
 
                 int32 count = 0;
