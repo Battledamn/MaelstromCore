@@ -4300,10 +4300,6 @@ void Spell::handle_immediate()
     // Remove used for cast item if need (it can be already nullptr after TakeReagents call
     TakeCastItem();
 
-    // handle ammo consumption for Hunter's volley spell
-    if (m_spellInfo->IsRangedWeaponSpell() && m_spellInfo->IsChanneled())
-        TakeAmmo();
-
     if (m_spellState != SPELL_STATE_CASTING)
         finish(true);                                       // successfully finish spell cast (not last in case autorepeat or channel spell)
 }
@@ -5569,36 +5565,7 @@ void Spell::TakePower()
 
 void Spell::TakeAmmo()
 {
-    Unit* unitCaster = m_caster->ToUnit();
-    if (!unitCaster)
-        return;
-
-    if (m_attackType == RANGED_ATTACK && unitCaster->IsPlayer() && !m_spellInfo->HasAttribute(SPELL_ATTR6_DO_NOT_CONSUME_RESOURCES))
-    {
-        Item* pItem = unitCaster->ToPlayer()->GetWeaponForAttack(RANGED_ATTACK);
-
-        // wands don't have ammo
-        if (!pItem  || pItem->IsBroken() || pItem->GetTemplate()->SubClass == ITEM_SUBCLASS_WEAPON_WAND)
-            return;
-
-        if (pItem->GetTemplate()->InventoryType == INVTYPE_THROWN)
-        {
-            if (pItem->GetMaxStackCount() == 1)
-            {
-                // decrease durability for non-stackable throw weapon
-                unitCaster->ToPlayer()->DurabilityPointLossForEquipSlot(EQUIPMENT_SLOT_RANGED);
-            }
-            else if (!sWorld->getBoolConfig(CONFIG_ENABLE_INFINITEAMMO))
-            {
-                // decrease items amount for stackable throw weapon
-                uint32 count = 1;
-                unitCaster->ToPlayer()->DestroyItemCount(pItem, count, true);
-            }
-        }
-        else if (!sWorld->getBoolConfig(CONFIG_ENABLE_INFINITEAMMO))
-            if (uint32 ammo = unitCaster->ToPlayer()->GetAmmoId())
-                unitCaster->ToPlayer()->DestroyItemCount(ammo, 1, true);
-    }
+    // Cataclysm removed ammo, and thrown weapons are no longer used up.
 }
 
 SpellCastResult Spell::CheckRuneCost(uint32 RuneCostID)
@@ -7969,64 +7936,7 @@ SpellCastResult Spell::CheckItems(uint32* param1, uint32* param2)
                     if (!pItem || pItem->IsBroken())
                         return SPELL_FAILED_EQUIPPED_ITEM;
 
-                    switch (pItem->GetTemplate()->SubClass)
-                    {
-                        case ITEM_SUBCLASS_WEAPON_THROWN:
-                            {
-                                uint32 ammo = pItem->GetEntry();
-                                if (!unitCaster->ToPlayer()->HasItemCount(ammo))
-                                    return SPELL_FAILED_NO_AMMO;
-                            };
-                            break;
-                        case ITEM_SUBCLASS_WEAPON_GUN:
-                        case ITEM_SUBCLASS_WEAPON_BOW:
-                        case ITEM_SUBCLASS_WEAPON_CROSSBOW:
-                            {
-                                uint32 ammo = unitCaster->ToPlayer()->GetAmmoId();
-                                if (!ammo)
-                                {
-                                    // Requires No Ammo
-                                    if (unitCaster->HasAura(46699))
-                                        break;                      // skip other checks
-
-                                    return SPELL_FAILED_NO_AMMO;
-                                }
-
-                                ItemTemplate const* ammoProto = sObjectMgr->GetItemTemplate(ammo);
-                                if (!ammoProto)
-                                    return SPELL_FAILED_NO_AMMO;
-
-                                if (ammoProto->Class != ITEM_CLASS_PROJECTILE)
-                                    return SPELL_FAILED_NO_AMMO;
-
-                                // check ammo ws. weapon compatibility
-                                switch (pItem->GetTemplate()->SubClass)
-                                {
-                                    case ITEM_SUBCLASS_WEAPON_BOW:
-                                    case ITEM_SUBCLASS_WEAPON_CROSSBOW:
-                                        if (ammoProto->SubClass != ITEM_SUBCLASS_ARROW)
-                                            return SPELL_FAILED_NO_AMMO;
-                                        break;
-                                    case ITEM_SUBCLASS_WEAPON_GUN:
-                                        if (ammoProto->SubClass != ITEM_SUBCLASS_BULLET)
-                                            return SPELL_FAILED_NO_AMMO;
-                                        break;
-                                    default:
-                                        return SPELL_FAILED_NO_AMMO;
-                                }
-
-                                if (!unitCaster->ToPlayer()->HasItemCount(ammo))
-                                {
-                                    unitCaster->ToPlayer()->SetAmmoId(0);
-                                    return SPELL_FAILED_NO_AMMO;
-                                }
-                            };
-                            break;
-                        case ITEM_SUBCLASS_WEAPON_WAND:
-                            break;
-                        default:
-                            break;
-                    }
+                    // Cataclysm removed ammo: bows, guns, crossbows and thrown weapons need nothing else.
                     break;
                 }
             case SPELL_EFFECT_CREATE_MANA_GEM:
