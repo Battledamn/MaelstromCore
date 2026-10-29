@@ -27,6 +27,7 @@
 #include "BanMgr.h"
 #include "CharacterPackets.h"
 #include "Common.h"
+#include "Config.h"
 #include "InstanceConnectionOpcodes.h"
 #include "Random.h"
 #include "DatabaseEnv.h"
@@ -327,6 +328,26 @@ void WorldSession::SendPacket(WorldPacket const* packet)
     sScriptMgr->OnPacketSent(this, *packet);
 
     if (!m_Socket)
+        return;
+
+    // MaelstromCore diagnostic: Debug.DropServerOpcodes lists server opcodes (hex, comma-separated)
+    // that are never sent, to find a packet the build 15595 client stalls on. Empty by default.
+    static std::unordered_set<uint16> const droppedOpcodes = []
+    {
+        std::unordered_set<uint16> opcodes;
+        std::string const list = sConfigMgr->GetOption<std::string>("Debug.DropServerOpcodes", "", false);
+        for (std::string_view token : Acore::Tokenize(list, ',', false))
+            if (Optional<uint16> opcode = Acore::StringTo<uint16>(token, 16))
+                opcodes.insert(*opcode);
+        return opcodes;
+    }();
+    if (!droppedOpcodes.empty() && droppedOpcodes.count(packet->GetOpcode()))
+        return;
+
+    // Debug.DropEmptyUpdateObject = 1 skips SMSG_UPDATE_OBJECT packets that carry no blocks (map id
+    // plus a zero block count), which pinned TrinityCore never sends.
+    static bool const dropEmptyUpdates = sConfigMgr->GetOption<bool>("Debug.DropEmptyUpdateObject", false, false);
+    if (dropEmptyUpdates && packet->GetOpcode() == SMSG_UPDATE_OBJECT && packet->size() == 6 && packet->read<uint32>(2) == 0)
         return;
 
 #if defined(ACORE_DEBUG)

@@ -106,6 +106,12 @@ void EncryptableAndCompressiblePacket::CompressIfNeeded(z_stream* compressionStr
     if (!NeedsCompression())
         return;
 
+    // MaelstromCore diagnostic: Debug.DisableUpdateCompression = 1 sends large update objects
+    // uncompressed (build 15595 accepts both), to rule the zlib stream in or out.
+    static bool const compressionDisabled = sConfigMgr->GetOption<bool>("Debug.DisableUpdateCompression", false, false);
+    if (compressionDisabled)
+        return;
+
     LOG_INFO("network", "Compressing packet with opcode 0x{:X} and size {} bytes", GetOpcode(), size());
     /*uint32 pSize = size();
 
