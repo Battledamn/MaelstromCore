@@ -1164,7 +1164,13 @@ public:
 
     int32 ModifyPower(Powers power, int32 val, bool withPowerUpdate = true);
 
-    void RewardRage(uint32 damage, uint32 weaponSpeedHitFactor, bool attacker);
+    // Cataclysm rage (CPP): per auto-attack swing from weapon speed, and from damage taken relative to max health.
+
+    void RewardRage(uint32 baseRage, bool attacker);
+
+    static uint32 CalcMeleeAttackRageGain(Unit const* attacker, WeaponAttackType attType);
+
+    static uint32 CalcDamageTakenRageGain(Unit const* victim, uint32 damage);
 
     [[nodiscard]] uint32 GetCreateMana() const { return GetUInt32Value(UNIT_FIELD_BASE_MANA); }
     void SetCreateMana(uint32 val) { SetUInt32Value(UNIT_FIELD_BASE_MANA, val); }

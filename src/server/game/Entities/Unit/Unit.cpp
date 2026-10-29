@@ -1119,11 +1119,9 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
             case BASE_ATTACK:
             case OFF_ATTACK:
                 {
-                    weaponSpeedHitFactor = attacker->GetRageWeaponSpeedHitFactor(cleanDamage->attackType);
-                    if (cleanDamage->hitOutCome == MELEE_HIT_CRIT)
-                        weaponSpeedHitFactor *= 2;
-
-                    attacker->RewardRage(rage_damage, weaponSpeedHitFactor, true);
+                    // Cataclysm: attack rage is granted per swing in DealMeleeDamage, not from damage.
+                    (void)weaponSpeedHitFactor;
+                    (void)rage_damage;
                     break;
                 }
             default:
@@ -1136,11 +1134,8 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
         // Rage from absorbed damage
         if (cleanDamage && cleanDamage->absorbed_damage)
         {
-            if (victim->HasActivePowerType(POWER_RAGE))
-                victim->RewardRage(cleanDamage->absorbed_damage, 0, false);
-
-            if (attacker && attacker->HasActivePowerType(POWER_RAGE))
-                attacker->RewardRage(cleanDamage->absorbed_damage, 0, true);
+            if (victim->HasActivePowerType(POWER_RAGE) && attacker != victim)
+                victim->RewardRage(CalcDamageTakenRageGain(victim, cleanDamage->absorbed_damage), false);
         }
 
         return 0;
@@ -1283,7 +1278,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
         if (attacker != victim && victim->HasActivePowerType(POWER_RAGE))
         {
             uint32 rageDamage = damage + (cleanDamage ? cleanDamage->absorbed_damage : 0);
-            victim->RewardRage(rageDamage, 0, false);
+            victim->RewardRage(CalcDamageTakenRageGain(victim, rageDamage), false);
         }
 
         if (attacker && attacker->IsPlayer())
@@ -2078,16 +2073,17 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
         Unit::DealDamage(this, victim, damageInfo->damages[i].damage, &cleanDamage, DIRECT_DAMAGE, SpellSchoolMask(damageInfo->damages[i].damageSchoolMask), nullptr, durabilityLoss);
     }
 
-    // gain rage if attack is fully blocked, dodged or parried
-    if (HasActivePowerType(POWER_RAGE) && (damageInfo->TargetState == VICTIMSTATE_BLOCKS || damageInfo->TargetState == VICTIMSTATE_DODGE || damageInfo->TargetState == VICTIMSTATE_PARRY))
+    // Cataclysm: every auto-attack swing that does not miss (hit, crit, block, dodge, parry,
+    // absorb) gives rage by weapon speed (CPP AttackerStateUpdate).
+    if (HasActivePowerType(POWER_RAGE) && victim != this && damageInfo->hitOutCome != MELEE_HIT_MISS)
     {
         switch (damageInfo->attackType)
         {
             case BASE_ATTACK:
             case OFF_ATTACK:
             {
-                uint32 weaponSpeedHitFactor = GetRageWeaponSpeedHitFactor(damageInfo->attackType);
-                RewardRage(damageInfo->cleanDamage, weaponSpeedHitFactor, true);
+                if (uint32 rage = CalcMeleeAttackRageGain(this, damageInfo->attackType))
+                    RewardRage(rage, true);
                 break;
             }
             default:
@@ -15804,37 +15800,53 @@ void Unit::UpdateHeight(float newZ)
         GetVehicleKit()->RelocatePassengers();
 }
 
-void Unit::RewardRage(uint32 damage, uint32 weaponSpeedHitFactor, bool attacker)
+// Ported from The Cataclysm Preservation Project (Unit::CalcMeleeAttackRageGain, CalcDamageTakenRageGain).
+uint32 Unit::CalcMeleeAttackRageGain(Unit const* attacker, WeaponAttackType attType)
 {
-    // Rage formulae https://wowwiki-archive.fandom.com/wiki/Rage#Formulae
-    float addRage;
+    if (!attacker || (attType != BASE_ATTACK && attType != OFF_ATTACK))
+        return 0;
 
-    float rageconversion = ((0.0091107836f * GetLevel() * GetLevel()) + 3.225598133f * GetLevel()) + 4.2652911f;
-
-    // Unknown if correct, but lineary adjust rage conversion above level 70
-    if (GetLevel() > 70)
-        rageconversion += 13.27f * (GetLevel() - 70);
-
-    if (attacker)
+    // Unhasted weapon speed: haste gives more swings, not more rage per swing.
+    uint32 attackTime = attacker->GetAttackTime(attType);
+    if (Player const* player = attacker->ToPlayer())
     {
-        // see Bornak's bluepost explanation (05/29/2009)
-        float rageFromDamageDealt = damage / rageconversion * 7.5f;
-        addRage = (rageFromDamageDealt + weaponSpeedHitFactor) / 2.0f;
-        addRage = std::min(addRage, rageFromDamageDealt * 2.0f);
-        AddPct(addRage, GetTotalAuraModifier(SPELL_AURA_MOD_RAGE_FROM_DAMAGE_DEALT));
+        Item const* weapon = player->GetWeaponForAttack(attType, true);
+        attackTime = weapon ? weapon->GetTemplate()->Delay : BASE_ATTACK_TIME;
     }
-    else
-    {
-        addRage = damage / rageconversion * 2.5f;
 
-        // Berserker Rage effect
-        if (HasAura(18499))
-            addRage *= 3.0f;
-    }
+    uint32 rage = uint32(attackTime / 1000.0f * 6.5f);
+    if (attType == OFF_ATTACK)
+        rage /= 2;
+
+    // Players below level 10 start with a 50% rage gain reduction that slowly diminishes
+    if (attacker->IsPlayer() && attacker->GetLevel() < 10)
+        rage -= uint32((rage / 2.0f) * (1.0f - (attacker->GetLevel() / 10.0f)));
+
+    rage *= 10;
+    AddPct(rage, attacker->GetTotalAuraModifier(SPELL_AURA_MOD_RAGE_FROM_DAMAGE_DEALT));
+    return rage;
+}
+
+uint32 Unit::CalcDamageTakenRageGain(Unit const* victim, uint32 damage)
+{
+    if (!victim || !damage || !victim->GetMaxHealth())
+        return 0;
+
+    // Sniff-based: 400 * damage / max health, at least 1 rage (10 internal units).
+    double const multiplier = double(damage) / victim->GetMaxHealth();
+    return std::max<uint32>(10, uint32(std::ceil(400.0 * multiplier)));
+}
+
+void Unit::RewardRage(uint32 baseRage, bool attacker)
+{
+    float addRage = float(baseRage);
+
+    // Berserker Rage effect
+    if (!attacker && HasAura(18499))
+        addRage *= 3.0f;
 
     addRage *= sWorld->getRate(RATE_POWER_RAGE_INCOME);
-
-    ModifyPower(POWER_RAGE, uint32(addRage * 10));
+    ModifyPower(POWER_RAGE, int32(addRage));
 }
 
 void Unit::StopAttackFaction(uint32 faction_id)
