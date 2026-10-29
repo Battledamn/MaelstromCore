@@ -4673,9 +4673,8 @@ void Player::ApplyEnchantment(Item* item, EnchantmentSlot slot, bool apply, bool
                             //                            ApplyRatingMod(CR_CRIT_TAKEN_SPELL, enchant_amount, apply);
                             //                            break;
                         case ITEM_MOD_RESILIENCE_RATING:
-                            ApplyRatingMod(CR_CRIT_TAKEN_MELEE, enchant_amount, apply);
+                            // Cataclysm: resilience is the single slot 15 rating.
                             ApplyRatingMod(CR_CRIT_TAKEN_RANGED, enchant_amount, apply);
-                            ApplyRatingMod(CR_CRIT_TAKEN_SPELL, enchant_amount, apply);
                             LOG_DEBUG("entities.player.items", "+ {} RESILIENCE", enchant_amount);
                             break;
                         case ITEM_MOD_HASTE_RATING:
@@ -7974,7 +7973,7 @@ void Player::_SaveStats(CharacterDatabaseTransaction trans)
     stmt->SetData(index++, GetUInt32Value(UNIT_FIELD_ATTACK_POWER));
     stmt->SetData(index++, GetUInt32Value(UNIT_FIELD_RANGED_ATTACK_POWER));
     stmt->SetData(index++, GetBaseSpellPowerBonus());
-    stmt->SetData(index++, GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + static_cast<uint16>(CR_CRIT_TAKEN_SPELL)));
+    stmt->SetData(index++, GetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + static_cast<uint16>(CR_CRIT_TAKEN_RANGED))); // resilience
 
     trans->Append(stmt);
 }

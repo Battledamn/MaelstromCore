@@ -1283,21 +1283,23 @@ public:
     static bool IsDamageReducedByArmor(SpellSchoolMask damageSchoolMask, SpellInfo const* spellInfo = nullptr, uint8 effIndex = MAX_SPELL_EFFECTS);
     static uint32 CalcArmorReducedDamage(Unit const* attacker, Unit const* victim, const uint32 damage, SpellInfo const* spellInfo, uint8 attackerLevel = 0, WeaponAttackType attackType = MAX_ATTACK);
 
-    // Resilience reduction - player or player's pet resilience (-1%), cap 100%
-    [[nodiscard]] uint32 GetMeleeDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_MELEE, 2.0f, 100.0f, damage); }
-    [[nodiscard]] uint32 GetRangedDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_RANGED, 2.0f, 100.0f, damage); }
-    [[nodiscard]] uint32 GetSpellDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_SPELL, 2.0f, 100.0f, damage); }
+    // Cataclysm resilience: one rating (slot 15, CR_RESILIENCE_PLAYER_DAMAGE_TAKEN in 4.3.4) that
+    // reduces damage from players by 1 - 0.99^x percent (Player::GetRatingBonusValue), the same for
+    // melee, ranged and spells. It no longer reduces crit chance or crit damage (CPP ApplyResilience).
+    [[nodiscard]] uint32 GetMeleeDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_RANGED, 1.0f, 100.0f, damage); }
+    [[nodiscard]] uint32 GetRangedDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_RANGED, 1.0f, 100.0f, damage); }
+    [[nodiscard]] uint32 GetSpellDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_RANGED, 1.0f, 100.0f, damage); }
 
     // Critic damages - For resilience: player or player's pet resilience (-1%)
     static uint32 SpellCriticalDamageBonus(Unit const* caster, SpellInfo const* spellProto, uint32 damage, Unit const* victim);
 
-    [[nodiscard]] float GetMeleeCritChanceReduction() const { return GetCombatRatingReduction(CR_CRIT_TAKEN_MELEE); }
-    [[nodiscard]] float GetRangedCritChanceReduction() const { return GetCombatRatingReduction(CR_CRIT_TAKEN_RANGED); }
-    [[nodiscard]] float GetSpellCritChanceReduction() const { return GetCombatRatingReduction(CR_CRIT_TAKEN_SPELL); }
+    [[nodiscard]] float GetMeleeCritChanceReduction() const { return 0.0f; }
+    [[nodiscard]] float GetRangedCritChanceReduction() const { return 0.0f; }
+    [[nodiscard]] float GetSpellCritChanceReduction() const { return 0.0f; }
 
-    [[nodiscard]] uint32 GetMeleeCritDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_MELEE, 2.2f, 33.0f, damage); }
-    [[nodiscard]] uint32 GetRangedCritDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_RANGED, 2.2f, 33.0f, damage); }
-    [[nodiscard]] uint32 GetSpellCritDamageReduction(uint32 damage) const { return GetCombatRatingDamageReduction(CR_CRIT_TAKEN_SPELL, 2.2f, 33.0f, damage); }
+    [[nodiscard]] uint32 GetMeleeCritDamageReduction(uint32 /*damage*/) const { return 0; }
+    [[nodiscard]] uint32 GetRangedCritDamageReduction(uint32 /*damage*/) const { return 0; }
+    [[nodiscard]] uint32 GetSpellCritDamageReduction(uint32 /*damage*/) const { return 0; }
 
     /*********************************************************/
     /***         METHODS RELATED TO CHARM SYSTEM           ***/

@@ -5314,12 +5314,21 @@ float Player::GetRatingMultiplier(CombatRating cr) const
     if (!Rating || !classRating)
         return 1.0f;                                        // By default use minimum coefficient (not must be called)
 
+    // Build 15595 left several 3.3.5a rows empty (hit taken, the old crit-taken slots 14 and 16):
+    // those ratings do nothing in Cataclysm, and dividing by 0 made every result NaN.
+    if (Rating->ratio <= 0.0f)
+        return 0.0f;
+
     return classRating->ratio / Rating->ratio;
 }
 
 float Player::GetRatingBonusValue(CombatRating cr) const
 {
-    return float(GetUInt32Value(static_cast<uint16>(PLAYER_FIELD_COMBAT_RATING_1) + cr)) * GetRatingMultiplier(cr);
+    float const result = float(GetUInt32Value(static_cast<uint16>(PLAYER_FIELD_COMBAT_RATING_1) + cr)) * GetRatingMultiplier(cr);
+    // Cataclysm resilience (slot 15): percent damage reduction 1 - 0.99^x (CPP GetRatingBonusValue).
+    if (cr != CR_CRIT_TAKEN_RANGED)
+        return result;
+    return (1.0f - std::pow(0.99f, result)) * 100.0f;
 }
 
 float Player::GetExpertiseDodgeOrParryReduction(WeaponAttackType attType) const
@@ -6906,9 +6915,8 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
                 break;
             case ITEM_MOD_CRIT_TAKEN_RATING:
             case ITEM_MOD_RESILIENCE_RATING:
-                ApplyRatingMod(CR_CRIT_TAKEN_MELEE, int32(val), apply);
+                // Cataclysm: resilience is the single slot 15 rating (CR_RESILIENCE_PLAYER_DAMAGE_TAKEN).
                 ApplyRatingMod(CR_CRIT_TAKEN_RANGED, int32(val), apply);
-                ApplyRatingMod(CR_CRIT_TAKEN_SPELL, int32(val), apply);
                 break;
             case ITEM_MOD_HASTE_RATING:
                 ApplyRatingMod(CR_HASTE_MELEE, int32(val), apply);
