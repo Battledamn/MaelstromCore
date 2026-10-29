@@ -1235,14 +1235,8 @@ bool Creature::Create(ObjectGuid::LowType guidlow, Map* map, uint32 phaseMask, u
         SetNativeDisplayId(display.CreatureDisplayID);
     }
 
-    float const zBeforeAddon = m_positionZ;
     LoadCreaturesAddon();
     LoadSparringPct();
-
-    //! Need to be called after LoadCreaturesAddon - MOVEMENTFLAG_HOVER is set there
-    //! Unit::SetHover there may have lifted it already (summons on the ground, e.g. the mage's orbs 4 yards up)
-    if (m_positionZ == zBeforeAddon)
-        m_positionZ += GetHoverHeight();
 
     LastUsedScriptID = GetScriptId();
 
@@ -2045,6 +2039,10 @@ void Creature::setDeathState(DeathState state, bool despawn)
         LoadCreaturesAddon(true);
         LoadSparringPct();
 
+        // LoadCreaturesAddon no longer restores the hover flag, and the earlier call ran while the
+        // creature was still JustRespawned (the hover branch requires IsAlive), so reevaluate now.
+        UpdateMovementFlags();
+
         if (GetCreatureData() && GetPhaseMask() != GetCreatureData()->phaseMask)
             SetPhaseMask(GetCreatureData()->phaseMask, false);
     }
@@ -2809,14 +2807,6 @@ bool Creature::LoadCreaturesAddon(bool reload)
         SetByteValue(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_PET_TALENTS, 0);
         SetByteValue(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_VIS_FLAG, uint8((cainfo->bytes1 >> 16) & 0xFF));
         SetByteValue(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_ANIM_TIER, uint8((cainfo->bytes1 >> 24) & 0xFF));
-
-        //! Suspected correlation between UNIT_FIELD_BYTES_1, offset 3, value 0x2:
-        //! If no inhabittype_fly (if no MovementFlag_DisableGravity or MovementFlag_CanFly flag found in sniffs)
-        //! Check using InhabitType as movement flags are assigned dynamically
-        //! basing on whether the creature is in air or not
-        //! Set MovementFlag_Hover. Otherwise do nothing.
-        if (CanHover())
-            AddUnitMovementFlag(MOVEMENTFLAG_HOVER);
     }
 
     if (cainfo->bytes2 != 0)
@@ -3514,6 +3504,24 @@ float Creature::GetAggroRange(Unit const* target) const
     return (aggroRadius * aggroRate);
 }
 
+bool Creature::SetHover(bool enable, bool updateAnimTier)
+{
+    if (!Unit::SetHover(enable, updateAnimTier))
+        return false;
+
+    if (updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT))
+    {
+        if (IsLevitating())
+            SetAnimTier(AnimTier::Fly);
+        else if (IsHovering())
+            SetAnimTier(AnimTier::Hover);
+        else
+            SetAnimTier(AnimTier::Ground);
+    }
+
+    return true;
+}
+
 void Creature::UpdateMovementFlags()
 {
     // Track where the flags were last evaluated - Creature::Update() uses this as the throttle
@@ -3534,8 +3542,7 @@ void Creature::UpdateMovementFlags()
 
     float ground = GetFloorZ();
 
-    bool canHover = CanHover();
-    bool isInAir  = (G3D::fuzzyGt(GetPositionZ(), ground + (canHover ? GetFloatValue(UNIT_FIELD_HOVERHEIGHT) : 0.0f) + GROUND_HEIGHT_TOLERANCE) || G3D::fuzzyLt(GetPositionZ(), ground - GROUND_HEIGHT_TOLERANCE)); // Can be underground too, prevent the falling
+    bool isInAir  = (G3D::fuzzyGt(GetPositionZ(), ground + GetHoverHeight() + GROUND_HEIGHT_TOLERANCE) || G3D::fuzzyLt(GetPositionZ(), ground - GROUND_HEIGHT_TOLERANCE)); // Can be underground too, prevent the falling
 
     if (GetMovementTemplate().IsFlightAllowed() && isInAir && !IsFalling())
     {

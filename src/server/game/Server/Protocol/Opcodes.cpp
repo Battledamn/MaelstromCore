@@ -527,6 +527,8 @@ void OpcodeTable::Initialize()
     /*0x0706*/ DEFINE_HANDLER(CMSG_SET_FACTION_ATWAR,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleSetFactionAtWar                    );
     /*0x0000*/ DEFINE_HANDLER(CMSG_SET_FACTION_CHEAT,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleSetFactionCheat                    );
     /*0x6207*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_PROFICIENCY,                                    STATUS_NEVER);
+    /*0x4335*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_ANIM_TIER,                                      STATUS_NEVER);
+    /*0x30A6*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_PLAY_HOVER_ANIM,                                STATUS_NEVER);
     DEFINE_SERVER_OPCODE_HANDLER(SMSG_SETUP_CURRENCY,                                                STATUS_NEVER);
     /*0x59B0*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_CURRENCY,                                       STATUS_NEVER);
     /*0x1DB4*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_CURRENCY_LOOT_REMOVED,                              STATUS_NEVER);
