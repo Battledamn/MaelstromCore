@@ -1768,6 +1768,8 @@ void Player::RegenerateAll()
 
     Regenerate(POWER_ENERGY);
 
+    Regenerate(POWER_FOCUS);                                // 4.3.4 hunters
+
     Regenerate(POWER_MANA);
 
     // Runes act as cooldowns, and they don't need to send any data
@@ -1918,8 +1920,13 @@ void Player::Regenerate(Powers power)
                 }
             }
             break;
+        case POWER_FOCUS:                                   // Regenerate focus (4.3.4 hunter)
+            // 4 per second, raised by ranged haste (m_modAttackSpeedPct below 1 when hasted)
+            addvalue += (GetFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index) + 4.f) / m_modAttackSpeedPct[RANGED_ATTACK];
+            addvalue *= 0.001f * m_regenTimer;
+            addvalue *= sWorld->getRate(RATE_POWER_FOCUS);
+            break;
         case POWER_RUNE:
-        case POWER_FOCUS:
         case POWER_HAPPINESS:
             break;
         case POWER_HEALTH:

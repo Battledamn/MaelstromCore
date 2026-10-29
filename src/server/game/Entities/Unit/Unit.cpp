@@ -12119,7 +12119,13 @@ uint32 Unit::GetPowerIndex(Powers power) const
     if (IsPlayer())
         return GetPowerIndexByClass(power, getClass());
 
-    // shortcut: retain non-player slots until creature/pet powers, including happiness, are converted together.
+    // Hunter pets use the hunter's 4.3.4 power slots (pinned TrinityCore-Cata): Focus gets its
+    // Cata field and happiness, removed in 4.1, has none, so it is never stored or sent. The
+    // build 15595 client crashes on an SMSG_POWER_UPDATE carrying power type 4.
+    if (IsPet() && static_cast<Pet const*>(this)->getPetType() == HUNTER_PET)
+        return GetPowerIndexByClass(power, CLASS_HUNTER);
+
+    // shortcut: retain other non-player slots until creature/pet powers are converted together.
     return uint32(power) < MAX_UNIT_POWER_FIELDS ? uint32(power) : uint32(MAX_POWERS);
 }
 
@@ -12234,7 +12240,10 @@ uint32 Unit::GetCreatePowers(Powers power) const
         case POWER_RAGE:
             return 1000;
         case POWER_FOCUS:
-            return (IsPlayer() || !((Creature const*)this)->IsPet() || ((Pet const*)this)->getPetType() != HUNTER_PET ? 0 : 100);
+            // 4.3.4: hunters (who lost mana) and their pets have 100 focus
+            if (IsPlayer())
+                return getClass() == CLASS_HUNTER ? 100 : 0;
+            return (!((Creature const*)this)->IsPet() || ((Pet const*)this)->getPetType() != HUNTER_PET ? 0 : 100);
         case POWER_ENERGY:
             return 100;
         case POWER_HAPPINESS:

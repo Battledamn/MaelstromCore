@@ -893,6 +893,11 @@ void Pet::LoseHappiness()
 
 HappinessState Pet::GetHappinessState()
 {
+    // Cataclysm (4.1) removed pet happiness; hunter pets no longer have the power at all
+    // (Unit::GetPowerIndex), so every pet counts as happy.
+    if (getPetType() == HUNTER_PET)
+        return HAPPY;
+
     if (GetPower(POWER_HAPPINESS) < HAPPINESS_LEVEL_SIZE)
         return UNHAPPY;
     else if (GetPower(POWER_HAPPINESS) >= HAPPINESS_LEVEL_SIZE * 2)
