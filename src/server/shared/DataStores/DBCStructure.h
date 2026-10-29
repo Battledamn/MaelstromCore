@@ -819,9 +819,9 @@ struct CreatureModelDataEntry
     //float footstepShakeSize
     //uint32 deathThudShakeSize
     //uint32 soundID
-    float CollisionWidth;
-    float CollisionHeight;
-    float MountHeight;                                       // Used in calculation of unit collision data when mounted
+    float CollisionWidth;                                    // 14 (build 15595 field numbers)
+    float CollisionHeight;                                   // 15
+    float MountHeight;                                       // 16 Used in calculation of unit collision data when mounted
     //float geoBoxMinX
     //float geoBoxMinY
     //float geoBoxMinZ
