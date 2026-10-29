@@ -364,128 +364,24 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
         index_mod_pos = UNIT_FIELD_RANGED_ATTACK_POWER_MOD_POS;
         index_mod_neg = UNIT_FIELD_RANGED_ATTACK_POWER_MOD_NEG;
         index_mult = UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER;
+    }
 
-        if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
-        {
-            val2 = level * 2.0f + GetStat(STAT_AGILITY) - 10.0f;
-        }
-        else if (IsClass(CLASS_ROGUE, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
-        {
-            val2 = level + GetStat(STAT_AGILITY) - 10.0f;
-        }
-        else if (IsClass(CLASS_DRUID, CLASS_CONTEXT_STATS))
-        {
-            switch (GetShapeshiftForm())
-            {
-            case FORM_CAT:
-            case FORM_BEAR:
-            case FORM_DIREBEAR:
-                val2 = 0.0f;
-                break;
-            default:
-                val2 = GetStat(STAT_AGILITY) - 10.0f;
-                break;
-            }
-        }
+    // Cataclysm: attack power per stat point comes from ChrClasses.dbc. Ported from The Cataclysm
+    // Preservation Project's Player::UpdateAttackPowerAndDamage.
+    if (ChrClassesEntry const* classEntry = sChrClassesStore.LookupEntry(getClass()))
+    {
+        if (ranged)
+            val2 = (level + std::max(GetStat(STAT_AGILITY) - 10.0f, 0.0f)) * classEntry->RangedAttackPowerPerAgility;
         else
         {
-            val2 = GetStat(STAT_AGILITY) - 10.0f;
-        }
-    }
-    else
-    {
-        if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_STATS))
-        {
-            val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
-        }
-        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS) || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_STATS) || IsClass(CLASS_ROGUE, CLASS_CONTEXT_STATS))
-        {
-            val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
-        }
-        else if (IsClass(CLASS_DRUID, CLASS_CONTEXT_STATS))
-        {
-            // Check if Predatory Strikes is skilled
-            float mLevelMult = 0.0f;
-            float weapon_bonus = 0.0f;
-            if (IsInFeralForm())
-            {
-                Unit::AuraEffectList const& mDummy = GetAuraEffectsByType(SPELL_AURA_DUMMY);
-                for (Unit::AuraEffectList::const_iterator itr = mDummy.begin(); itr != mDummy.end(); ++itr)
-                {
-                    AuraEffect* aurEff = *itr;
-                    if (aurEff->GetSpellInfo()->SpellIconID == 1563)
-                    {
-                        switch (aurEff->GetEffIndex())
-                        {
-                        case 0: // Predatory Strikes (effect 0)
-                            mLevelMult = CalculatePct(1.0f, aurEff->GetAmount());
-                            break;
-                        case 1: // Predatory Strikes (effect 1)
-                            if (Item* mainHand = m_items[EQUIPMENT_SLOT_MAINHAND])
-                            {
-                                // also gains % attack power from equipped weapon
-                                ItemTemplate const* proto = mainHand->GetTemplate();
-                                if (!proto)
-                                    continue;
+            float const strengthValue = std::max((GetStat(STAT_STRENGTH) - 10.0f) * classEntry->AttackPowerPerStrength, 0.0f);
+            float agilityValue = std::max((GetStat(STAT_AGILITY) - 10.0f) * classEntry->AttackPowerPerAgility, 0.0f);
 
-                                uint32 ap = proto->getFeralBonus();
-                                // Get AP Bonuses from weapon
-                                for (uint8 i = 0; i < MAX_ITEM_PROTO_STATS; ++i)
-                                {
-                                    if (i >= proto->StatsCount)
-                                        break;
+            // Druids in Bear and Cat form get two points attack power per agility point
+            if (GetShapeshiftForm() == FORM_BEAR || GetShapeshiftForm() == FORM_CAT)
+                agilityValue = std::max((GetStat(STAT_AGILITY) - 10.0f) * 2.0f, 0.0f);
 
-                                    if (proto->ItemStat[i].ItemStatType == ITEM_MOD_ATTACK_POWER)
-                                        ap += proto->ItemStat[i].ItemStatValue;
-                                }
-
-                                // Get AP Bonuses from weapon spells
-                                for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
-                                {
-                                    // no spell
-                                    if (!proto->Spells[i].SpellId || proto->Spells[i].SpellTrigger != ITEM_SPELLTRIGGER_ON_EQUIP)
-                                        continue;
-
-                                    // check if it is valid spell
-                                    SpellInfo const* spellproto = sSpellMgr->GetSpellInfo(proto->Spells[i].SpellId);
-                                    if (!spellproto)
-                                        continue;
-
-                                    for (uint8 j = 0; j < MAX_SPELL_EFFECTS; ++j)
-                                        if (spellproto->Effects[j].ApplyAuraName == SPELL_AURA_MOD_ATTACK_POWER)
-                                            ap += spellproto->Effects[j].CalcValue();
-                                }
-
-                                weapon_bonus = CalculatePct(float(ap), aurEff->GetAmount());
-                            }
-                            break;
-                        default:
-                            break;
-                        }
-                    }
-                }
-            }
-
-            switch (GetShapeshiftForm())
-            {
-            case FORM_CAT:
-                val2 = (GetLevel() * mLevelMult) + GetStat(STAT_STRENGTH) * 2.0f + GetStat(STAT_AGILITY) - 20.0f + weapon_bonus + m_baseFeralAP;
-                break;
-            case FORM_BEAR:
-            case FORM_DIREBEAR:
-                val2 = (GetLevel() * mLevelMult) + GetStat(STAT_STRENGTH) * 2.0f - 20.0f + weapon_bonus + m_baseFeralAP;
-                break;
-            case FORM_MOONKIN:
-                val2 = (GetLevel() * mLevelMult) + GetStat(STAT_STRENGTH) * 2.0f - 20.0f + m_baseFeralAP;
-                break;
-            default:
-                val2 = GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
-                break;
-            }
-        }
-        else if (IsClass(CLASS_MAGE, CLASS_CONTEXT_STATS) || IsClass(CLASS_PRIEST, CLASS_CONTEXT_STATS) || IsClass(CLASS_WARLOCK, CLASS_CONTEXT_STATS))
-        {
-            val2 = GetStat(STAT_STRENGTH) - 10.0f;
+            val2 = strengthValue + agilityValue;
         }
     }
 

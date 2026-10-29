@@ -699,6 +699,9 @@ struct ChrClassesEntry
     // 57, unused
     uint32  CinematicSequence;                              // 58 id from CinematicSequences.dbc
     uint32  expansion;                                      // 59 (0 - original race, 1 - tbc addon, ...)
+    uint32  AttackPowerPerStrength;                         // Cata 11
+    uint32  AttackPowerPerAgility;                          // Cata 12
+    uint32  RangedAttackPowerPerAgility;                    // Cata 13
 };
 
 enum ChrRacesFlags
