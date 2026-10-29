@@ -2280,7 +2280,10 @@ uint32 Unit::CalcArmorReducedDamage(Unit const* attacker, Unit const* victim, co
         armor = 0.0f;
 
     float levelModifier = attacker ? attacker->GetLevel() : attackerLevel;
-    if (levelModifier > 59)
+    // Cataclysm adds a steeper step above level 80 (CPP GetArmorReduction).
+    if (levelModifier > 80)
+        levelModifier = levelModifier + (4.5f * (levelModifier - 59)) + (20.0f * (levelModifier - 80));
+    else if (levelModifier > 59)
         levelModifier = levelModifier + (4.5f * (levelModifier - 59));
 
     float tmpvalue = 0.1f * armor / (8.5f * levelModifier + 40);

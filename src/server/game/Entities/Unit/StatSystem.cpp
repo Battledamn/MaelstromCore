@@ -272,7 +272,7 @@ void Player::UpdateArmor()
 
     float value = GetFlatModifierValue(unitMod, BASE_VALUE);   // base armor (from items)
     value *= GetPctModifierValue(unitMod, BASE_PCT);           // armor percent from items
-    value += GetStat(STAT_AGILITY) * 2.0f;                             // armor bonus from stats
+    // Cataclysm removed the 3.3.5a armor bonus of 2 per Agility.
     value += GetFlatModifierValue(unitMod, TOTAL_VALUE);
 
     //add dynamic flat mods
@@ -292,12 +292,19 @@ void Player::UpdateArmor()
 
 float Player::GetHealthBonusFromStamina()
 {
+    // Cataclysm: 10 health per Stamina up to level 80, rising to 14 at 85 (gtOCTHpPerStamina.dbc,
+    // as in the 4.3.4 PaperDollFrame.lua and CPP).
+    float ratio = 10.0f;
+    uint32 const level = std::min<uint32>(GetLevel(), GT_MAX_LEVEL);
+    if (GtOCTHpPerStaminaEntry const* hpBase = sGtOCTHpPerStaminaStore.LookupEntry((getClass() - 1) * GT_MAX_LEVEL + level - 1))
+        ratio = hpBase->ratio;
+
     float stamina = GetStat(STAT_STAMINA);
 
     float baseStam = stamina < 20 ? stamina : 20;
     float moreStam = stamina - baseStam;
 
-    return baseStam + (moreStam * 10.0f);
+    return baseStam + (moreStam * ratio);
 }
 
 float Player::GetManaBonusFromIntellect()
@@ -320,7 +327,13 @@ void Player::UpdateMaxHealth()
     value *= GetPctModifierValue(unitMod, TOTAL_PCT);
 
     sScriptMgr->OnPlayerAfterUpdateMaxHealth(this, value);
+
+    // Cataclysm keeps the health percentage when max health changes (gear, buffs, stats), as CPP does.
+    bool const keepPct = IsAlive() && GetMaxHealth() > 0;
+    float const healthPct = keepPct ? GetHealthPct() : 0.0f;
     SetMaxHealth((uint32)value);
+    if (keepPct)
+        SetHealth(std::max<uint32>(1, CalculatePct(GetMaxHealth(), healthPct)));
 }
 
 void Player::UpdateMaxPower(Powers power)

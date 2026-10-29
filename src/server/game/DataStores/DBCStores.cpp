@@ -101,6 +101,7 @@ DBCStorage <GtNPCManaCostScalerEntry>     sGtNPCManaCostScalerStore(GtNPCManaCos
 DBCStorage <GtOCTClassCombatRatingScalarEntry> sGtOCTClassCombatRatingScalarStore(GtOCTClassCombatRatingScalarfmt);
 DBCStorage <GtOCTRegenHPEntry>            sGtOCTRegenHPStore(GtOCTRegenHPfmt);
 DBCStorage <GtSpellScalingEntry>          sGtSpellScalingStore(GtSpellScalingfmt);
+DBCStorage <GtOCTHpPerStaminaEntry>       sGtOCTHpPerStaminaStore(GtOCTHpPerStaminafmt);
 //DBCStorage <GtOCTRegenMPEntry>            sGtOCTRegenMPStore(GtOCTRegenMPfmt);  -- not used currently
 DBCStorage <GtRegenHPPerSptEntry>         sGtRegenHPPerSptStore(GtRegenHPPerSptfmt);
 DBCStorage <GtRegenMPPerSptEntry>         sGtRegenMPPerSptStore(GtRegenMPPerSptfmt);
@@ -352,6 +353,7 @@ void LoadDBCStores(std::string const& dataPath)
     // Cataclysm does not use the legacy health-regeneration stores.
     //LOAD_GT_DBC(sGtOCTRegenHPStore,                "gtOCTRegenHP.dbc",                     "gtoctregenhp_dbc");
     LOAD_DBC(sGtSpellScalingStore,                  "gtSpellScaling.dbc",                   nullptr);
+    LOAD_DBC(sGtOCTHpPerStaminaStore,               "gtOCTHpPerStamina.dbc",                nullptr);
     //LOAD_DBC(sGtOCTRegenMPStore,                  "gtOCTRegenMP.dbc",                     "gtoctregenmp_dbc");
     //LOAD_GT_DBC(sGtRegenHPPerSptStore,             "gtRegenHPPerSpt.dbc",                  "gtregenhpperspt_dbc");
     LOAD_GT_DBC(sGtRegenMPPerSptStore,              "gtRegenMPPerSpt.dbc",                  "gtregenmpperspt_dbc");

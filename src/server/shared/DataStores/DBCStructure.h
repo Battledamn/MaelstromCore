@@ -1137,6 +1137,12 @@ struct GtSpellScalingEntry
     float value;
 };
 
+// Cata: health per point of Stamina above 20, row (class - 1) * 100 + level - 1.
+struct GtOCTHpPerStaminaEntry
+{
+    float ratio;
+};
+
 //struct GtOCTRegenMPEntry
 //{
 //    float    ratio;
