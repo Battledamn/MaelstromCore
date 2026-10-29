@@ -2003,9 +2003,6 @@ void Player::RegenerateHealth()
 
     float HealthIncreaseRate = sWorld->getRate(RATE_HEALTH);
 
-    if (sWorld->getBoolConfig(CONFIG_LOW_LEVEL_REGEN_BOOST) && GetLevel() < 15)
-        HealthIncreaseRate = sWorld->getRate(RATE_HEALTH) * (2.066f - (GetLevel() * 0.066f));
-
     float addvalue = 0.0f;
 
     // polymorphed case
@@ -2014,23 +2011,27 @@ void Player::RegenerateHealth()
     // normal regen case (maybe partly in combat case)
     else if (!IsInCombat() || HasRegenDuringCombatAura())
     {
-        addvalue = OCTRegenHPPerSpirit() * HealthIncreaseRate;
+        addvalue = HealthIncreaseRate;
 
-        if (!IsStandState())
-        {
-            addvalue *= 1.33f;
-        }
-
-        addvalue *= GetTotalAuraMultiplier(SPELL_AURA_MOD_HEALTH_REGEN_PERCENT);
-
+        // Cata: out-of-combat regen is a share of max health per tick (2 s); Spirit no longer
+        // feeds health regen, so the 3.3.5a OCTRegenHPPerSpirit() gave nothing.
         if (!IsInCombat())
         {
-            addvalue += GetTotalAuraModifier(SPELL_AURA_MOD_REGEN) * 2 * IN_MILLISECONDS / (5 * IN_MILLISECONDS);
+            if (GetLevel() < 15)
+                addvalue = 0.20f * float(GetMaxHealth()) / GetLevel() * HealthIncreaseRate;
+            else
+                addvalue = 0.015f * float(GetMaxHealth()) * HealthIncreaseRate;
+
+            addvalue *= GetTotalAuraMultiplier(SPELL_AURA_MOD_HEALTH_REGEN_PERCENT);
+            addvalue += GetTotalAuraModifier(SPELL_AURA_MOD_REGEN) * 0.4f;
         }
         else if (HasRegenDuringCombatAura())
         {
             ApplyPct(addvalue, GetTotalAuraModifier(SPELL_AURA_MOD_REGEN_DURING_COMBAT));
         }
+
+        if (!IsStandState())
+            addvalue *= 1.5f;
     }
 
     // always regeneration bonus (including combat)
