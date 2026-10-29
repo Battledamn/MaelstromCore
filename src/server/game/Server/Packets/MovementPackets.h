@@ -67,6 +67,10 @@ namespace WorldPackets
             MSESplineElevation,
             MSETimestamp,
             MSECounter,
+            MSEOneBit,
+            MSEFlushBits,
+            MSEHasTransportOneBit, // a set bit written only inside the transport block
+            MSEExtraFloat,         // the opcode's extra float, e.g. the new speed (CPP: MSEExtraElement)
             MSEEnd,
         };
 
@@ -76,10 +80,13 @@ namespace WorldPackets
         void WriteMovementUpdate(WorldPacket& packet, MovementInfo const& info);
         MovementStatusElements const* GetMovementSequence(uint16 opcode);
         void ReadGroundMovement(WorldPacket& packet, MovementInfo& info, MovementStatusElements const* sequence,
-            uint32* counter = nullptr);
+            uint32* counter = nullptr, float* extraFloat = nullptr);
         void WriteGroundMovement(WorldPacket& packet, MovementInfo const& info, MovementStatusElements const* sequence,
-            uint32 counter = 0);
+            uint32 counter = 0, float extraFloat = 0.0f);
         MovementStatusElements const* GetMovementFlagSequence(uint16 opcode);
+        // SMSG_MOVE_SET_*, SMSG_SPLINE_MOVE_SET_*, SMSG_MOVE_UPDATE_* speed and rate packets and their
+        // CMSG_MOVE_FORCE_*_CHANGE_ACK acknowledgements; nullptr where no 4.3.4 layout is known.
+        MovementStatusElements const* GetSpeedChangeSequence(uint16 opcode);
         void WriteTeleport(WorldPacket& packet, ObjectGuid guid, uint32 counter, Position const& pos,
             ObjectGuid transport = ObjectGuid::Empty);
         void ReadTeleportAck(WorldPacket& packet, ObjectGuid& guid, uint32& counter, uint32& time);

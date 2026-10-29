@@ -11123,9 +11123,11 @@ void Unit::SetSpeed(UnitMoveType mtype, float rate, bool forced)
     }
     else if (forced)
     {
-        WorldPacket data(speedOpcodes[static_cast<size_t>(SpeedOpcodeIndex::NPC)], 12);
-        data << GetPackGUID();
-        data << float(GetSpeed(mtype));
+        WorldPacket data(speedOpcodes[static_cast<size_t>(SpeedOpcodeIndex::NPC)], 13);
+        MovementInfo info;
+        info.guid = GetGUID();
+        WorldPackets::Movement::WriteGroundMovement(data, info,
+            WorldPackets::Movement::GetSpeedChangeSequence(data.GetOpcode()), 0, GetSpeed(mtype));
         SendMessageToSet(&data, true);
     }
 
@@ -11157,15 +11159,17 @@ void Unit::SendSpeedToController(UnitMoveType mtype, Player* target) const
     SpeedOpcodePair const& speedOpcodes = SetSpeed2Opc_table[mtype];
     uint32 counter = target->GetSession()->GetOrderCounter();
 
+    // The map-change guard in the acknowledgement handlers rejects the boundary counter itself,
+    // including zero at login.
+    if (counter == target->GetMapChangeOrderCounter())
+    {
+        target->GetSession()->IncrementOrderCounter();
+        counter = target->GetSession()->GetOrderCounter();
+    }
+    float const speed = GetSpeed(mtype);
+
     if (mtype == MOVE_RUN)
     {
-        // The map-change guard rejects the boundary counter itself, including zero at login.
-        if (counter == target->GetMapChangeOrderCounter())
-        {
-            target->GetSession()->IncrementOrderCounter();
-            counter = target->GetSession()->GetOrderCounter();
-        }
-        float const speed = GetSpeed(mtype);
         m_pendingRunSpeedChange = PendingRunSpeedChange{ counter, speed };
         WorldPacket data(SMSG_MOVE_SET_RUN_SPEED, 17);
         WorldPackets::Movement::WriteRunSpeedChange(data, GetGUID(), counter, speed);
@@ -11175,12 +11179,16 @@ void Unit::SendSpeedToController(UnitMoveType mtype, Player* target) const
         return;
     }
 
-    ++target->m_forced_speed_changes[mtype];
+    // CPP has no 4.3.4 layout for the turn-rate and pitch-rate acknowledgements, so those are not
+    // counted: HandleForceSpeedChangeAck drops them unparsed instead of validating them.
+    if (mtype != MOVE_TURN_RATE && mtype != MOVE_PITCH_RATE)
+        ++target->m_forced_speed_changes[mtype];
 
     WorldPacket data(speedOpcodes[static_cast<size_t>(SpeedOpcodeIndex::PC)], 18);
-    data << GetPackGUID();
-    data << counter;
-    data << GetSpeed(mtype);
+    MovementInfo info;
+    info.guid = GetGUID();
+    WorldPackets::Movement::WriteGroundMovement(data, info,
+        WorldPackets::Movement::GetSpeedChangeSequence(data.GetOpcode()), counter, speed);
     target->GetSession()->SendPacket(&data);
     target->GetSession()->IncrementOrderCounter();
 }

@@ -183,16 +183,11 @@ enum OpcodeClient : uint16
     MSG_MOVE_STOP_SWIM                              = 0x3802,
     MSG_MOVE_SET_RUN_SPEED_CHEAT                    = 0x0000,
     MSG_MOVE_SET_RUN_BACK_SPEED_CHEAT               = 0x0000,
-    MSG_MOVE_SET_RUN_BACK_SPEED                     = 0x0CF,
     MSG_MOVE_SET_WALK_SPEED_CHEAT                   = 0x0000,
-    MSG_MOVE_SET_WALK_SPEED                         = 0x0D1,
     MSG_MOVE_SET_SWIM_SPEED_CHEAT                   = 0x0000,
-    MSG_MOVE_SET_SWIM_SPEED                         = 0x0D3,
     MSG_MOVE_SET_SWIM_BACK_SPEED_CHEAT              = 0x0000,
-    MSG_MOVE_SET_SWIM_BACK_SPEED                    = 0x0D5,
     MSG_MOVE_SET_ALL_SPEED_CHEAT                    = 0x0000,
     MSG_MOVE_SET_TURN_RATE_CHEAT                    = 0x0000,
-    MSG_MOVE_SET_TURN_RATE                          = 0x0D8,
     MSG_MOVE_TOGGLE_COLLISION_CHEAT                 = 0x7B04,
     MSG_MOVE_SET_FACING                             = 0x7914,
     MSG_MOVE_SET_PITCH                              = 0x7312,
@@ -200,8 +195,8 @@ enum OpcodeClient : uint16
     CMSG_MOVE_CHARM_PORT_CHEAT                      = 0x0E0,
     CMSG_MOVE_SET_RAW_POSITION                      = 0x0E1,
     CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK            = 0x7818,
-    CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK            = 0x0E5,
-    CMSG_FORCE_SWIM_SPEED_CHANGE_ACK                = 0x0E7,
+    CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK       = 0x3216,
+    CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK           = 0x7A10,
     CMSG_FORCE_MOVE_ROOT_ACK                        = 0x701E,
     CMSG_FORCE_MOVE_UNROOT_ACK                      = 0x7808,
     MSG_MOVE_ROOT                                   = 0x0EC,
@@ -476,9 +471,9 @@ enum OpcodeClient : uint16
     CMSG_BATTLEMASTER_HELLO                         = 0x0234,
     CMSG_MOVE_START_SWIM_CHEAT                      = 0x2D8,
     CMSG_MOVE_STOP_SWIM_CHEAT                       = 0x2D9,
-    CMSG_FORCE_WALK_SPEED_CHANGE_ACK                = 0x2DB,
-    CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK           = 0x2DD,
-    CMSG_FORCE_TURN_RATE_CHANGE_ACK                 = 0x2DF,
+    CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK           = 0x7210,
+    CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK      = 0x7A16,
+    CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK            = 0x7316,
     MSG_PVP_LOG_DATA                                = 0x0000,
     CMSG_LEAVE_BATTLEFIELD                          = 0x2E1,
     CMSG_AREA_SPIRIT_HEALER_QUERY                   = 0x4907,
@@ -553,11 +548,9 @@ enum OpcodeClient : uint16
     CMSG_CHEAT_SET_HONOR_CURRENCY                   = 0x37B,
     CMSG_CHEAT_SET_ARENA_CURRENCY                   = 0x37C,
     MSG_MOVE_SET_FLIGHT_SPEED_CHEAT                 = 0x0000,
-    MSG_MOVE_SET_FLIGHT_SPEED                       = 0x37E,
     MSG_MOVE_SET_FLIGHT_BACK_SPEED_CHEAT            = 0x37F,
-    MSG_MOVE_SET_FLIGHT_BACK_SPEED                  = 0x380,
-    CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK              = 0x382,
-    CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK         = 0x384,
+    CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK         = 0x7314,
+    CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK    = 0x310E,
     CMSG_MAELSTROM_INVALIDATE_CACHE                 = 0x387,
     CMSG_SET_TAXI_BENCHMARK_MODE                    = 0x4314,
     CMSG_REALM_SPLIT                                = 0x2906,
@@ -675,8 +668,7 @@ enum OpcodeClient : uint16
     CMSG_SET_RUNE_COUNT                             = 0x458,
     CMSG_SET_RUNE_COOLDOWN                          = 0x459,
     MSG_MOVE_SET_PITCH_RATE_CHEAT                   = 0x45A,
-    MSG_MOVE_SET_PITCH_RATE                         = 0x45B,
-    CMSG_FORCE_PITCH_RATE_CHANGE_ACK                = 0x45D,
+    CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK           = 0x3100,
     CMSG_CALENDAR_EVENT_INVITE_NOTES                = 0x45F,
     CMSG_UPDATE_MISSILE_TRAJECTORY                  = 0x781E,
     CMSG_COMPLETE_MOVIE                             = 0x4136,
@@ -857,8 +849,8 @@ enum OpcodeServer : uint16
     SMSG_MOVE_WATER_WALK                            = 0x75B1,
     SMSG_MOVE_LAND_WALK                             = 0x34B7,
     SMSG_MOVE_SET_RUN_SPEED                         = 0x3DB5,
-    SMSG_FORCE_RUN_BACK_SPEED_CHANGE                = 0x0E4,
-    SMSG_FORCE_SWIM_SPEED_CHANGE                    = 0x0E6,
+    SMSG_MOVE_SET_RUN_BACK_SPEED                    = 0x71B1,
+    SMSG_MOVE_SET_SWIM_SPEED                        = 0x15A7,
     SMSG_MOVE_ROOT                                 = 0x7DA0,
     SMSG_MOVE_UNROOT                               = 0x7DB4,
     SMSG_MOVE_KNOCK_BACK                            = 0x5CB4,
@@ -1026,6 +1018,14 @@ enum OpcodeServer : uint16
     SMSG_MOVE_SET_ACTIVE_MOVER                       = 0x11B3,
     SMSG_MOVE_UPDATE                                 = 0x79A2,
     SMSG_MOVE_UPDATE_RUN_SPEED                       = 0x14A6,
+    SMSG_MOVE_UPDATE_WALK_SPEED                      = 0x54A2,
+    SMSG_MOVE_UPDATE_RUN_BACK_SPEED                  = 0x3DA6,
+    SMSG_MOVE_UPDATE_SWIM_SPEED                      = 0x59B5,
+    SMSG_MOVE_UPDATE_SWIM_BACK_SPEED                 = 0x30B5,
+    SMSG_MOVE_UPDATE_TURN_RATE                       = 0x5DA1,
+    SMSG_MOVE_UPDATE_FLIGHT_SPEED                    = 0x30B1,
+    SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED               = 0x74A0,
+    SMSG_MOVE_UPDATE_PITCH_RATE                      = 0x1DB5,
     SMSG_GM_PLAYER_INFO                             = 0x4A15,
     SMSG_LOGIN_VERIFY_WORLD                         = 0x2005,
     SMSG_LOAD_CUF_PROFILES                          = 0x50B1,
@@ -1101,9 +1101,9 @@ enum OpcodeServer : uint16
     SMSG_INSTANCE_INFO                         = 0x6626,
     SMSG_PLAY_SOUND                                 = 0x2134,
     SMSG_BATTLEFIELD_STATUS                         = 0x7DA1,
-    SMSG_FORCE_WALK_SPEED_CHANGE                    = 0x2DA,
-    SMSG_FORCE_SWIM_BACK_SPEED_CHANGE               = 0x2DC,
-    SMSG_FORCE_TURN_RATE_CHANGE                     = 0x2DE,
+    SMSG_MOVE_SET_WALK_SPEED                        = 0x1DA4,
+    SMSG_MOVE_SET_SWIM_BACK_SPEED                   = 0x5CA6,
+    SMSG_MOVE_SET_TURN_RATE                         = 0x30A5,
     SMSG_AREA_SPIRIT_HEALER_TIME                    = 0x0734,
     SMSG_WARDEN_DATA                                = 0x31A0,
     SMSG_GROUP_JOINED_BATTLEGROUND                  = 0x2E8,
@@ -1121,12 +1121,12 @@ enum OpcodeServer : uint16
     SMSG_RAID_INSTANCE_MESSAGE                      = 0x6E15,
     SMSG_COMPRESSED_MOVES                           = 0x0517,
     SMSG_CHAT_RESTRICTED                            = 0x6536,
-    SMSG_SPLINE_SET_RUN_SPEED                       = 0x2FE,
-    SMSG_SPLINE_SET_RUN_BACK_SPEED                  = 0x2FF,
-    SMSG_SPLINE_SET_SWIM_SPEED                      = 0x300,
-    SMSG_SPLINE_SET_WALK_SPEED                      = 0x301,
-    SMSG_SPLINE_SET_SWIM_BACK_SPEED                 = 0x302,
-    SMSG_SPLINE_SET_TURN_RATE                       = 0x303,
+    SMSG_SPLINE_MOVE_SET_RUN_SPEED                  = 0x51B7,
+    SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED             = 0x3DB3,
+    SMSG_SPLINE_MOVE_SET_SWIM_SPEED                 = 0x39A4,
+    SMSG_SPLINE_MOVE_SET_WALK_SPEED                 = 0x34A5,
+    SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED            = 0x59A1,
+    SMSG_SPLINE_MOVE_SET_TURN_RATE                  = 0x78B5,
     SMSG_SPLINE_MOVE_UNROOT                         = 0x75B6,
     SMSG_SPLINE_MOVE_FEATHER_FALL                   = 0x305,
     SMSG_SPLINE_MOVE_NORMAL_FALL                    = 0x306,
@@ -1186,10 +1186,10 @@ enum OpcodeServer : uint16
     SMSG_ARENA_ERROR                                = 0x2D17,
     SMSG_DEATH_RELEASE_LOC                          = 0x2F07,
     SMSG_FORCED_DEATH_UPDATE                        = 0x2606,
-    SMSG_FORCE_FLIGHT_SPEED_CHANGE                  = 0x381,
-    SMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE             = 0x383,
-    SMSG_SPLINE_SET_FLIGHT_SPEED                    = 0x385,
-    SMSG_SPLINE_SET_FLIGHT_BACK_SPEED               = 0x386,
+    SMSG_MOVE_SET_FLIGHT_SPEED                      = 0x71A6,
+    SMSG_MOVE_SET_FLIGHT_BACK_SPEED                 = 0x30A2,
+    SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED               = 0x39A0,
+    SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED          = 0x38B3,
     SMSG_FLIGHT_SPLINE_SYNC                         = 0x0924,
     SMSG_JOINED_BATTLEGROUND_QUEUE                  = 0x0000,
     SMSG_REALM_SPLIT                                = 0x2714,
@@ -1285,8 +1285,8 @@ enum OpcodeServer : uint16
     SMSG_DANCE_QUERY_RESPONSE                       = 0x2F06,
     SMSG_INVALIDATE_DANCE                           = 0x0E27,
     SMSG_LEARNED_DANCE_MOVES                        = 0x0E05,
-    SMSG_FORCE_PITCH_RATE_CHANGE                    = 0x45C,
-    SMSG_SPLINE_SET_PITCH_RATE                      = 0x45E,
+    SMSG_MOVE_SET_PITCH_RATE                        = 0x75B0,
+    SMSG_SPLINE_MOVE_SET_PITCH_RATE                 = 0x14B0,
     SMSG_CALENDAR_EVENT_INVITE_NOTES                = 0x0E17,
     SMSG_CALENDAR_EVENT_INVITE_NOTES_ALERT          = 0x2535,
     SMSG_UPDATE_ACCOUNT_DATA_COMPLETE               = 0x2015,
@@ -1439,26 +1439,16 @@ inline constexpr OpcodeServer MSG_MOVE_SET_RUN_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_RUN_SPEED_CHEAT);
 inline constexpr OpcodeServer MSG_MOVE_SET_RUN_BACK_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_RUN_BACK_SPEED_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_RUN_BACK_SPEED_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_RUN_BACK_SPEED);
 inline constexpr OpcodeServer MSG_MOVE_SET_WALK_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_WALK_SPEED_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_WALK_SPEED_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_WALK_SPEED);
 inline constexpr OpcodeServer MSG_MOVE_SET_SWIM_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_SWIM_SPEED_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_SWIM_SPEED_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_SWIM_SPEED);
 inline constexpr OpcodeServer MSG_MOVE_SET_SWIM_BACK_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_SWIM_BACK_SPEED_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_SWIM_BACK_SPEED_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_SWIM_BACK_SPEED);
 inline constexpr OpcodeServer MSG_MOVE_SET_ALL_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_ALL_SPEED_CHEAT);
 inline constexpr OpcodeServer MSG_MOVE_SET_TURN_RATE_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_TURN_RATE_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_TURN_RATE_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_TURN_RATE);
 inline constexpr OpcodeServer MSG_MOVE_TOGGLE_COLLISION_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_TOGGLE_COLLISION_CHEAT);
 inline constexpr OpcodeServer MSG_MOVE_SET_FACING_SERVER =
@@ -1553,12 +1543,8 @@ inline constexpr OpcodeServer MSG_INSPECT_ARENA_TEAMS_SERVER =
     static_cast<OpcodeServer>(MSG_INSPECT_ARENA_TEAMS);
 inline constexpr OpcodeServer MSG_MOVE_SET_FLIGHT_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_FLIGHT_SPEED_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_FLIGHT_SPEED_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_FLIGHT_SPEED);
 inline constexpr OpcodeServer MSG_MOVE_SET_FLIGHT_BACK_SPEED_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_FLIGHT_BACK_SPEED_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_FLIGHT_BACK_SPEED_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_FLIGHT_BACK_SPEED);
 inline constexpr OpcodeServer MSG_PARTY_ASSIGNMENT_SERVER =
     static_cast<OpcodeServer>(MSG_PARTY_ASSIGNMENT);
 inline constexpr OpcodeServer MSG_MOVE_START_DESCEND_SERVER =
@@ -1585,8 +1571,6 @@ inline constexpr OpcodeServer MSG_GM_CHANGE_ARENA_RATING_SERVER =
     static_cast<OpcodeServer>(MSG_GM_CHANGE_ARENA_RATING);
 inline constexpr OpcodeServer MSG_MOVE_SET_PITCH_RATE_CHEAT_SERVER =
     static_cast<OpcodeServer>(MSG_MOVE_SET_PITCH_RATE_CHEAT);
-inline constexpr OpcodeServer MSG_MOVE_SET_PITCH_RATE_SERVER =
-    static_cast<OpcodeServer>(MSG_MOVE_SET_PITCH_RATE);
 inline constexpr OpcodeClient MSG_MOVE_GRAVITY_CHNG_CLIENT =
     static_cast<OpcodeClient>(MSG_MOVE_GRAVITY_CHNG);
 inline constexpr OpcodeServer MSG_SET_RAID_DIFFICULTY_SERVER =

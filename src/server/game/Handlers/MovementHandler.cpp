@@ -739,80 +739,107 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket& recvData)
     uint32 opcode = recvData.GetOpcode();
     LOG_DEBUG("network", "WORLD: Recvd {} ({}, 0x{:X}) opcode", GetOpcodeNameForLogging(static_cast<OpcodeClient>(opcode)), opcode, opcode);
 
-    /* extract packet */
-    ObjectGuid guid;
-    uint32 counter;
-    MovementInfo movementInfo;
-    float  newspeed;
-
-    recvData >> guid.ReadAsPacked();
-    recvData >> counter;                                   // counter or moveEvent
-    movementInfo.guid = guid;
-    ReadMovementInfo(recvData, &movementInfo);
-    recvData >> newspeed;
-
-    Unit* mover = _player->m_mover;
-
-    // pussywizard: special check, only player mover allowed here
-    if (guid != mover->GetGUID() || guid != _player->GetGUID())
-    {
-        recvData.rfinish(); // prevent warnings spam
-        return;
-    }
-
-    // old map - async processing, ignore
-    if (counter <= _player->GetMapChangeOrderCounter())
-        return;
-
-    if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
-    {
-        recvData.rfinish();                     // prevent warnings spam
-        return;
-    }
-
     if (opcode == CMSG_MOVE_SET_COLLISION_HGT_ACK)
     {
+        // Collision height still uses the legacy layout until its own conversion.
+        ObjectGuid guid;
+        uint32 counter;
+        MovementInfo movementInfo;
+        float newHeight;
+
+        recvData >> guid.ReadAsPacked();
+        recvData >> counter;
+        movementInfo.guid = guid;
+        ReadMovementInfo(recvData, &movementInfo);
+        recvData >> newHeight;
+
+        Unit* mover = _player->m_mover;
+        if (guid != mover->GetGUID() || guid != _player->GetGUID())
+        {
+            recvData.rfinish(); // prevent warnings spam
+            return;
+        }
+
+        // old map - async processing, ignore
+        if (counter <= _player->GetMapChangeOrderCounter())
+            return;
+
+        if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
+        {
+            recvData.rfinish(); // prevent warnings spam
+            return;
+        }
+
         WorldPacket data(MSG_MOVE_SET_COLLISION_HGT, 18);
         WriteMovementInfo(&data, &movementInfo);
-        data << newspeed; // new collision height
+        data << newHeight;
         mover->SendMessageToSet(&data, _player);
         return;
     }
 
-    // Other speed types still use the legacy acknowledgement path.
     UnitMoveType move_type;
-    UnitMoveType force_move_type;
 
     static char const* move_type_name[MAX_MOVE_TYPE] = {  "Walk", "Run", "RunBack", "Swim", "SwimBack", "TurnRate", "Flight", "FlightBack", "PitchRate" };
 
     switch (opcode)
     {
-        case CMSG_FORCE_WALK_SPEED_CHANGE_ACK:          move_type = MOVE_WALK;          force_move_type = MOVE_WALK;        break;
-        case CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK:      move_type = MOVE_RUN_BACK;      force_move_type = MOVE_RUN_BACK;    break;
-        case CMSG_FORCE_SWIM_SPEED_CHANGE_ACK:          move_type = MOVE_SWIM;          force_move_type = MOVE_SWIM;        break;
-        case CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK:     move_type = MOVE_SWIM_BACK;     force_move_type = MOVE_SWIM_BACK;   break;
-        case CMSG_FORCE_TURN_RATE_CHANGE_ACK:           move_type = MOVE_TURN_RATE;     force_move_type = MOVE_TURN_RATE;   break;
-        case CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK:        move_type = MOVE_FLIGHT;        force_move_type = MOVE_FLIGHT;      break;
-        case CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK:   move_type = MOVE_FLIGHT_BACK;   force_move_type = MOVE_FLIGHT_BACK; break;
-        case CMSG_FORCE_PITCH_RATE_CHANGE_ACK:          move_type = MOVE_PITCH_RATE;    force_move_type = MOVE_PITCH_RATE;  break;
+        case CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK:          move_type = MOVE_WALK;          break;
+        case CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK:      move_type = MOVE_RUN_BACK;      break;
+        case CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK:          move_type = MOVE_SWIM;          break;
+        case CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK:     move_type = MOVE_SWIM_BACK;     break;
+        case CMSG_MOVE_FORCE_TURN_RATE_CHANGE_ACK:           move_type = MOVE_TURN_RATE;     break;
+        case CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK:        move_type = MOVE_FLIGHT;        break;
+        case CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK:   move_type = MOVE_FLIGHT_BACK;   break;
+        case CMSG_MOVE_FORCE_PITCH_RATE_CHANGE_ACK:          move_type = MOVE_PITCH_RATE;    break;
         default:
             LOG_ERROR("network.opcode", "WorldSession::HandleForceSpeedChangeAck: Unknown move type opcode: {}", opcode);
+            recvData.rfinish();
             return;
     }
+
+    // CPP has no 4.3.4 layout for the turn-rate and pitch-rate acknowledgements; SendSpeedToController
+    // does not count those changes, so the unparsed acknowledgement is dropped instead of validated.
+    WorldPackets::Movement::MovementStatusElements const* sequence =
+        WorldPackets::Movement::GetSpeedChangeSequence(opcode);
+    if (!sequence)
+    {
+        LOG_DEBUG("network", "Ignoring {} acknowledgement without a known 4.3.4 layout", move_type_name[move_type]);
+        recvData.rfinish();
+        return;
+    }
+
+    uint32 counter;
+    float newspeed;
+    MovementInfo movementInfo;
+    WorldPackets::Movement::ReadGroundMovement(recvData, movementInfo, sequence, &counter, &newspeed);
+
+    Unit* mover = _player->m_mover;
+
+    // pussywizard: special check, only player mover allowed here
+    if (movementInfo.guid != mover->GetGUID() || movementInfo.guid != _player->GetGUID())
+        return;
+
+    // old map - async processing, ignore
+    if (counter <= _player->GetMapChangeOrderCounter())
+        return;
+
+    SanitizeMovementFlags(&movementInfo);
+    if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
+        return;
 
     sScriptMgr->AnticheatSetUnderACKmount(_player);
 
     SpeedOpcodePair const& speedOpcodes = SetSpeed2Opc_table[move_type];
-    WorldPacket data(speedOpcodes[static_cast<size_t>(SpeedOpcodeIndex::ACK_RESPONSE)], 18);
-    WriteMovementInfo(&data, &movementInfo);
-    data << newspeed;
+    WorldPacket data(speedOpcodes[static_cast<size_t>(SpeedOpcodeIndex::ACK_RESPONSE)]);
+    WorldPackets::Movement::WriteGroundMovement(data, movementInfo,
+        WorldPackets::Movement::GetSpeedChangeSequence(data.GetOpcode()), 0, newspeed);
     mover->SendMessageToSet(&data, _player);
 
     // Skip all forced speed changes except the last and unexpected acknowledgements.
-    if (_player->m_forced_speed_changes[force_move_type] > 0)
+    if (_player->m_forced_speed_changes[move_type] > 0)
     {
-        --_player->m_forced_speed_changes[force_move_type];
-        if (_player->m_forced_speed_changes[force_move_type] > 0)
+        --_player->m_forced_speed_changes[move_type];
+        if (_player->m_forced_speed_changes[move_type] > 0)
             return;
     }
 

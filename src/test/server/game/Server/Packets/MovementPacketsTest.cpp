@@ -188,6 +188,34 @@ TEST(MovementPacketsTest, ReadsRunSpeedAcknowledgementAndWritesBothServerPackets
         WorldPackets::Movement::WriteRunSpeedUpdate(update, info, speed);
         EXPECT_EQ(ByteArrayToHexStr(std::span<uint8 const>(update.contents(), update.size())), fixture.Update);
 
+        // The generic CPP speed sequences must reproduce the in-game-tested run layouts byte for byte.
+        {
+            using namespace WorldPackets::Movement;
+            WorldPacket genericAck = ClientPacket(CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK, fixture.Ack);
+            MovementInfo genericInfo;
+            uint32 genericCounter = 0;
+            float genericSpeed = 0.0f;
+            ReadGroundMovement(genericAck, genericInfo, GetSpeedChangeSequence(CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK),
+                &genericCounter, &genericSpeed);
+            EXPECT_EQ(genericCounter, counter);
+            EXPECT_FLOAT_EQ(genericSpeed, speed);
+            EXPECT_EQ(genericInfo.guid, info.guid);
+
+            MovementInfo guidOnly;
+            guidOnly.guid = info.guid;
+            WorldPacket genericRequest(SMSG_MOVE_SET_RUN_SPEED);
+            WriteGroundMovement(genericRequest, guidOnly, GetSpeedChangeSequence(SMSG_MOVE_SET_RUN_SPEED), counter,
+                speed);
+            EXPECT_EQ(ByteArrayToHexStr(std::span<uint8 const>(genericRequest.contents(), genericRequest.size())),
+                fixture.Request);
+
+            WorldPacket genericUpdate(SMSG_MOVE_UPDATE_RUN_SPEED);
+            WriteGroundMovement(genericUpdate, genericInfo, GetSpeedChangeSequence(SMSG_MOVE_UPDATE_RUN_SPEED), 0,
+                genericSpeed);
+            EXPECT_EQ(ByteArrayToHexStr(std::span<uint8 const>(genericUpdate.contents(), genericUpdate.size())),
+                fixture.Update);
+        }
+
         std::string hex = fixture.Ack;
         for (std::size_t length = 0; length < hex.size(); length += 2)
         {
@@ -278,6 +306,99 @@ TEST(MovementPacketsTest, ReadsGroundMovementAndRoundTripsTheSameOpcodeLayout)
         MovementInfo info;
         EXPECT_THROW(WorldPackets::Movement::ReadGroundMovement(trailing, info, sequence),
             ByteBufferInvalidValueException) << fixture.Opcode;
+    }
+}
+
+TEST(MovementPacketsTest, EverySpeedTypeHasCataSequencesThatCarryTheSpeed)
+{
+    using namespace WorldPackets::Movement;
+    struct SpeedOpcodes
+    {
+        OpcodeServer Set;
+        OpcodeServer Spline;
+        OpcodeServer Update;
+        uint16 Ack; // 0: no 4.3.4 acknowledgement layout
+    };
+    // Turn and pitch rate: CPP defines no update or acknowledgement layout.
+    for (SpeedOpcodes const& opcodes : std::initializer_list<SpeedOpcodes>{
+        { SMSG_MOVE_SET_WALK_SPEED, SMSG_SPLINE_MOVE_SET_WALK_SPEED, SMSG_MOVE_UPDATE_WALK_SPEED,
+            CMSG_MOVE_FORCE_WALK_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_RUN_SPEED, SMSG_SPLINE_MOVE_SET_RUN_SPEED, SMSG_MOVE_UPDATE_RUN_SPEED,
+            CMSG_MOVE_FORCE_RUN_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_RUN_BACK_SPEED, SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, SMSG_MOVE_UPDATE_RUN_BACK_SPEED,
+            CMSG_MOVE_FORCE_RUN_BACK_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_SWIM_SPEED, SMSG_SPLINE_MOVE_SET_SWIM_SPEED, SMSG_MOVE_UPDATE_SWIM_SPEED,
+            CMSG_MOVE_FORCE_SWIM_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_SWIM_BACK_SPEED, SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, SMSG_MOVE_UPDATE_SWIM_BACK_SPEED,
+            CMSG_MOVE_FORCE_SWIM_BACK_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_TURN_RATE, SMSG_SPLINE_MOVE_SET_TURN_RATE, SMSG_MOVE_UPDATE_TURN_RATE, 0 },
+        { SMSG_MOVE_SET_FLIGHT_SPEED, SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, SMSG_MOVE_UPDATE_FLIGHT_SPEED,
+            CMSG_MOVE_FORCE_FLIGHT_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_FLIGHT_BACK_SPEED, SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED,
+            CMSG_MOVE_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK },
+        { SMSG_MOVE_SET_PITCH_RATE, SMSG_SPLINE_MOVE_SET_PITCH_RATE, SMSG_MOVE_UPDATE_PITCH_RATE, 0 },
+    })
+    {
+        auto count = [](MovementStatusElements const* sequence, MovementStatusElements element)
+        {
+            uint32 found = 0;
+            for (; *sequence != MSEEnd; ++sequence)
+                found += *sequence == element;
+            return found;
+        };
+
+        MovementStatusElements const* set = GetSpeedChangeSequence(opcodes.Set);
+        ASSERT_NE(set, nullptr) << opcodes.Set;
+        EXPECT_EQ(count(set, MSEExtraFloat), 1u) << opcodes.Set;
+        EXPECT_EQ(count(set, MSECounter), 1u) << opcodes.Set;
+        MovementStatusElements const* spline = GetSpeedChangeSequence(opcodes.Spline);
+        ASSERT_NE(spline, nullptr) << opcodes.Spline;
+        EXPECT_EQ(count(spline, MSEExtraFloat), 1u) << opcodes.Spline;
+        EXPECT_EQ(count(spline, MSECounter), 0u) << opcodes.Spline;
+
+        // Every controller request and NPC packet carries the whole GUID and the speed.
+        MovementInfo guidOnly;
+        guidOnly.guid = ObjectGuid(uint64(0x0807060504030201));
+        WorldPacket request(opcodes.Set);
+        WriteGroundMovement(request, guidOnly, set, 0x10203040, 10.5f);
+        EXPECT_EQ(request.size(), 8u + 1u + 4u + 4u) << opcodes.Set;
+        WorldPacket npc(opcodes.Spline);
+        WriteGroundMovement(npc, guidOnly, spline, 0, 10.5f);
+        EXPECT_EQ(npc.size(), 8u + 1u + 4u) << opcodes.Spline;
+
+        if (!opcodes.Ack)
+        {
+            EXPECT_EQ(GetSpeedChangeSequence(opcodes.Update), nullptr) << opcodes.Update;
+            continue;
+        }
+        MovementStatusElements const* update = GetSpeedChangeSequence(opcodes.Update);
+        ASSERT_NE(update, nullptr) << opcodes.Update;
+        EXPECT_EQ(count(update, MSEExtraFloat), 1u) << opcodes.Update;
+
+        // An acknowledgement written with its own sequence reads back with the same counter, speed and movement.
+        MovementStatusElements const* ack = GetSpeedChangeSequence(opcodes.Ack);
+        ASSERT_NE(ack, nullptr) << opcodes.Ack;
+        EXPECT_EQ(count(ack, MSEExtraFloat), 1u) << opcodes.Ack;
+        EXPECT_EQ(count(ack, MSECounter), 1u) << opcodes.Ack;
+        for (std::string const& fixture : { Idle, Sparse, OptionalFields })
+        {
+            WorldPacket heartbeat = ClientPacket(MSG_MOVE_HEARTBEAT, fixture);
+            MovementInfo info;
+            ReadHeartbeat(heartbeat, info);
+
+            WorldPacket written(opcodes.Ack);
+            WriteGroundMovement(written, info, ack, 0x10203040, 10.5f);
+            WorldPacket received(opcodes.Ack, written.size());
+            received.append(written.contents(), written.size());
+            MovementInfo read;
+            uint32 counter = 0;
+            float speed = 0.0f;
+            ReadGroundMovement(received, read, ack, &counter, &speed);
+            EXPECT_EQ(counter, 0x10203040u) << opcodes.Ack;
+            EXPECT_FLOAT_EQ(speed, 10.5f) << opcodes.Ack;
+            EXPECT_EQ(read.guid, info.guid) << opcodes.Ack;
+            EXPECT_EQ(MovementUpdate(read), MovementUpdate(info)) << opcodes.Ack << " " << fixture;
+        }
     }
 }
 

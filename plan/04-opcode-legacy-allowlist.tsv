@@ -79,15 +79,7 @@ c2s	CMSG_FORCEACTION	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_FORCEACTIONONOTHER	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_FORCEACTIONSHOW	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_FORCE_ANIM	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
-c2s	CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_FORCE_PITCH_RATE_CHANGE_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK	#186	movement packet layout is ported with the movement work
 c2s	CMSG_FORCE_SAY_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
-c2s	CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_FORCE_SWIM_SPEED_CHANGE_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_FORCE_TURN_RATE_CHANGE_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_FORCE_WALK_SPEED_CHANGE_ACK	#186	movement packet layout is ported with the movement work
 c2s	CMSG_GET_CHANNEL_MEMBER_COUNT	#182	grouping and social packets are ported with phase 9
 c2s	CMSG_GMRESPONSE_CREATE_TICKET	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_GM_CHARACTER_RESTORE	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
@@ -245,16 +237,8 @@ c2s	MSG_MOVE_FEATHER_FALL	#186	movement packet layout is ported with the movemen
 c2s	MSG_MOVE_KNOCK_BACK	#186	movement packet layout is ported with the movement work
 c2s	MSG_MOVE_ROOT	#186	movement packet layout is ported with the movement work
 c2s	MSG_MOVE_SET_COLLISION_HGT	#186	movement packet layout is ported with the movement work
-c2s	MSG_MOVE_SET_FLIGHT_BACK_SPEED	#186	movement packet layout is ported with the movement work
 c2s	MSG_MOVE_SET_FLIGHT_BACK_SPEED_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
-c2s	MSG_MOVE_SET_FLIGHT_SPEED	#186	movement packet layout is ported with the movement work
-c2s	MSG_MOVE_SET_PITCH_RATE	#186	movement packet layout is ported with the movement work
 c2s	MSG_MOVE_SET_PITCH_RATE_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
-c2s	MSG_MOVE_SET_RUN_BACK_SPEED	#186	movement packet layout is ported with the movement work
-c2s	MSG_MOVE_SET_SWIM_BACK_SPEED	#186	movement packet layout is ported with the movement work
-c2s	MSG_MOVE_SET_SWIM_SPEED	#186	movement packet layout is ported with the movement work
-c2s	MSG_MOVE_SET_TURN_RATE	#186	movement packet layout is ported with the movement work
-c2s	MSG_MOVE_SET_WALK_SPEED	#186	movement packet layout is ported with the movement work
 c2s	MSG_MOVE_START_SWIM_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
 c2s	MSG_MOVE_STOP_SWIM_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
 c2s	MSG_MOVE_UNROOT	#186	movement packet layout is ported with the movement work
@@ -300,16 +284,8 @@ s2c	SMSG_DEBUG_AISTATE	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
 s2c	SMSG_DEBUG_LIST_TARGETS	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
 s2c	SMSG_DUMP_OBJECTS_DATA	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 s2c	SMSG_DYNAMIC_DROP_ROLL_RESULT	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
-s2c	SMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_FLIGHT_SPEED_CHANGE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_PITCH_RATE_CHANGE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_RUN_BACK_SPEED_CHANGE	#186	movement packet layout is ported with the movement work
 s2c	SMSG_FORCE_SEND_QUEUED_PACKETS	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 s2c	SMSG_FORCE_SET_VEHICLE_REC_ID	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_SWIM_BACK_SPEED_CHANGE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_SWIM_SPEED_CHANGE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_TURN_RATE_CHANGE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_FORCE_WALK_SPEED_CHANGE	#186	movement packet layout is ported with the movement work
 s2c	SMSG_GHOSTEE_GONE	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 s2c	SMSG_GMRESPONSE_CREATE_TICKET	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 s2c	SMSG_GOGOGO_OBSOLETE	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
@@ -363,15 +339,6 @@ s2c	SMSG_SPELL_CHANCE_RESIST_PUSHBACK	#168	WotLK-only opcode with no 4.3.4 count
 s2c	SMSG_SPLINE_MOVE_FEATHER_FALL	#186	movement packet layout is ported with the movement work
 s2c	SMSG_SPLINE_MOVE_LAND_WALK	#186	movement packet layout is ported with the movement work
 s2c	SMSG_SPLINE_MOVE_NORMAL_FALL	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_FLIGHT_BACK_SPEED	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_FLIGHT_SPEED	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_PITCH_RATE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_RUN_BACK_SPEED	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_RUN_SPEED	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_SWIM_BACK_SPEED	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_SWIM_SPEED	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_TURN_RATE	#186	movement packet layout is ported with the movement work
-s2c	SMSG_SPLINE_SET_WALK_SPEED	#186	movement packet layout is ported with the movement work
 s2c	SMSG_TRADE_STATUS_EXTENDED	#182	grouping and social packets are ported with phase 9
 s2c	SMSG_UPDATE_LFG_LIST	#183	Dungeon Finder is ported with phase 10
 s2c	SMSG_VOICE_SESSION_ADJUST_PRIORITY	#182	grouping and social packets are ported with phase 9
