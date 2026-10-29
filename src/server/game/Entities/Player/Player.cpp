@@ -1566,10 +1566,14 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             if (!GetSession()->PlayerLogout())
             {
                 // send transfer packets
-                WorldPacket data(SMSG_TRANSFER_PENDING, 4 + 4 + 4);
-                data << uint32(mapid);
+                // Cata: transfer spell and ship bits first, then the ship (origin map, entry) and the map.
+                WorldPacket data(SMSG_TRANSFER_PENDING, 1 + 4 + 4 + 4);
+                data.WriteBit(false);
+                data.WriteBit(m_transport != nullptr);
+                data.FlushBits();
                 if (m_transport)
-                    data << m_transport->GetEntry() << GetMapId();
+                    data << int32(GetMapId()) << uint32(m_transport->GetEntry());
+                data << int32(mapid);
 
                 SendDirectMessage(&data);
             }
@@ -1586,12 +1590,12 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             if (!GetSession()->PlayerLogout())
             {
                 SetCanTeleport(true);
+                // Cata order: X, orientation, Z, map, Y.
+                Position const& pos = m_transport ? m_movementInfo.transport.pos : teleportStore_dest;
                 WorldPacket data(SMSG_NEW_WORLD, 4 + 4 + 4 + 4 + 4);
-                data << uint32(mapid);
-                if (m_transport)
-                    data << m_movementInfo.transport.pos.PositionXYZOStream();
-                else
-                    data << teleportStore_dest.PositionXYZOStream();
+                data << pos.GetPositionX() << pos.GetOrientation() << pos.GetPositionZ();
+                data << int32(mapid);
+                data << pos.GetPositionY();
 
                 SendDirectMessage(&data);
                 SendSavedInstances();
