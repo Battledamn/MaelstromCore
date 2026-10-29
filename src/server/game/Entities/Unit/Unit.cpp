@@ -16334,9 +16334,12 @@ void Unit::SetCanFly(bool enable)
             uint32 const counter = player->GetSession()->GetOrderCounter();
             const_cast<Player*>(player)->SetPendingFlightChange(counter);
 
-            WorldPacket data(enable ? SMSG_MOVE_SET_CAN_FLY : SMSG_MOVE_UNSET_CAN_FLY, GetPackGUID().size() + 4);
-            data << GetPackGUID();
-            data << counter;
+            // Cata: bit-packed guid and counter; the 3.3.5a packed-guid layout is dropped by the client.
+            WorldPacket data(enable ? SMSG_MOVE_SET_CAN_FLY : SMSG_MOVE_UNSET_CAN_FLY, 13);
+            MovementInfo info;
+            info.guid = GetGUID();
+            WorldPackets::Movement::WriteGroundMovement(data, info,
+                WorldPackets::Movement::GetMovementFlagSequence(data.GetOpcode()), counter);
             player->SendDirectMessage(&data);
             player->GetSession()->IncrementOrderCounter();
             return;

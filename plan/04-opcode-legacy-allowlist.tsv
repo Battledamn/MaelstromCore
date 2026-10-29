@@ -144,7 +144,6 @@ c2s	CMSG_MAKEMONSTERATTACKGUID	#168	WotLK-only opcode with no 4.3.4 counterpart 
 c2s	CMSG_MOVE_CHARACTER_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
 c2s	CMSG_MOVE_CHARM_PORT_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode
 c2s	CMSG_MOVE_SET_COLLISION_HGT_ACK	#186	movement packet layout is ported with the movement work
-c2s	CMSG_MOVE_SET_FLY	#186	movement packet layout is ported with the movement work
 c2s	CMSG_MOVE_SET_RAW_POSITION	#186	movement packet layout is ported with the movement work
 c2s	CMSG_MOVE_SET_RUN_SPEED	#186	movement packet layout is ported with the movement work
 c2s	CMSG_MOVE_START_SWIM_CHEAT	#168	WotLK-only debug or cheat handler; no 4.3.4 opcode

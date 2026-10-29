@@ -1508,7 +1508,7 @@ void WorldSession::HandleMoveFlagChangeOpcode(WorldPacket& recv_data)
 
     OpcodeClient opcode = static_cast<OpcodeClient>(recv_data.GetOpcode());
 
-    if (opcode == CMSG_MOVE_WATER_WALK_ACK)
+    if (opcode == CMSG_MOVE_WATER_WALK_ACK || opcode == CMSG_MOVE_SET_CAN_FLY_ACK)
     {
         uint32 counter;
         MovementInfo movementInfo;
@@ -1521,6 +1521,8 @@ void WorldSession::HandleMoveFlagChangeOpcode(WorldPacket& recv_data)
         sScriptMgr->AnticheatSetCanFlybyServer(_player, movementInfo.HasMovementFlag(MOVEMENTFLAG_CAN_FLY));
         if (!ProcessMovementInfo(movementInfo, mover, mover->ToPlayer(), recv_data))
             return;
+        if (opcode == CMSG_MOVE_SET_CAN_FLY_ACK && _player->GetPendingFlightChange() == counter)
+            _player->SetPendingFlightChange(false);
         WorldPacket data(SMSG_MOVE_UPDATE);
         WorldPackets::Movement::WriteMovementUpdate(data, movementInfo);
         mover->SendMessageToSet(&data, _player);

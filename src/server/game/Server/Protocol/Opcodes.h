@@ -519,7 +519,7 @@ enum OpcodeClient : uint16
     MSG_MOVE_START_SWIM_CHEAT                       = 0x341,
     MSG_MOVE_STOP_SWIM_CHEAT                        = 0x342,
     CMSG_MOVE_SET_CAN_FLY_ACK                       = 0x790C,
-    CMSG_MOVE_SET_FLY                               = 0x346,
+    CMSG_MOVE_SET_CAN_FLY                           = 0x720E,
     CMSG_SOCKET_GEMS                                = 0x2F04,
     CMSG_ARENA_TEAM_CREATE                          = 0x04A1,
     MSG_MOVE_UPDATE_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY = 0x34A,

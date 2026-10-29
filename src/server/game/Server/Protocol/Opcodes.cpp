@@ -1108,7 +1108,7 @@ void OpcodeTable::Initialize()
     /*0x3DA1*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_MOVE_SET_CAN_FLY,                                   STATUS_NEVER);
     /*0x15A2*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_MOVE_UNSET_CAN_FLY,                                 STATUS_NEVER);
     /*0x790C*/ DEFINE_HANDLER(CMSG_MOVE_SET_CAN_FLY_ACK,                                             STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleMoveFlagChangeOpcode               );
-    /*0x0346*/ DEFINE_HANDLER(CMSG_MOVE_SET_FLY,                                                     STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleMovementOpcodes                    );
+    /*0x720E*/ DEFINE_HANDLER(CMSG_MOVE_SET_CAN_FLY,                                                 STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleMovementOpcodes                    );
     /*0x2F04*/ DEFINE_HANDLER(CMSG_SOCKET_GEMS,                                                      STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::HandleSocketOpcode                       );
     /*0x04A1*/ DEFINE_HANDLER(CMSG_ARENA_TEAM_CREATE,                                                STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x39B3*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_ARENA_TEAM_COMMAND_RESULT,                          STATUS_NEVER);
