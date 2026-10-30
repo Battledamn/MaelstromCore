@@ -947,6 +947,16 @@ std::string GetRandomCharacterName(uint8 race, uint8 sex)
     return Acore::Containers::SelectRandomContainerElement(itr->second);
 }
 
+bool IsValidPhaseId(uint32 phaseId)
+{
+    return sPhaseStore.LookupEntry(phaseId) != nullptr;
+}
+
+bool IsValidPhaseGroupId(uint32 phaseGroupId)
+{
+    return sPhasesByGroup.find(phaseGroupId) != sPhasesByGroup.end();
+}
+
 uint32 GetVirtualMapForMapAndZone(uint32 mapid, uint32 zoneId)
 {
     if (mapid != MAP_OUTLAND && mapid != MAP_NORTHREND)                        // speed for most cases

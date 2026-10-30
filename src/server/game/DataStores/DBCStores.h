@@ -68,6 +68,8 @@ std::vector<uint32> GetPhasesForGroup(uint32 phaseOrGroupId);
 
 // True if phaseOrGroupId identifies a real Phase.dbc entry or PhaseXPhaseGroup.dbc group.
 bool IsValidPhaseOrPhaseGroupId(uint32 phaseOrGroupId);
+bool IsValidPhaseId(uint32 phaseId);
+bool IsValidPhaseGroupId(uint32 phaseGroupId);
 
 // A random NameGen.dbc name for the race and sex; empty when the client data has none for them.
 std::string GetRandomCharacterName(uint8 race, uint8 sex);

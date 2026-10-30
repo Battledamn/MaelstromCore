@@ -1446,6 +1446,7 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     data.mapid = mapid;
     data.phaseMask = phaseMask;
     data.phaseId = GetSpawnPhaseId();
+    data.phaseGroup = GetSpawnPhaseGroup();
     data.displayid = displayId;
     data.equipmentId = GetCurrentEquipmentId();
     if (!GetTransport())
@@ -1493,6 +1494,7 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     stmt->SetData(index++, spawnMask);
     stmt->SetData(index++, GetPhaseMask());
     stmt->SetData(index++, GetSpawnPhaseId());
+    stmt->SetData(index++, GetSpawnPhaseGroup());
     stmt->SetData(index++, int32(GetCurrentEquipmentId()));
     stmt->SetData(index++, GetPositionX());
     stmt->SetData(index++, GetPositionY());
@@ -1750,6 +1752,7 @@ bool Creature::LoadCreatureFromDB(ObjectGuid::LowType spawnId, Map* map, bool ad
         return false;
 
     SetSpawnPhaseId(data->phaseId);
+    SetSpawnPhaseGroup(data->phaseGroup);
 
     //We should set first home position, because then AI calls home movement
     SetHomePosition(data->posX, data->posY, data->posZ, data->orientation);
