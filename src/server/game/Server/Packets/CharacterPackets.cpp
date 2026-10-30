@@ -43,7 +43,7 @@ WorldPacket const* WorldPackets::Character::EnumCharactersResult::Write()
         _worldPacket.WriteBit(charInfo.Guid[7]);
         _worldPacket.WriteBit(charInfo.GuildGUID[3]);
         _worldPacket.WriteBit(charInfo.Guid[5]);
-        _worldPacket.WriteBit(charInfo.Guid[6]);
+        _worldPacket.WriteBit(charInfo.GuildGUID[6]);
         _worldPacket.WriteBit(charInfo.Guid[1]);
         _worldPacket.WriteBit(charInfo.GuildGUID[5]);
         _worldPacket.WriteBit(charInfo.GuildGUID[4]);

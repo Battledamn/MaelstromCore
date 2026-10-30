@@ -503,3 +503,80 @@ TEST_F(GroundMovementRoutingTest, RejectsGroundMovementFromASpoofedMoverGuid)
     EXPECT_FLOAT_EQ(player->GetPositionZ(), 0.0f);
     EXPECT_FALSE(session->IsKicked());
 }
+
+// Observers of a moving player get SMSG_MOVE_UPDATE and the SMSG_MOVE_UPDATE_*/SMSG_SPLINE_MOVE_* packets in their
+// 4.3.4 layouts; the 3.3.5a packed-guid layouts left other players frozen or running in place.
+TEST(MovementPacketsTest, UsesCataclysmObserverMovementOpcodes)
+{
+    EXPECT_EQ(uint16(SMSG_MOVE_UPDATE), 0x79A2);
+    EXPECT_EQ(uint16(SMSG_MOVE_UPDATE_KNOCK_BACK), 0x3DB2);
+    EXPECT_EQ(uint16(SMSG_MOVE_KNOCK_BACK), 0x5CB4);
+    EXPECT_EQ(uint16(CMSG_MOVE_KNOCK_BACK_ACK), 0x721C);
+    EXPECT_EQ(uint16(SMSG_SPLINE_MOVE_FEATHER_FALL), 0x3DA5);
+    EXPECT_EQ(uint16(SMSG_SPLINE_MOVE_NORMAL_FALL), 0x38B2);
+    EXPECT_EQ(uint16(SMSG_SPLINE_MOVE_WATER_WALK), 0x50A2);
+    EXPECT_EQ(uint16(SMSG_SPLINE_MOVE_LAND_WALK), 0x3DA7);
+}
+
+TEST(MovementPacketsTest, WritesSplineMoveStatesWithBitPackedGuid)
+{
+    for (OpcodeServer opcode : { SMSG_SPLINE_MOVE_SET_WALK_MODE, SMSG_SPLINE_MOVE_SET_RUN_MODE,
+        SMSG_SPLINE_MOVE_START_SWIM, SMSG_SPLINE_MOVE_STOP_SWIM, SMSG_SPLINE_MOVE_GRAVITY_DISABLE,
+        SMSG_SPLINE_MOVE_GRAVITY_ENABLE, SMSG_SPLINE_MOVE_SET_HOVER, SMSG_SPLINE_MOVE_UNSET_HOVER,
+        SMSG_SPLINE_MOVE_SET_FLYING, SMSG_SPLINE_MOVE_UNSET_FLYING, SMSG_SPLINE_MOVE_WATER_WALK,
+        SMSG_SPLINE_MOVE_LAND_WALK, SMSG_SPLINE_MOVE_FEATHER_FALL, SMSG_SPLINE_MOVE_NORMAL_FALL,
+        SMSG_SPLINE_MOVE_ROOT, SMSG_SPLINE_MOVE_UNROOT })
+    {
+        ASSERT_NE(WorldPackets::Movement::GetSplineMoveStateSequence(opcode), nullptr) << opcode;
+        WorldPacket packet(opcode);
+        WorldPackets::Movement::WriteSplineMoveState(packet, ObjectGuid(uint64(0x8877665544332211)));
+        EXPECT_EQ(packet.size(), 9u) << opcode;
+        EXPECT_EQ(packet.contents()[0], 0xFF) << opcode;
+    }
+
+    WorldPacket swim(SMSG_SPLINE_MOVE_START_SWIM);
+    WorldPackets::Movement::WriteSplineMoveState(swim, ObjectGuid(uint64(0x8877665544332211)));
+    EXPECT_EQ(ByteArrayToHexStr(std::span<uint8 const>(swim.contents(), swim.size())), "FF4589326776542310");
+}
+
+TEST(MovementPacketsTest, WritesKnockBackAndRoundTripsItsAcknowledgement)
+{
+    WorldPacket knockBack(SMSG_MOVE_KNOCK_BACK);
+    WorldPackets::Movement::WriteKnockBack(knockBack, ObjectGuid(uint64(0x01)), 7, 1.0f, 0.5f, 2.0f, -4.0f);
+    EXPECT_EQ(ByteArrayToHexStr(std::span<uint8 const>(knockBack.contents(), knockBack.size())),
+        "80" "0000003F" "07000000" "00000040" "000080C0" "0000803F" "00");
+
+    MovementInfo info;
+    info.guid = ObjectGuid(uint64(0x01020304));
+    info.AddMovementFlag(MOVEMENTFLAG_FALLING);
+    info.pos.Relocate(1.0f, 2.0f, 3.0f, 1.5f);
+    info.time = 0x11223344;
+    info.fallTime = 100;
+    info.jump.zspeed = -7.0f;
+    info.jump.sinAngle = 0.5f;
+    info.jump.cosAngle = 0.25f;
+    info.jump.xyspeed = 8.0f;
+
+    WorldPackets::Movement::MovementStatusElements const* ack =
+        WorldPackets::Movement::GetMovementFlagSequence(CMSG_MOVE_KNOCK_BACK_ACK);
+    ASSERT_NE(ack, nullptr);
+    ASSERT_NE(WorldPackets::Movement::GetMovementFlagSequence(SMSG_MOVE_UPDATE_KNOCK_BACK), nullptr);
+
+    WorldPacket written(SMSG_MOVE_UPDATE_KNOCK_BACK);
+    WorldPackets::Movement::WriteGroundMovement(written, info, ack, 9);
+    WorldPacket packet = ClientPacket(CMSG_MOVE_KNOCK_BACK_ACK,
+        ByteArrayToHexStr(std::span<uint8 const>(written.contents(), written.size())));
+    MovementInfo read;
+    uint32 counter = 0;
+    WorldPackets::Movement::ReadGroundMovement(packet, read, ack, &counter);
+    EXPECT_EQ(counter, 9u);
+    EXPECT_EQ(read.guid, info.guid);
+    EXPECT_EQ(read.flags, info.flags);
+    EXPECT_EQ(read.time, info.time);
+    EXPECT_EQ(read.fallTime, 100u);
+    EXPECT_FLOAT_EQ(read.pos.GetPositionY(), 2.0f);
+    EXPECT_FLOAT_EQ(read.pos.GetOrientation(), 1.5f);
+    EXPECT_FLOAT_EQ(read.jump.zspeed, -7.0f);
+    EXPECT_FLOAT_EQ(read.jump.cosAngle, 0.25f);
+    EXPECT_FLOAT_EQ(read.jump.xyspeed, 8.0f);
+}

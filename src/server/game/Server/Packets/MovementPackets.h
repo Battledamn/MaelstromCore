@@ -94,6 +94,15 @@ namespace WorldPackets
         void WriteTimeSkipped(WorldPacket& packet, ObjectGuid const& guid, uint32 time);
         void WriteTeleportUpdate(WorldPacket& packet, MovementInfo const& info);
 
+        // SMSG_SPLINE_MOVE_* state changes of a server-moved unit (walk/run mode, swim, gravity, flying, hover,
+        // water walk, feather fall, root) carry only the bit-packed guid; nullptr where no 4.3.4 layout is known.
+        MovementStatusElements const* GetSplineMoveStateSequence(uint16 opcode);
+        void WriteSplineMoveState(WorldPacket& packet, ObjectGuid const& guid);
+        // SMSG_MOVE_KNOCK_BACK to the controlling client; CMSG_MOVE_KNOCK_BACK_ACK and SMSG_MOVE_UPDATE_KNOCK_BACK
+        // use the generic sequences from GetMovementFlagSequence().
+        void WriteKnockBack(WorldPacket& packet, ObjectGuid const& guid, uint32 counter, float vcos, float vsin,
+            float speedXY, float speedZ);
+
         void WriteRunSpeedChange(WorldPacket& packet, ObjectGuid const& guid, uint32 counter, float speed);
         void ReadRunSpeedChangeAck(WorldPacket& packet, MovementInfo& info, uint32& counter, float& speed);
         void WriteRunSpeedUpdate(WorldPacket& packet, MovementInfo const& info, float speed);

@@ -36,7 +36,7 @@ class AC_GAME_API TradeData
 {
 public:                                                 // constructors
     TradeData(Player* player, Player* trader) :
-        _player(player),  _trader(trader), _accepted(false), m_acceptProccess(false), _money(0), m_spell(0) { }
+        _player(player),  _trader(trader), _accepted(false), m_acceptProccess(false), _money(0), m_spell(0), m_clientStateIndex(1), m_serverStateIndex(1) { }
 
     [[nodiscard]] Player* GetTrader() const { return _trader; }
     [[nodiscard]] TradeData* GetTraderData() const;
@@ -61,6 +61,14 @@ public:                                                 // constructors
     [[nodiscard]] bool IsInAcceptProcess() const { return m_acceptProccess; }
     void SetInAcceptProcess(bool state) { m_acceptProccess = state; }
 
+    // 4.3.4 trade state indices (CPP): the client index counts this player's own changes, the server
+    // index changes on every change to the offer; the client returns the latter when it accepts
+    [[nodiscard]] uint32 GetClientStateIndex() const { return m_clientStateIndex; }
+    void UpdateClientStateIndex() { ++m_clientStateIndex; }
+
+    [[nodiscard]] uint32 GetServerStateIndex() const { return m_serverStateIndex; }
+    void UpdateServerStateIndex();
+
 private:                                                // internal functions
     void Update(bool for_trader = true);
 
@@ -77,6 +85,9 @@ private:                                                // fields
     ObjectGuid m_spellCastItem;                         // applied spell casted by item use
 
     ObjectGuid m_items[TRADE_SLOT_COUNT];               // traded itmes from m_player side including non-traded slot
+
+    uint32     m_clientStateIndex;
+    uint32     m_serverStateIndex;
 };
 
 #endif

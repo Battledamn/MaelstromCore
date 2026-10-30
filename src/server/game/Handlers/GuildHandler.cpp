@@ -15,6 +15,7 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "GameTime.h"
 #include "Guild.h"
 #include "GuildMgr.h"
 #include "GuildPackets.h"
@@ -26,11 +27,11 @@
 
 void WorldSession::HandleGuildQueryOpcode(WorldPackets::Guild::QueryGuildInfo& query)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_QUERY [{}]: Guild: {}", GetPlayerInfo(), query.GuildId);
-    if (!query.GuildId)
-        return;
+    LOG_DEBUG("guild", "CMSG_GUILD_QUERY [{}]: Guild: {} Target: {}", GetPlayerInfo(), query.GuildGuid.ToString(),
+        query.PlayerGuid.ToString());
 
-    if (Guild* guild = sGuildMgr->GetGuildById(query.GuildId))
+    // Also sent from the character list, before a player is logged in
+    if (Guild* guild = sGuildMgr->GetGuildById(query.GuildGuid.GetCounter()))
         guild->HandleQuery(this);
 }
 
@@ -49,11 +50,10 @@ void WorldSession::HandleGuildInviteOpcode(WorldPackets::Guild::GuildInviteByNam
 
 void WorldSession::HandleGuildRemoveOpcode(WorldPackets::Guild::GuildOfficerRemoveMember& packet)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_REMOVE [{}]: Target: {}", GetPlayerInfo(), packet.Removee);
+    LOG_DEBUG("guild", "CMSG_GUILD_REMOVE [{}]: Target: {}", GetPlayerInfo(), packet.Removee.ToString());
 
-    if (normalizePlayerName(packet.Removee))
-        if (Guild* guild = GetPlayer()->GetGuild())
-            guild->HandleRemoveMember(this, packet.Removee);
+    if (Guild* guild = GetPlayer()->GetGuild())
+        guild->HandleRemoveMember(this, packet.Removee);
 }
 
 void WorldSession::HandleGuildAcceptOpcode(WorldPackets::Guild::AcceptGuildInvite& /*invite*/)
@@ -106,20 +106,30 @@ void WorldSession::HandleGuildRosterOpcode(WorldPackets::Guild::GuildGetRoster& 
 
 void WorldSession::HandleGuildPromoteOpcode(WorldPackets::Guild::GuildPromoteMember& promote)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_PROMOTE [{}]: Target: {}", GetPlayerInfo(), promote.Promotee);
+    LOG_DEBUG("guild", "CMSG_GUILD_PROMOTE [{}]: Target: {}", GetPlayerInfo(), promote.Promotee.ToString());
 
-    if (normalizePlayerName(promote.Promotee))
-        if (Guild* guild = GetPlayer()->GetGuild())
-            guild->HandleUpdateMemberRank(this, promote.Promotee, false);
+    if (Guild* guild = GetPlayer()->GetGuild())
+        guild->HandleUpdateMemberRank(this, promote.Promotee, false);
 }
 
 void WorldSession::HandleGuildDemoteOpcode(WorldPackets::Guild::GuildDemoteMember& demote)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_DEMOTE [{}]: Target: {}", GetPlayerInfo(), demote.Demotee);
+    LOG_DEBUG("guild", "CMSG_GUILD_DEMOTE [{}]: Target: {}", GetPlayerInfo(), demote.Demotee.ToString());
 
-    if (normalizePlayerName(demote.Demotee))
-        if (Guild* guild = GetPlayer()->GetGuild())
-            guild->HandleUpdateMemberRank(this, demote.Demotee, true);
+    if (Guild* guild = GetPlayer()->GetGuild())
+        guild->HandleUpdateMemberRank(this, demote.Demotee, true);
+}
+
+void WorldSession::HandleGuildAssignRankOpcode(WorldPackets::Guild::GuildAssignMemberRank& packet)
+{
+    LOG_DEBUG("guild", "CMSG_GUILD_ASSIGN_MEMBER_RANK [{}]: Target: {} Rank: {}, Issuer: {}", GetPlayerInfo(),
+        packet.Member.ToString(), packet.RankID, packet.Setter.ToString());
+
+    if (packet.RankID >= GUILD_RANKS_MAX_COUNT)
+        return;
+
+    if (Guild* guild = GetPlayer()->GetGuild())
+        guild->HandleSetMemberRank(this, packet.Member, uint8(packet.RankID));
 }
 
 void WorldSession::HandleGuildLeaveOpcode(WorldPackets::Guild::GuildLeave& /*leave*/)
@@ -140,16 +150,36 @@ void WorldSession::HandleGuildDisbandOpcode(WorldPackets::Guild::GuildDelete& /*
 
 void WorldSession::HandleGuildLeaderOpcode(WorldPackets::Guild::GuildSetGuildMaster& packet)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_LEADER [{}]: Target: {}", GetPlayerInfo(), packet.NewMasterName);
+    LOG_DEBUG("guild", "CMSG_GUILD_SET_GUILD_MASTER [{}]: Target: {} Dethrone: {}", GetPlayerInfo(), packet.NewMasterName,
+        packet.IsDethrone);
 
-    if (normalizePlayerName(packet.NewMasterName))
-        if (Guild* guild = GetPlayer()->GetGuild())
-            guild->HandleSetLeader(this, packet.NewMasterName);
+    // Dethroning an inactive guild master is not implemented: it needs the 90 day inactivity tracking
+    if (packet.IsDethrone)
+    {
+        Guild::SendCommandResult(this, GUILD_COMMAND_CHANGE_LEADER, ERR_GUILD_PERMISSIONS);
+        return;
+    }
+
+    Guild* guild = GetPlayer()->GetGuild();
+    if (!guild)
+        return;
+
+    // /gleader without a name sends an empty one
+    if (!normalizePlayerName(packet.NewMasterName))
+    {
+        Guild::SendCommandResult(this, GUILD_COMMAND_CHANGE_LEADER, ERR_GUILD_PLAYER_NOT_FOUND_S, packet.NewMasterName);
+        return;
+    }
+
+    guild->HandleSetLeader(this, packet.NewMasterName);
 }
 
 void WorldSession::HandleGuildMOTDOpcode(WorldPackets::Guild::GuildUpdateMotdText& packet)
 {
     LOG_DEBUG("guild", "CMSG_GUILD_MOTD [{}]: MOTD: {}", GetPlayerInfo(), packet.MotdText);
+
+    if (packet.MotdText.size() > 128)
+        packet.MotdText.resize(128);
 
     if (Guild* guild = GetPlayer()->GetGuild())
         guild->HandleSetMOTD(this, packet.MotdText);
@@ -157,74 +187,75 @@ void WorldSession::HandleGuildMOTDOpcode(WorldPackets::Guild::GuildUpdateMotdTex
 
 void WorldSession::HandleGuildSetPublicNoteOpcode(WorldPackets::Guild::GuildSetMemberNote& packet)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_SET_PUBLIC_NOTE [{}]: Target: {}, Note: {}", GetPlayerInfo(), packet.NoteeName, packet.Note);
+    LOG_DEBUG("guild", "CMSG_GUILD_SET_NOTE [{}]: Target: {}, Note: {}, Public: {}", GetPlayerInfo(),
+        packet.NoteeGUID.ToString(), packet.Note, packet.IsPublic);
 
-    if (normalizePlayerName(packet.NoteeName))
-        if (Guild* guild = GetPlayer()->GetGuild())
-            guild->HandleSetMemberNote(this, packet.NoteeName, packet.Note, true);
+    if (packet.Note.size() > 31)
+        packet.Note.resize(31);
+
+    if (Guild* guild = GetPlayer()->GetGuild())
+        guild->HandleSetMemberNote(this, packet.NoteeGUID, packet.Note, packet.IsPublic);
 }
 
-void WorldSession::HandleGuildSetOfficerNoteOpcode(WorldPackets::Guild::GuildSetMemberNote& packet)
+void WorldSession::HandleGuildQueryRanksOpcode(WorldPackets::Guild::GuildQueryRanks& packet)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_SET_OFFICER_NOTE [{}]: Target: {}, Note: {}",
-              GetPlayerInfo(), packet.NoteeName, packet.Note);
+    LOG_DEBUG("guild", "CMSG_GUILD_QUERY_RANKS [{}]: Guild: {}", GetPlayerInfo(), packet.GuildGuid.ToString());
 
-    if (normalizePlayerName(packet.NoteeName))
-        if (Guild* guild = GetPlayer()->GetGuild())
-            guild->HandleSetMemberNote(this, packet.NoteeName, packet.Note, false);
+    if (Guild* guild = sGuildMgr->GetGuildById(packet.GuildGuid.GetCounter()))
+        if (guild->GetMember(GetPlayer()->GetGUID()))
+            guild->SendGuildRankInfo(this);
 }
 
 void WorldSession::HandleGuildRankOpcode(WorldPackets::Guild::GuildSetRankPermissions& packet)
 {
     Guild* guild = GetPlayer()->GetGuild();
     if (!guild)
-    {
         return;
-    }
 
+    if (packet.RankID >= GUILD_RANKS_MAX_COUNT)
+        return;
+
+    if (packet.RankName.size() > 15)
+        packet.RankName.resize(15);
+
+    // The packet always carries 8 tabs; this core has GUILD_BANK_MAX_TABS of them
     std::array<GuildBankRightsAndSlots, GUILD_BANK_MAX_TABS> rightsAndSlots;
-
     for (uint8 tabId = 0; tabId < GUILD_BANK_MAX_TABS; ++tabId)
-    {
-        // For some reason the client is sending - 1 for guildmaster tab withdraw item limit, that's ilegal for us because we expect unsigned int.
-        // Probably core handling for this should be changed.
-        if (packet.TabWithdrawItemLimit[tabId] <= 0)
-        {
-            packet.TabWithdrawItemLimit[tabId] = uint32(GUILD_WITHDRAW_SLOT_UNLIMITED);
-        }
         rightsAndSlots[tabId] = GuildBankRightsAndSlots(tabId, uint8(packet.TabFlags[tabId]), packet.TabWithdrawItemLimit[tabId]);
-    }
 
-    LOG_DEBUG("guild", "CMSG_GUILD_RANK [{}]: Rank: {} ({})", GetPlayerInfo(), packet.RankName, packet.RankID);
+    LOG_DEBUG("guild", "CMSG_GUILD_SET_RANK_PERMISSIONS [{}]: Rank: {} ({})", GetPlayerInfo(), packet.RankName, packet.RankID);
 
-    // Same as the issue above but this time with rights.
-    if (packet.Flags <= 0)
-    {
-        packet.Flags = GUILD_BANK_RIGHT_FULL;
-    }
-
-    guild->HandleSetRankInfo(this, packet.RankID, packet.RankName, packet.Flags, packet.WithdrawGoldLimit, rightsAndSlots);
+    guild->HandleSetRankInfo(this, uint8(packet.RankID), packet.RankName, packet.Flags, packet.WithdrawGoldLimit, rightsAndSlots);
 }
 
 void WorldSession::HandleGuildAddRankOpcode(WorldPackets::Guild::GuildAddRank& packet)
 {
     LOG_DEBUG("guild", "CMSG_GUILD_ADD_RANK [{}]: Rank: {}", GetPlayerInfo(), packet.Name);
 
+    if (packet.Name.size() > 15)
+        packet.Name.resize(15);
+
     if (Guild* guild = GetPlayer()->GetGuild())
         guild->HandleAddNewRank(this, packet.Name);
 }
 
-void WorldSession::HandleGuildDelRankOpcode(WorldPackets::Guild::GuildDeleteRank& /*packet*/)
+void WorldSession::HandleGuildDelRankOpcode(WorldPackets::Guild::GuildDeleteRank& packet)
 {
-    LOG_DEBUG("guild", "CMSG_GUILD_DEL_RANK [{}]", GetPlayerInfo());
+    LOG_DEBUG("guild", "CMSG_GUILD_DEL_RANK [{}]: Rank: {}", GetPlayerInfo(), packet.RankID);
+
+    if (packet.RankID >= GUILD_RANKS_MAX_COUNT)
+        return;
 
     if (Guild* guild = GetPlayer()->GetGuild())
-        guild->HandleRemoveLowestRank(this);
+        guild->HandleRemoveRank(this, uint8(packet.RankID));
 }
 
 void WorldSession::HandleGuildChangeInfoTextOpcode(WorldPackets::Guild::GuildUpdateInfoText& packet)
 {
     LOG_DEBUG("guild", "CMSG_GUILD_INFO_TEXT [{}]: {}", GetPlayerInfo(), packet.InfoText);
+
+    if (packet.InfoText.size() > 500)
+        packet.InfoText.resize(500);
 
     if (Guild* guild = GetPlayer()->GetGuild())
         guild->HandleSetInfo(this, packet.InfoText);
@@ -256,7 +287,7 @@ void WorldSession::HandleSaveGuildEmblemOpcode(WorldPackets::Guild::SaveGuildEmb
 
 void WorldSession::HandleGuildEventLogQueryOpcode(WorldPackets::Guild::GuildEventLogQuery& /*packet*/)
 {
-    LOG_DEBUG("guild", "MSG_GUILD_EVENT_LOG_QUERY [{}]", GetPlayerInfo());
+    LOG_DEBUG("guild", "CMSG_GUILD_EVENT_LOG_QUERY [{}]", GetPlayerInfo());
 
     if (Guild* guild = GetPlayer()->GetGuild())
         guild->SendEventLog(this);
@@ -408,4 +439,60 @@ void WorldSession::HandleSetGuildBankTabText(WorldPackets::Guild::GuildBankSetTa
 
     if (Guild* guild = GetPlayer()->GetGuild())
         guild->SetBankTabText(packet.Tab, packet.TabText);
+}
+
+// Cataclysm guild features that are not implemented yet (guild levels, news, rewards, challenges):
+// answer with an empty or level 1 state so the guild window works.
+void WorldSession::HandleGuildQueryNewsOpcode(WorldPackets::Guild::GuildQueryNews& /*packet*/)
+{
+    if (GetPlayer()->GetGuild())
+        SendPacket(WorldPackets::Guild::GuildNews().Write());
+}
+
+void WorldSession::HandleGuildXPQueryOpcode(WorldPackets::Guild::GuildXPQuery& packet)
+{
+    if (Guild* guild = sGuildMgr->GetGuildById(packet.GuildGuid.GetCounter()))
+        if (guild->GetMember(GetPlayer()->GetGUID()))
+            SendPacket(WorldPackets::Guild::GuildXP().Write());
+}
+
+void WorldSession::HandleGuildRequestMaxDailyXP(WorldPackets::Guild::GuildRequestMaxDailyXP& packet)
+{
+    if (Guild* guild = sGuildMgr->GetGuildById(packet.GuildGuid.GetCounter()))
+        if (guild->GetMember(GetPlayer()->GetGUID()))
+            SendPacket(WorldPackets::Guild::GuildMaxDailyXP().Write());
+}
+
+void WorldSession::HandleRequestGuildRewardsList(WorldPackets::Guild::RequestGuildRewardsList& /*packet*/)
+{
+    if (!GetPlayer()->GetGuild())
+        return;
+
+    WorldPackets::Guild::GuildRewardList rewardList;
+    rewardList.Version = int32(GameTime::GetGameTime().count());
+    SendPacket(rewardList.Write());
+}
+
+void WorldSession::HandleGuildRequestPartyState(WorldPackets::Guild::GuildRequestPartyState& packet)
+{
+    Guild* guild = sGuildMgr->GetGuildById(packet.GuildGuid.GetCounter());
+    if (!guild || !guild->GetMember(GetPlayer()->GetGUID()))
+        return;
+
+    // Guild groups only matter for guild experience and reputation bonuses, which are not implemented
+    SendPacket(WorldPackets::Guild::GuildPartyState().Write());
+}
+
+void WorldSession::HandleGuildRequestChallengeUpdate(WorldPackets::Guild::GuildChallengeUpdateRequest& /*packet*/)
+{
+    if (GetPlayer()->GetGuild())
+        SendPacket(WorldPackets::Guild::GuildChallengeUpdate().Write());
+}
+
+void WorldSession::HandleAutoDeclineGuildInvites(WorldPackets::Guild::AutoDeclineGuildInvites& packet)
+{
+    if (packet.Allow)
+        GetPlayer()->SetPlayerFlag(PLAYER_FLAGS_AUTO_DECLINE_GUILD);
+    else
+        GetPlayer()->RemovePlayerFlag(PLAYER_FLAGS_AUTO_DECLINE_GUILD);
 }

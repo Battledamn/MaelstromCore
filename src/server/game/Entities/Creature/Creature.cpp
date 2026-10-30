@@ -32,6 +32,7 @@
 #include "GroupMgr.h"
 #include "Log.h"
 #include "LootMgr.h"
+#include "MovementPackets.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "Pet.h"
@@ -3407,7 +3408,7 @@ bool Creature::SetWalk(bool enable)
         return false;
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_WALK_MODE : SMSG_SPLINE_MOVE_SET_RUN_MODE, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, false);
     return true;
 }
@@ -3418,7 +3419,7 @@ bool Creature::SetSwim(bool enable)
         return false;
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_START_SWIM : SMSG_SPLINE_MOVE_STOP_SWIM);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, true);
     return true;
 }

@@ -16,6 +16,7 @@
  */
 
 #include "Player.h"
+#include "Random.h"
 #include "WorldSession.h"
 
 TradeData* TradeData::GetTraderData() const
@@ -63,6 +64,8 @@ void TradeData::SetItem(TradeSlots slot, Item* item)
     SetAccepted(false);
     GetTraderData()->SetAccepted(false);
 
+    UpdateServerStateIndex();
+
     Update();
 
     // need remove possible trader spell applied to changed item
@@ -85,6 +88,8 @@ void TradeData::SetSpell(uint32 spell_id, Item* castItem /*= nullptr*/)
 
     SetAccepted(false);
     GetTraderData()->SetAccepted(false);
+
+    UpdateServerStateIndex();
 
     Update(true);                                           // send spell info to item owner
     Update(false);                                          // send spell info to caster self
@@ -109,7 +114,14 @@ void TradeData::SetMoney(uint32 money)
     SetAccepted(false);
     GetTraderData()->SetAccepted(false);
 
+    UpdateServerStateIndex();
+
     Update(true);
+}
+
+void TradeData::UpdateServerStateIndex()
+{
+    m_serverStateIndex = rand32();
 }
 
 void TradeData::Update(bool forTarget /*= true*/)

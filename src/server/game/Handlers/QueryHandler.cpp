@@ -74,16 +74,14 @@ void WorldSession::HandleTimeQueryOpcode(WorldPackets::Query::TimeQuery& /*packe
     SendTimeQueryResponse();
 }
 
-// The client asks for DB2 rows it wants refreshed (Item/Item-sparse, e.g. the mail stationery items
-// at login). A negative record id means "this row does not exist" (deleted by hotfix), so it is only
-// sent for item ids the server does not know; real rows are not served yet, and leaving them
-// unanswered keeps the client on its own client-file data. Read order is the pinned TrinityCore
-// DBQueryBulk layout.
+// The client asks for DB2 rows its own files lack (Item/Item-sparse, e.g. the mail stationery items,
+// which it needs before it will send a mail). Hotfix rows Blizzard served to build 15595 are sent
+// in full (CPP HandleDBQueryBulk). A negative record id means "this row does not exist", so it is
+// only sent for item ids the server does not know; other known items are left unanswered, which
+// keeps the client on its own client-file data. Read order is the pinned TrinityCore DBQueryBulk
+// layout.
 void WorldSession::HandleDBQueryBulk(WorldPacket& recvData)
 {
-    static constexpr uint32 ITEM_DB2_HASH        = 0x919BE54E;   // Item.db2
-    static constexpr uint32 ITEM_SPARSE_DB2_HASH = 0x50238EC2;   // Item-sparse.db2
-
     uint32 tableHash;
     recvData >> tableHash;
 
@@ -116,7 +114,22 @@ void WorldSession::HandleDBQueryBulk(WorldPacket& recvData)
         recvData.ReadByteSeq(guid[2]);
 
         bool const itemTable = tableHash == ITEM_DB2_HASH || tableHash == ITEM_SPARSE_DB2_HASH;
-        if (!itemTable || sObjectMgr->GetItemTemplate(recordId))
+        if (!itemTable)
+            continue;
+
+        if (ByteBuffer const* record = sObjectMgr->GetItemHotfixRecord(tableHash, recordId))
+        {
+            WorldPacket reply(SMSG_DB_REPLY, 4 + 4 + 4 + 4 + record->size());
+            reply << int32(recordId);
+            reply << uint32(tableHash);
+            reply << uint32(GameTime::GetGameTime().count());
+            reply << uint32(record->size());
+            reply.append(*record);
+            SendPacket(&reply);
+            continue;
+        }
+
+        if (sObjectMgr->GetItemTemplate(recordId))
             continue;
 
         WorldPacket reply(SMSG_DB_REPLY, 4 + 4 + 4 + 4);

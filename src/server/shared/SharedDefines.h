@@ -2180,7 +2180,20 @@ enum Emote
     EMOTE_STATE_STRANGULATE             = 473,
     EMOTE_STATE_READY_SPELL_OMNI        = 474,
     EMOTE_STATE_HOLD_JOUST              = 475,
-    EMOTE_ONESHOT_CRY_JAINA             = 476
+    EMOTE_ONESHOT_CRY_JAINA             = 476,
+    // 4.3.4 additions (CPP)
+    EMOTE_ONESHOT_SPECIAL_UNARMED       = 477,
+    EMOTE_STATE_DANCE_NOSHEATHE         = 478,
+    EMOTE_ONESHOT_SNIFF                 = 479,
+    EMOTE_ONESHOT_DRAGONSTOMP           = 480,
+    EMOTE_ONESHOT_KNOCKDOWN             = 482,
+    EMOTE_STATE_READ                    = 483,
+    EMOTE_ONESHOT_FLYEMOTETALK          = 485,
+    EMOTE_STATE_READ_ALLOWMOVEMENT      = 492,
+    EMOTE_STATE_READY1H_ALLOW_MOVEMENT  = 505,
+    EMOTE_STATE_READY2H_ALLOW_MOVEMENT  = 506,
+    EMOTE_ONESHOT_OPEN                  = 517,
+    EMOTE_STATE_READ_CHRISTMAS          = 518
 };
 
 // AnimationData.dbc
@@ -3912,32 +3925,34 @@ enum SpellFamilyNames
     SPELLFAMILY_PET         = 17
 };
 
+// 4.3.4 values (CPP); CPP's names in brackets where AzerothCore's differ
 enum TradeStatus
 {
-    TRADE_STATUS_BUSY           = 0,
-    TRADE_STATUS_BEGIN_TRADE    = 1,
-    TRADE_STATUS_OPEN_WINDOW    = 2,
-    TRADE_STATUS_TRADE_CANCELED = 3,
-    TRADE_STATUS_TRADE_ACCEPT   = 4,
-    TRADE_STATUS_BUSY_2         = 5,
-    TRADE_STATUS_NO_TARGET      = 6,
-    TRADE_STATUS_BACK_TO_TRADE  = 7,
-    TRADE_STATUS_TRADE_COMPLETE = 8,
-    TRADE_STATUS_TRADE_REJECTED = 9,
-    TRADE_STATUS_TARGET_TO_FAR  = 10,
-    TRADE_STATUS_WRONG_FACTION  = 11,
-    TRADE_STATUS_CLOSE_WINDOW   = 12,
-    // 13?
-    TRADE_STATUS_IGNORE_YOU     = 14,
-    TRADE_STATUS_YOU_STUNNED    = 15,
-    TRADE_STATUS_TARGET_STUNNED = 16,
-    TRADE_STATUS_YOU_DEAD       = 17,
-    TRADE_STATUS_TARGET_DEAD    = 18,
-    TRADE_STATUS_YOU_LOGOUT     = 19,
-    TRADE_STATUS_TARGET_LOGOUT  = 20,
-    TRADE_STATUS_TRIAL_ACCOUNT  = 21,                       // Trial accounts can not perform that action
-    TRADE_STATUS_WRONG_REALM    = 22,                       // You can only trade conjured items... (cross realm BG related).
-    TRADE_STATUS_NOT_ON_TAPLIST = 23                        // Related to trading soulbound loot items
+    TRADE_STATUS_OPEN_WINDOW           = 0,                 // [INITIATED]
+    TRADE_STATUS_NOT_ON_TAPLIST        = 2,                 // Related to trading soulbound loot items
+    TRADE_STATUS_YOU_LOGOUT            = 3,
+    TRADE_STATUS_IGNORE_YOU            = 4,
+    TRADE_STATUS_TARGET_DEAD           = 5,
+    TRADE_STATUS_TRADE_ACCEPT          = 6,
+    TRADE_STATUS_TARGET_LOGOUT         = 7,
+    TRADE_STATUS_TRADE_COMPLETE        = 9,
+    TRADE_STATUS_TRIAL_ACCOUNT         = 10,                // Trial accounts can not perform that action
+    TRADE_STATUS_BEGIN_TRADE           = 12,
+    TRADE_STATUS_YOU_DEAD              = 13,
+    TRADE_STATUS_TARGET_TO_FAR         = 16,
+    TRADE_STATUS_NO_TARGET             = 17,
+    TRADE_STATUS_BUSY_2                = 18,
+    TRADE_STATUS_CURRENCY_NOT_TRADABLE = 19,
+    TRADE_STATUS_WRONG_FACTION         = 20,
+    TRADE_STATUS_BUSY                  = 21,
+    TRADE_STATUS_TRADE_REJECTED        = 22,                // [STATE_CHANGED]
+    TRADE_STATUS_TRADE_CANCELED        = 23,
+    TRADE_STATUS_CURRENCY              = 24,
+    TRADE_STATUS_BACK_TO_TRADE         = 25,                // [UNACCEPTED]
+    TRADE_STATUS_WRONG_REALM           = 26,                // You can only trade conjured items... (cross realm BG related).
+    TRADE_STATUS_YOU_STUNNED           = 27,
+    TRADE_STATUS_TARGET_STUNNED        = 29,
+    TRADE_STATUS_CLOSE_WINDOW          = 31                 // [FAILED], carries an InventoryResult
 };
 
 enum XPColorChar : uint8

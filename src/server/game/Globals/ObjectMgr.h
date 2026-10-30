@@ -20,6 +20,7 @@
 
 #include "AhoCorasick.h"
 #include "Bag.h"
+#include "ByteBuffer.h"
 #include "ConditionMgr.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
@@ -48,6 +49,13 @@ struct PlayerClassInfo;
 struct PlayerClassLevelInfo;
 struct PlayerInfo;
 struct PlayerLevelInfo;
+
+// DB2 table hashes the client names in CMSG_DB_QUERY_BULK and SMSG_DB_REPLY
+enum ItemDB2Hash : uint32
+{
+    ITEM_DB2_HASH        = 0x919BE54E,   // Item.db2
+    ITEM_SPARSE_DB2_HASH = 0x50238EC2    // Item-sparse.db2
+};
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push, N), also any gcc version not support it at some platform
 #if defined(__GNUC__)
@@ -785,6 +793,11 @@ public:
     ItemTemplate const* GetItemTemplate(uint32 entry);
     [[nodiscard]] ItemTemplateContainer const* GetItemTemplateStore() const { return &_itemTemplateStore; }
     [[nodiscard]] std::vector<ItemTemplate*> const* GetItemTemplateStoreFast() const { return &_itemTemplateStoreFast; }
+
+    // DB2 rows Blizzard served to build 15595 as hotfixes (TDB 434: hotfix_item, hotfix_item_sparse),
+    // kept in client wire format for SMSG_DB_REPLY; keyed by DB2 table hash, then record id
+    void LoadItemHotfixRecords();
+    [[nodiscard]] ByteBuffer const* GetItemHotfixRecord(uint32 tableHash, uint32 id) const;
 
     uint32 GetModelForTotem(SummonSlot totemSlot, Races race) const;
 
@@ -1694,6 +1707,7 @@ private:
     BroadcastTextContainer _broadcastTextStore;
     ItemTemplateContainer _itemTemplateStore;
     std::vector<ItemTemplate*> _itemTemplateStoreFast; // pussywizard
+    std::unordered_map<uint32, std::unordered_map<uint32, ByteBuffer>> _itemHotfixRecords;
     ItemLocaleContainer _itemLocaleStore;
     ItemSetNameLocaleContainer _itemSetNameLocaleStore;
     QuestLocaleContainer _questLocaleStore;

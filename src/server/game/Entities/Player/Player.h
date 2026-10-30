@@ -479,7 +479,7 @@ enum PlayerFlags : uint32
     PLAYER_FLAGS_UNK24             = 0x01000000,                // disabled all melee ability on tab include autoattack
     PLAYER_FLAGS_NO_XP_GAIN        = 0x02000000,
     PLAYER_FLAGS_UNK26             = 0x04000000,
-    PLAYER_FLAGS_UNK27             = 0x08000000,
+    PLAYER_FLAGS_AUTO_DECLINE_GUILD = 0x08000000,               // automatically declines guild invites (CMSG_AUTO_DECLINE_GUILD_INVITES)
     PLAYER_FLAGS_UNK28             = 0x10000000,
     PLAYER_FLAGS_UNK29             = 0x20000000,
     PLAYER_FLAGS_UNK30             = 0x40000000,
@@ -1954,6 +1954,10 @@ public:
         // Object's OBJECT_FIELD_DATA slot, packed as an ObjectGuid(HighGuid::Guild, id)
         // -- matches the pinned TrinityCore reference (Player::SetInGuild).
         SetGuidValue(OBJECT_FIELD_DATA, GuildId ? ObjectGuid(HighGuid::Guild, GuildId) : ObjectGuid::Empty);
+        // 4.3.4 also flags guild membership in the high half of OBJECT_FIELD_TYPE and shows the guild level.
+        // Guild levels are not implemented, so every guild is level 1.
+        SetUInt16Value(OBJECT_FIELD_TYPE, 1, GuildId != 0);
+        SetUInt32Value(PLAYER_GUILDLEVEL, GuildId ? 1 : 0);
         // xinef: update global storage
         sCharacterCache->UpdateCharacterGuildId(GetGUID(), GetGuildId());
     }

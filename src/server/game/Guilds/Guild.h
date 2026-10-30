@@ -42,14 +42,20 @@ enum GuildMisc
     GUILD_BANK_MAX_TABS                 = 6,                    // send by client for money log also
     GUILD_BANK_MAX_SLOTS                = 98,
     GUILD_BANK_MONEY_LOGS_TAB           = 100,                  // used for money log in DB
-    GUILD_RANKS_MIN_COUNT               = 5,
+    GUILD_RANKS_MIN_COUNT               = 2,                    // 4.3.4 client allows deleting down to two ranks
     GUILD_RANKS_MAX_COUNT               = 10,
     GUILD_RANK_NONE                     = 0xFF,
     GUILD_WITHDRAW_MONEY_UNLIMITED      = 0xFFFFFFFF,
     GUILD_WITHDRAW_SLOT_UNLIMITED       = 0xFFFFFFFF,
     GUILD_EVENT_LOG_GUID_UNDEFINED      = 0xFFFFFFFF,
+    GUILD_BANK_PACKET_TABS              = 8,                    // 4.3.4 rank and permission packets always carry 8 tabs
+    GUILD_PROFESSION_COUNT              = 2,
+    GUILD_CHALLENGE_TYPE_COUNT          = 4,                    // MAX_GUILD_CHALLENGE_TYPES in 4.3.4 (dungeon, raid, rated bg + unused 0)
     TAB_UNDEFINED                       = 0xFF,
 };
+
+// Faction.dbc "Guild": the per-member guild reputation shown in the 4.3.4 reputation pane
+constexpr uint32 FACTION_GUILD = 1168;
 
 constexpr uint64 GUILD_BANK_MONEY_LIMIT = UI64LIT(0x7FFFFFFFFFFFF);
 
@@ -91,7 +97,7 @@ enum GuildRankRights
     GR_RIGHT_WITHDRAW_REPAIR            = 0x00040000,                   // withdraw for repair
     GR_RIGHT_WITHDRAW_GOLD              = 0x00080000,                   // withdraw gold
     GR_RIGHT_CREATE_GUILD_EVENT         = 0x00100000,                   // wotlk
-    GR_RIGHT_ALL                        = 0x001DF1FF
+    GR_RIGHT_ALL                        = 0x00DDFFBF
 };
 
 enum GuildCommandType
@@ -140,30 +146,45 @@ enum GuildCommandError
     ERR_GUILD_NOT_ENOUGH_MONEY          = 26,
     ERR_GUILD_BANK_FULL                 = 28,
     ERR_GUILD_ITEM_NOT_FOUND            = 29,
+    ERR_GUILD_TOO_MUCH_MONEY            = 31,
+    ERR_GUILD_BANK_WRONG_TAB            = 32,
+    ERR_RANK_REQUIRES_AUTHENTICATOR     = 34,
+    ERR_GUILD_BANK_VOUCHER_FAILED       = 35,
+    ERR_GUILD_TRIAL_ACCOUNT             = 36,
+    ERR_GUILD_UNDELETABLE_DUE_TO_LEVEL  = 37,
+    ERR_GUILD_MOVE_STARTING             = 38,
+    ERR_GUILD_REP_TOO_LOW               = 39
 };
 
+// 4.3.4 SMSG_GUILD_EVENT ids (shifted by one against 3.3.5, new rank and mobile events)
 enum GuildEvents
 {
-    GE_PROMOTION                        = 0,
-    GE_DEMOTION                         = 1,
-    GE_MOTD                             = 2,
-    GE_JOINED                           = 3,
-    GE_LEFT                             = 4,
-    GE_REMOVED                          = 5,
-    GE_LEADER_IS                        = 6,
-    GE_LEADER_CHANGED                   = 7,
-    GE_DISBANDED                        = 8,
-    GE_TABARDCHANGE                     = 9,
-    GE_RANK_UPDATED                     = 10,
-    GE_RANK_DELETED                     = 11,
-    GE_SIGNED_ON                        = 12,
-    GE_SIGNED_OFF                       = 13,
-    GE_GUILDBANKBAGSLOTS_CHANGED        = 14,   /// @todo: Sent when items are moved in gbank - all players with bank open will send tab query
-    GE_BANK_TAB_PURCHASED               = 15,
-    GE_BANK_TAB_UPDATED                 = 16,
-    GE_BANK_MONEY_SET                   = 17,
-    GE_BANK_TAB_AND_MONEY_UPDATED       = 18,
-    GE_BANK_TEXT_CHANGED                = 19,
+    GE_PROMOTION                        = 1,
+    GE_DEMOTION                         = 2,
+    GE_MOTD                             = 3,
+    GE_JOINED                           = 4,
+    GE_LEFT                             = 5,
+    GE_REMOVED                          = 6,
+    GE_LEADER_IS                        = 7,
+    GE_LEADER_CHANGED                   = 8,
+    GE_DISBANDED                        = 9,
+    GE_TABARDCHANGE                     = 10,
+    GE_RANK_UPDATED                     = 11,
+    GE_RANK_CREATED                     = 12,
+    GE_RANK_DELETED                     = 13,
+    GE_RANK_ORDER_CHANGED               = 14,
+    GE_FOUNDER                          = 15,
+    GE_SIGNED_ON                        = 16,
+    GE_SIGNED_OFF                       = 17,
+    GE_GUILDBANKBAGSLOTS_CHANGED        = 18,   /// @todo: Sent when items are moved in gbank - all players with bank open will send tab query
+    GE_BANK_TAB_PURCHASED               = 19,
+    GE_BANK_TAB_UPDATED                 = 20,
+    GE_BANK_MONEY_SET                   = 21,
+    GE_BANK_TAB_AND_MONEY_UPDATED       = 22,
+    GE_BANK_TEXT_CHANGED                = 23,
+    // 24 - error 795
+    GE_SIGNED_ON_MOBILE                 = 25,
+    GE_SIGNED_OFF_MOBILE                = 26,
 };
 
 enum PetitionTurns
@@ -342,6 +363,8 @@ public: // pussywizard: public class Member
         bool IsOnline() { return (m_flags & GUILDMEMBER_STATUS_ONLINE); }
 
         void ChangeRank(uint8 newRank);
+        // Moves the member one rank up after a higher rank was deleted (the database is shifted by the caller)
+        void ShiftRankUp();
 
         void UpdateLogoutTime();
         inline bool IsRank(uint8 rankId) const { return m_rankId == rankId; }
@@ -522,6 +545,7 @@ private:
         void SaveToDB(CharacterDatabaseTransaction trans) const;
 
         uint8 GetId() const { return m_rankId; }
+        void SetId(uint8 rankId) { m_rankId = rankId; }
 
         std::string const& GetName() const { return m_name; }
         void SetName(std::string_view name);
@@ -687,6 +711,9 @@ public:
 
     // Getters
     uint32 GetId() const { return m_id; }
+    ObjectGuid GetGUID() const { return ObjectGuid(HighGuid::Guild, m_id); }
+    // Cataclysm guild levels are not implemented: every guild is level 1 with no experience
+    uint32 GetLevel() const { return 1; }
     ObjectGuid GetLeaderGUID() const { return m_leaderGuid; }
     std::string const& GetName() const { return m_name; }
     std::string const& GetMOTD() const { return m_motd; }
@@ -704,20 +731,21 @@ public:
     void HandleSetEmblem(WorldSession* session, EmblemInfo const& emblemInfo);
     void HandleSetEmblem(EmblemInfo const& emblemInfo);
     void HandleSetLeader(WorldSession* session, std::string_view name);
+    void SendGuildRankInfo(WorldSession* session) const;
     void HandleSetBankTabInfo(WorldSession* session, uint8 tabId, std::string_view name, std::string_view icon);
-    void HandleSetMemberNote(WorldSession* session, std::string_view name, std::string_view note, bool isPublic);
+    void HandleSetMemberNote(WorldSession* session, ObjectGuid guid, std::string_view note, bool isPublic);
     void HandleSetRankInfo(WorldSession* session, uint8 rankId, std::string_view name, uint32 rights, uint32 moneyPerDay, std::array<GuildBankRightsAndSlots, GUILD_BANK_MAX_TABS> const& rightsAndSlots);
+    void HandleSetMemberRank(WorldSession* session, ObjectGuid targetGuid, uint8 rankId);
     void HandleSetRankInfo(uint8 rankId, Optional<std::string_view> name, Optional<uint32> rights = {},
         Optional<uint32> moneyPerDay = {});
     void HandleBuyBankTab(WorldSession* session, uint8 tabId);
     void HandleInviteMember(WorldSession* session, std::string const& name);
     void HandleAcceptMember(WorldSession* session);
     void HandleLeaveMember(WorldSession* session);
-    void HandleRemoveMember(WorldSession* session, std::string_view name);
-    void HandleUpdateMemberRank(WorldSession* session, std::string_view name, bool demote);
+    void HandleRemoveMember(WorldSession* session, ObjectGuid guid);
+    void HandleUpdateMemberRank(WorldSession* session, ObjectGuid guid, bool demote);
     void HandleAddNewRank(WorldSession* session, std::string_view name);
     void HandleRemoveRank(WorldSession* session, uint8 rankId);
-    void HandleRemoveLowestRank(WorldSession* session);
     void HandleMemberDepositMoney(WorldSession* session, uint32 amount);
     bool HandleMemberWithdrawMoney(WorldSession* session, uint32 amount, bool repair = false);
     void HandleMemberLogout(WorldSession* session);
@@ -736,6 +764,7 @@ public:
     void SendPermissions(WorldSession* session);
     void SendMoneyInfo(WorldSession* session) const;
     void SendLoginInfo(WorldSession* session);
+    void SendMemberUpdateNote(ObjectGuid guid, std::string_view note, bool isPublic) const;
 
     // Load from DB
     bool LoadFromDB(Field* fields);

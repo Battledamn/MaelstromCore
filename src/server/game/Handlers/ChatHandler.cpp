@@ -853,6 +853,11 @@ void WorldSession::HandleEmoteOpcode(WorldPackets::Chat::EmoteClient& packet)
         return;
 
     sScriptMgr->OnPlayerEmote(_player, emoteId);
+
+    // 4.3.4: emote 0 also ends an emote state, e.g. the /read the client starts at a mailbox (CPP)
+    if (emoteId == EMOTE_ONESHOT_NONE && _player->GetUInt32Value(UNIT_NPC_EMOTESTATE))
+        _player->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_ONESHOT_NONE);
+
     _player->HandleEmoteCommand(emoteId);
 }
 
@@ -966,6 +971,7 @@ void WorldSession::HandleTextEmoteOpcode(WorldPacket& recvData)
         case EMOTE_ONESHOT_NONE:
             break;
         case EMOTE_STATE_DANCE:
+        case EMOTE_STATE_READ:                              // 4.3.4: the client sends /read when a mailbox opens (CPP)
             GetPlayer()->SetUInt32Value(UNIT_NPC_EMOTESTATE, emote_anim);
             break;
         default:
@@ -1031,6 +1037,7 @@ void WorldSession::HandleSendTextEmoteOpcode(WorldPacket& recvData)
         case EMOTE_ONESHOT_NONE:
             break;
         case EMOTE_STATE_DANCE:
+        case EMOTE_STATE_READ:                              // 4.3.4: the client sends /read when a mailbox opens (CPP)
             GetPlayer()->SetUInt32Value(UNIT_NPC_EMOTESTATE, emoteAnim);
             break;
         default:

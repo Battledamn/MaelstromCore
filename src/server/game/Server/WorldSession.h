@@ -155,6 +155,15 @@ namespace WorldPackets
         class GuildBankSetTabText;
         class GuildSetGuildMaster;
         class SaveGuildEmblem;
+        class GuildQueryRanks;
+        class GuildAssignMemberRank;
+        class GuildQueryNews;
+        class GuildXPQuery;
+        class GuildRequestMaxDailyXP;
+        class RequestGuildRewardsList;
+        class GuildRequestPartyState;
+        class GuildChallengeUpdateRequest;
+        class AutoDeclineGuildInvites;
     }
 
     namespace Misc
@@ -162,6 +171,14 @@ namespace WorldPackets
         class MinimapPingClient;
         class RandomRollClient;
         class Complain;
+    }
+
+    namespace Party
+    {
+        class PartyInviteClient;
+        class PartyInviteResponse;
+        class SetEveryoneIsAssistant;
+        class SetRole;
     }
 
     namespace Pet
@@ -672,8 +689,6 @@ public:
     void SendNotInArenaTeamPacket(uint8 type);
     void SendPetitionShowList(ObjectGuid guid);
 
-    void BuildPartyMemberStatsChangedPacket(Player* player, WorldPacket* data);
-
     void DoLootRelease(ObjectGuid lguid);
 
     // Account mute time
@@ -860,9 +875,10 @@ public:                                                 // opcodes handlers
 
     void HandleBattlefieldStatusOpcode(WorldPacket& recvData);
 
-    void HandleGroupInviteOpcode(WorldPacket& recvPacket);
-    void HandleGroupAcceptOpcode(WorldPacket& recvPacket);
-    void HandleGroupDeclineOpcode(WorldPacket& recvPacket);
+    void HandlePartyInviteOpcode(WorldPackets::Party::PartyInviteClient& packet);
+    void HandlePartyInviteResponseOpcode(WorldPackets::Party::PartyInviteResponse& packet);
+    void AcceptPartyInvite();
+    void DeclinePartyInvite();
     void HandleGroupUninviteOpcode(WorldPacket& recvPacket);
     void HandleGroupUninviteGuidOpcode(WorldPacket& recvPacket);
     void HandleGroupSetLeaderOpcode(WorldPacket& recvPacket);
@@ -879,6 +895,10 @@ public:                                                 // opcodes handlers
     void HandleGroupChangeSubGroupOpcode(WorldPacket& recvData);
     void HandleGroupAssistantLeaderOpcode(WorldPacket& recvData);
     void HandlePartyAssignmentOpcode(WorldPacket& recvData);
+    void HandleSetEveryoneIsAssistant(WorldPackets::Party::SetEveryoneIsAssistant& packet);
+    void HandleSetRoleOpcode(WorldPackets::Party::SetRole& packet);
+    void HandleRolePollBeginOpcode(WorldPacket& recvData);
+    void HandleGroupRequestJoinUpdates(WorldPacket& recvData);
 
     void HandlePetitionBuyOpcode(WorldPacket& recvData);
     void HandlePetitionShowSignOpcode(WorldPacket& recvData);
@@ -905,7 +925,15 @@ public:                                                 // opcodes handlers
     void HandleGuildLeaderOpcode(WorldPackets::Guild::GuildSetGuildMaster& packet);
     void HandleGuildMOTDOpcode(WorldPackets::Guild::GuildUpdateMotdText& packet);
     void HandleGuildSetPublicNoteOpcode(WorldPackets::Guild::GuildSetMemberNote& packet);
-    void HandleGuildSetOfficerNoteOpcode(WorldPackets::Guild::GuildSetMemberNote& packet);
+    void HandleGuildQueryRanksOpcode(WorldPackets::Guild::GuildQueryRanks& packet);
+    void HandleGuildAssignRankOpcode(WorldPackets::Guild::GuildAssignMemberRank& packet);
+    void HandleGuildQueryNewsOpcode(WorldPackets::Guild::GuildQueryNews& packet);
+    void HandleGuildXPQueryOpcode(WorldPackets::Guild::GuildXPQuery& packet);
+    void HandleGuildRequestMaxDailyXP(WorldPackets::Guild::GuildRequestMaxDailyXP& packet);
+    void HandleRequestGuildRewardsList(WorldPackets::Guild::RequestGuildRewardsList& packet);
+    void HandleGuildRequestPartyState(WorldPackets::Guild::GuildRequestPartyState& packet);
+    void HandleGuildRequestChallengeUpdate(WorldPackets::Guild::GuildChallengeUpdateRequest& packet);
+    void HandleAutoDeclineGuildInvites(WorldPackets::Guild::AutoDeclineGuildInvites& packet);
     void HandleGuildRankOpcode(WorldPackets::Guild::GuildSetRankPermissions& packet);
     void HandleGuildAddRankOpcode(WorldPackets::Guild::GuildAddRank& packet);
     void HandleGuildDelRankOpcode(WorldPackets::Guild::GuildDeleteRank& packet);

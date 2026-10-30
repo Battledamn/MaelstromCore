@@ -14393,7 +14393,7 @@ void Unit::SendMoveRoot(bool apply)
     if (!client)
     {
         WorldPacket data(apply ? SMSG_SPLINE_MOVE_ROOT : SMSG_SPLINE_MOVE_UNROOT, guid.size());
-        data << guid;
+        WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
         SendMessageToSet(&data, true);
     }
     // Wrath+ force root: when unit is controlled by a player
@@ -15286,12 +15286,8 @@ void Unit::KnockbackFrom(float x, float y, float speedXY, float speedZ)
         GetSinCos(x, y, vsin, vcos);
 
         WorldPacket data(SMSG_MOVE_KNOCK_BACK, (8 + 4 + 4 + 4 + 4 + 4));
-        data << GetPackGUID();
-        data << player->GetSession()->GetOrderCounter();        // movement counter
-        data << float(vcos);                                    // x direction
-        data << float(vsin);                                    // y direction
-        data << float(speedXY);                                 // Horizontal speed
-        data << float(-speedZ);                                 // Z Movement speed (vertical)
+        WorldPackets::Movement::WriteKnockBack(data, GetGUID(), player->GetSession()->GetOrderCounter(), vcos, vsin,
+            speedXY, -speedZ);
 
         player->SendDirectMessage(&data);
         player->GetSession()->IncrementOrderCounter();
@@ -15381,12 +15377,7 @@ void Unit::JumpTo(float speedXY, float speedZ, bool forward)
         float vsin = std::sin(angle + GetOrientation());
 
         WorldPacket data(SMSG_MOVE_KNOCK_BACK, (8 + 4 + 4 + 4 + 4 + 4));
-        data << GetPackGUID();
-        data << uint32(0);                                      // Sequence
-        data << float(vcos);                                    // x direction
-        data << float(vsin);                                    // y direction
-        data << float(speedXY);                                 // Horizontal speed
-        data << float(-speedZ);                                 // Z Movement speed (vertical)
+        WorldPackets::Movement::WriteKnockBack(data, GetGUID(), 0, vcos, vsin, speedXY, -speedZ);
 
         ToPlayer()->SendDirectMessage(&data);
     }
@@ -16446,7 +16437,7 @@ void Unit::SetDisableGravity(bool enable)
     }
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_GRAVITY_DISABLE : SMSG_SPLINE_MOVE_GRAVITY_ENABLE, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, true);
 }
 
@@ -16510,7 +16501,7 @@ void Unit::SetCanFly(bool enable)
     }
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_FLYING : SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, true);
 }
 
@@ -16551,7 +16542,7 @@ void Unit::SetFeatherFall(bool enable)
     }
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_FEATHER_FALL : SMSG_SPLINE_MOVE_NORMAL_FALL);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, true);
 }
 
@@ -16604,7 +16595,7 @@ void Unit::SetHover(bool enable)
     }
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_HOVER : SMSG_SPLINE_MOVE_UNSET_HOVER, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, true);
 }
 
@@ -16641,7 +16632,7 @@ void Unit::SetWaterWalking(bool enable)
     }
 
     WorldPacket data(enable ? SMSG_SPLINE_MOVE_WATER_WALK : SMSG_SPLINE_MOVE_LAND_WALK, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     SendMessageToSet(&data, true);
 }
 
@@ -16650,7 +16641,7 @@ void Unit::SendMovementWaterWalking(Player* sendTo)
     if (!movespline->Initialized())
         return;
     WorldPacket data(SMSG_SPLINE_MOVE_WATER_WALK, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     sendTo->SendDirectMessage(&data);
 }
 
@@ -16659,7 +16650,7 @@ void Unit::SendMovementFeatherFall(Player* sendTo)
     if (!movespline->Initialized())
         return;
     WorldPacket data(SMSG_SPLINE_MOVE_FEATHER_FALL, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     sendTo->SendDirectMessage(&data);
 }
 
@@ -16668,7 +16659,7 @@ void Unit::SendMovementHover(Player* sendTo)
     if (!movespline->Initialized())
         return;
     WorldPacket data(SMSG_SPLINE_MOVE_SET_HOVER, 9);
-    data << GetPackGUID();
+    WorldPackets::Movement::WriteSplineMoveState(data, GetGUID());
     sendTo->SendDirectMessage(&data);
 }
 

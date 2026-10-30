@@ -170,7 +170,11 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     // 0: uint32, 1: uint8, 3: string, 4: uint32, 5: uint32
     PrepareStatement(CHAR_INS_GUILD_RANK, "INSERT INTO guild_rank (guildid, rid, rname, rights, BankMoneyPerDay) VALUES (?, ?, ?, ?, ?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_DEL_GUILD_RANKS, "DELETE FROM guild_rank WHERE guildid = ?", CONNECTION_ASYNC); // 0: uint32
-    PrepareStatement(CHAR_DEL_GUILD_LOWEST_RANK, "DELETE FROM guild_rank WHERE guildid = ? AND rid >= ?", CONNECTION_ASYNC); // 0: uint32, 1: uint8
+    PrepareStatement(CHAR_DEL_GUILD_RANK, "DELETE FROM guild_rank WHERE guildid = ? AND rid = ?", CONNECTION_ASYNC); // 0: uint32, 1: uint8
+    // Close the gap after a deleted rank; ascending order keeps (guildid, rid) unique while shifting
+    PrepareStatement(CHAR_UPD_GUILD_RANKS_SHIFT, "UPDATE guild_rank SET rid = rid - 1 WHERE guildid = ? AND rid > ? ORDER BY rid", CONNECTION_ASYNC); // 0: uint32, 1: uint8
+    PrepareStatement(CHAR_UPD_GUILD_BANK_RIGHTS_SHIFT, "UPDATE guild_bank_right SET rid = rid - 1 WHERE guildid = ? AND rid > ? ORDER BY rid", CONNECTION_ASYNC); // 0: uint32, 1: uint8
+    PrepareStatement(CHAR_UPD_GUILD_MEMBERS_RANK_SHIFT, "UPDATE guild_member SET `rank` = `rank` - 1 WHERE guildid = ? AND `rank` > ?", CONNECTION_ASYNC); // 0: uint32, 1: uint8
     PrepareStatement(CHAR_INS_GUILD_BANK_TAB, "INSERT INTO guild_bank_tab (guildid, TabId) VALUES (?, ?)", CONNECTION_ASYNC); // 0: uint32, 1: uint8
     PrepareStatement(CHAR_DEL_GUILD_BANK_TAB, "DELETE FROM guild_bank_tab WHERE guildid = ? AND TabId = ?", CONNECTION_ASYNC); // 0: uint32, 1: uint8
     PrepareStatement(CHAR_DEL_GUILD_BANK_TABS, "DELETE FROM guild_bank_tab WHERE guildid = ?", CONNECTION_ASYNC); // 0: uint32

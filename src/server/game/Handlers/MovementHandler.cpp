@@ -418,8 +418,10 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recvData)
         return;
 
     /* process position-change */
-    WorldPacket data(opcode == MSG_MOVE_HEARTBEAT ? uint16(SMSG_MOVE_UPDATE) : opcode, recvData.size());
-    WriteMovementInfo(&data, &movementInfo);
+    // 4.3.4 relays every movement opcode to observers as SMSG_MOVE_UPDATE with the server-side layout (CPP
+    // HandleMovementOpcode); echoing the client opcode left other players frozen or running in place.
+    WorldPacket data(SMSG_MOVE_UPDATE, recvData.size());
+    WorldPackets::Movement::WriteMovementUpdate(data, movementInfo);
     mover->SendMessageToSet(&data, _player);
     if (opcode == MSG_MOVE_HEARTBEAT)
         LOG_DEBUG("network", "Accepted Cataclysm movement heartbeat after movement validation: x={}, y={}, z={}, o={}",
@@ -972,24 +974,22 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket& recvData)
 
     Unit* mover = _player->m_mover;
 
-    ObjectGuid guid;
-    recvData >> guid.ReadAsPacked();
+    // Cata bit-packs the mover guid into the generic movement sequence (CPP MovementKnockBackAck).
+    MovementInfo movementInfo;
+    uint32 counter = 0;
+    WorldPackets::Movement::ReadGroundMovement(recvData, movementInfo,
+        WorldPackets::Movement::GetMovementFlagSequence(CMSG_MOVE_KNOCK_BACK_ACK), &counter);
+    SanitizeMovementFlags(&movementInfo);
 
     // pussywizard: typical check for incomming movement packets
-    if (!mover || !mover->IsInWorld() || mover->IsDuringRemoveFromWorld() || guid != mover->GetGUID())
+    if (!mover || !mover->IsInWorld() || mover->IsDuringRemoveFromWorld() || movementInfo.guid != mover->GetGUID())
     {
         recvData.rfinish(); // prevent warnings spam
         return;
     }
 
-    recvData.read_skip<uint32>();                          // unk
-
-    MovementInfo movementInfo;
-    movementInfo.guid = guid;
-    ReadMovementInfo(recvData, &movementInfo);
-
     // Relocate the mover to the acknowledged position. Otherwise the server (and the
-    // MSG_MOVE_KNOCK_BACK broadcast below) keeps using the pre-knockback position until
+    // SMSG_MOVE_UPDATE_KNOCK_BACK broadcast below) keeps using the pre-knockback position until
     // the next regular movement packet arrives, desyncing the unit for nearby clients
     if (!ProcessMovementInfo(movementInfo, mover, mover->ToPlayer(), recvData))
     {
@@ -1000,15 +1000,11 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket& recvData)
     if (mover->IsPlayer() && static_cast<Player*>(mover)->IsFreeFlying())
         mover->SetCanFly(true);
 
-    WorldPacket data(MSG_MOVE_KNOCK_BACK, 66);
-    WriteMovementInfo(&data, &movementInfo);
     _player->SetCanTeleport(true);
-    // knockback specific info
-    data << movementInfo.jump.sinAngle;
-    data << movementInfo.jump.cosAngle;
-    data << movementInfo.jump.xyspeed;
-    data << movementInfo.jump.zspeed;
 
+    WorldPacket data(SMSG_MOVE_UPDATE_KNOCK_BACK, 66);
+    WorldPackets::Movement::WriteGroundMovement(data, movementInfo,
+        WorldPackets::Movement::GetMovementFlagSequence(SMSG_MOVE_UPDATE_KNOCK_BACK));
     _player->SendMessageToSet(&data, false);
 }
 

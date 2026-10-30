@@ -3965,6 +3965,89 @@ ItemTemplate const* ObjectMgr::GetItemTemplate(uint32 entry)
     return entry < _itemTemplateStoreFast.size() ? _itemTemplateStoreFast[entry] : nullptr;
 }
 
+void ObjectMgr::LoadItemHotfixRecords()
+{
+    uint32 oldMSTime = getMSTime();
+
+    _itemHotfixRecords.clear();
+
+    // Field formats from CPP's DB2fmt.h (n/i int32, f float, s string); the tables keep DB2 field
+    // order, and build_world_db.py hotfixes stores every integer column as BIGINT
+    struct HotfixTable
+    {
+        uint32 Hash;
+        char const* Name;
+        std::string_view Format;
+    };
+
+    static HotfixTable const tables[] =
+    {
+        { ITEM_DB2_HASH,        "hotfix_item",        "niiiiiii" },
+        { ITEM_SPARSE_DB2_HASH, "hotfix_item_sparse", "niiiffiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiifiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiisssssiiiiiiiiiiiiiiiiiiiiiifiiifii" },
+    };
+
+    uint32 count = 0;
+    for (HotfixTable const& table : tables)
+    {
+        QueryResult result = WorldDatabase.Query("SELECT * FROM {}", table.Name);
+        if (!result)
+            continue;
+
+        if (result->GetFieldCount() < table.Format.size())
+        {
+            LOG_ERROR("sql.sql", "Table `{}` has {} columns, the DB2 format needs {}. Skipped.",
+                table.Name, result->GetFieldCount(), table.Format.size());
+            continue;
+        }
+
+        do
+        {
+            Field* fields = result->Fetch();
+            ByteBuffer record;
+            for (std::size_t i = 0; i < table.Format.size(); ++i)
+            {
+                switch (table.Format[i])
+                {
+                    case 'f':
+                        record << fields[i].Get<float>();
+                        break;
+                    case 's':
+                    {
+                        // CPP DB2Storage::WriteRecord: uint16 length, then the text and its terminator
+                        std::string const text = fields[i].Get<std::string>();
+                        record << uint16(text.size());
+                        if (!text.empty())
+                        {
+                            record.append(text.c_str(), text.size());
+                            record << uint8(0);
+                        }
+                        break;
+                    }
+                    default:
+                        record << uint32(fields[i].Get<int64>());
+                        break;
+                }
+            }
+
+            _itemHotfixRecords[table.Hash][uint32(fields[0].Get<int64>())] = std::move(record);
+            ++count;
+        } while (result->NextRow());
+    }
+
+    LOG_INFO("server.loading", ">> Loaded {} Item Hotfix Records in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
+    LOG_INFO("server.loading", " ");
+}
+
+ByteBuffer const* ObjectMgr::GetItemHotfixRecord(uint32 tableHash, uint32 id) const
+{
+    auto table = _itemHotfixRecords.find(tableHash);
+    if (table == _itemHotfixRecords.end())
+        return nullptr;
+
+    auto record = table->second.find(id);
+    return record != table->second.end() ? &record->second : nullptr;
+}
+
 void ObjectMgr::LoadItemSetNameLocales()
 {
     uint32 oldMSTime = getMSTime();
