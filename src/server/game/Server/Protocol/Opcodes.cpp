@@ -528,6 +528,7 @@ void OpcodeTable::Initialize()
     /*0x0000*/ DEFINE_HANDLER(CMSG_SET_FACTION_CHEAT,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleSetFactionCheat                    );
     /*0x6207*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_PROFICIENCY,                                    STATUS_NEVER);
     DEFINE_SERVER_OPCODE_HANDLER(SMSG_SETUP_CURRENCY,                                                STATUS_NEVER);
+    /*0x59B0*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_CURRENCY,                                       STATUS_NEVER);
     /*0x6F06*/ DEFINE_HANDLER(CMSG_SET_ACTION_BUTTON,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleSetActionButtonOpcode              );
     /*0x38B5*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_UPDATE_ACTION_BUTTONS,                              STATUS_NEVER);
     /*0x0104*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SEND_KNOWN_SPELLS,                                  STATUS_NEVER);
