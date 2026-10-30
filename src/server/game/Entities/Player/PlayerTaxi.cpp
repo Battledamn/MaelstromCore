@@ -115,16 +115,16 @@ bool PlayerTaxi::LoadTaxiMask(std::string_view data)
 
 void PlayerTaxi::AppendTaximaskTo(ByteBuffer& data, bool all)
 {
-    if (all)
-    {
-        for (uint8 i = 0; i < TaxiMaskSize; i++)
-            data << uint32(sTaxiNodesMask[i]);              // all existed nodes
-    }
-    else
-    {
-        for (uint8 i = 0; i < TaxiMaskSize; i++)
-            data << uint32(m_taximask[i]);                  // known nodes
-    }
+    // 4.3.4 (CPP PlayerTaxi::AppendTaximaskTo): a uint32 byte count, then one bit per node, byte by
+    // byte; the client expects 114 bytes (node 907). The mask is kept as uint32 words, whose
+    // little-endian bytes have the same bit order. Without the count the client saw no known nodes.
+    static constexpr uint32 clientMaskBytes = 114;
+    static_assert(clientMaskBytes <= TaxiMaskSize * 4);
+
+    TaxiMask const& mask = all ? sTaxiNodesMask : m_taximask;
+    data << uint32(clientMaskBytes);
+    for (uint32 i = 0; i < clientMaskBytes; ++i)
+        data << uint8(mask[i / 4] >> ((i % 4) * 8));
 }
 
 bool PlayerTaxi::LoadTaxiDestinationsFromString(std::string const& values, TeamId teamId)

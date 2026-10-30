@@ -712,7 +712,12 @@ void FlightPathMovementGenerator::DoReset(Player* player)
         init.Path().push_back(vertice);
     }
     init.SetFirstPointId(GetCurrentNode());
-    init.SetFly();
+    // Cataclysm: the 4.3.4 client only curves the route between taxi nodes with the Catmull-Rom flag and
+    // the full, uncompressed point list; with Flying alone it flew straight lines with sharp turns
+    // (CPP FlightPathMovementGenerator::DoReset).
+    init.SetSmoothFlying();
+    init.SetWalk(true);
+    init.SetUncompressed();
     init.SetVelocity(sWorld->getFloatConfig(CONFIG_TAXI_FLIGHT_SPEED));
     init.Launch();
 }

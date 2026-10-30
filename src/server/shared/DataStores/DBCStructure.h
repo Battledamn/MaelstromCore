@@ -2079,7 +2079,7 @@ struct TaxiNodesEntry
     float     z;                                            // 4        m_z
     char const*     name[16];                               // 5-21     m_Name_lang
     // 22 string flags
-    uint32    MountCreatureID[2];                           // 23-24    m_MountCreatureID[2]
+    uint32    MountCreatureID[2];                           // Cata 6-7 m_MountCreatureID[2] (Horde, Alliance)
 };
 
 struct TaxiPathEntry
