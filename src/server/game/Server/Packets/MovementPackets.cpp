@@ -2315,10 +2315,207 @@ static MovementStatusElements const MovementFallReset[] =
     MSEEnd,
 };
 
+static MovementStatusElements const DismissControlledVehicle[] =
+{
+    MSEPositionY,
+    MSEPositionZ,
+    MSEPositionX,
+    MSEHasSplineElevation,
+    MSEHasFallData,
+    MSEHasTransportData,
+    MSEHasGuidByte4,
+    MSEHasGuidByte7,
+    MSEHasMovementFlags2,
+    MSEHasGuidByte2,
+    MSEHasOrientation,
+    MSEHasGuidByte0,
+    MSEHasGuidByte6,
+    MSEHasPitch,
+    MSEHasTimestamp,
+    MSEHasGuidByte1,
+    MSEZeroBit,
+    MSEHasSpline,
+    MSEHasGuidByte3,
+    MSEHasMovementFlags,
+    MSEHasGuidByte5,
+
+    MSEHasTransportGuidByte5,
+    MSEHasVehicleId,
+    MSEHasTransportGuidByte2,
+    MSEHasTransportGuidByte0,
+    MSEHasTransportGuidByte7,
+    MSEHasTransportGuidByte3,
+    MSEHasTransportGuidByte4,
+    MSEHasTransportGuidByte1,
+    MSEHasTransportGuidByte6,
+    MSEHasTransportTime2,
+
+    MSEMovementFlags2,
+    MSEHasFallDirection,
+    MSEMovementFlags,
+
+    MSEGuidByte6,
+    MSEGuidByte3,
+    MSEGuidByte1,
+    MSEGuidByte5,
+    MSEGuidByte2,
+    MSEGuidByte4,
+    MSEGuidByte7,
+    MSEGuidByte0,
+
+    MSETimestamp,
+
+    MSETransportVehicleId,
+    MSETransportGuidByte4,
+    MSETransportGuidByte7,
+    MSETransportTime2,
+    MSETransportGuidByte6,
+    MSETransportTime,
+    MSETransportPositionZ,
+    MSETransportGuidByte0,
+    MSETransportPositionX,
+    MSETransportGuidByte3,
+    MSETransportSeat,
+    MSETransportPositionY,
+    MSETransportOrientation,
+    MSETransportGuidByte1,
+    MSETransportGuidByte5,
+    MSETransportGuidByte2,
+
+    MSEFallTime,
+    MSEFallHorizontalSpeed,
+    MSEFallCosAngle,
+    MSEFallSinAngle,
+    MSEFallVerticalSpeed,
+
+    MSEOrientation,
+    MSESplineElevation,
+    MSEPitch,
+    MSEEnd,
+};
+
+static MovementStatusElements const ChangeSeatsAccessoryGuid[] =
+{
+    MSEExtraInt8,
+    MSEHasGuidByte2,
+    MSEHasGuidByte4,
+    MSEHasGuidByte7,
+    MSEHasGuidByte6,
+    MSEHasGuidByte5,
+    MSEHasGuidByte0,
+    MSEHasGuidByte1,
+    MSEHasGuidByte3,
+    MSEGuidByte6,
+    MSEGuidByte1,
+    MSEGuidByte2,
+    MSEGuidByte5,
+    MSEGuidByte3,
+    MSEGuidByte0,
+    MSEGuidByte4,
+    MSEGuidByte7,
+    MSEEnd,
+};
+
+static MovementStatusElements const ChangeSeatsOnControlledVehicle[] =
+{
+    MSEPositionY,
+    MSEPositionX,
+    MSEPositionZ,
+    MSEExtraElement,
+    MSEHasMovementFlags,
+    MSEHasTransportData,
+    MSEHasGuidByte2,
+    MSEHasGuidByte6,
+    MSEHasGuidByte4,
+    MSEExtraElement,
+    MSEExtraElement,
+    MSEHasOrientation,
+    MSEZeroBit,
+    MSEExtraElement,
+    MSEHasGuidByte7,
+    MSEExtraElement,
+    MSEHasTimestamp,
+    MSEHasSplineElevation,
+    MSEHasGuidByte5,
+    MSEExtraElement,
+    MSEHasMovementFlags2,
+    MSEHasPitch,
+    MSEExtraElement,
+    MSEHasGuidByte0,
+    MSEExtraElement,
+    MSEHasFallData,
+    MSEHasGuidByte1,
+    MSEHasSpline,
+    MSEMovementFlags,
+    MSEExtraElement,
+    MSEHasGuidByte3,
+    MSEHasTransportGuidByte3,
+    MSEHasTransportGuidByte0,
+    MSEHasTransportGuidByte7,
+    MSEHasTransportGuidByte5,
+    MSEHasVehicleId,
+    MSEHasTransportGuidByte1,
+    MSEHasTransportGuidByte2,
+    MSEHasTransportTime2,
+    MSEHasTransportGuidByte4,
+    MSEHasTransportGuidByte6,
+    MSEMovementFlags2,
+    MSEHasFallDirection,
+    MSEExtraElement,
+    MSEGuidByte7,
+    MSEGuidByte5,
+    MSEExtraElement,
+    MSEExtraElement,
+    MSEGuidByte6,
+    MSEExtraElement,
+    MSEExtraElement,
+    MSEGuidByte3,
+    MSEExtraElement,
+    MSEGuidByte0,
+    MSEExtraElement,
+    MSEGuidByte4,
+    MSEGuidByte1,
+    MSEExtraElement,
+    MSEGuidByte2,
+    MSEPitch,
+    MSEFallCosAngle,
+    MSEFallSinAngle,
+    MSEFallHorizontalSpeed,
+    MSEFallTime,
+    MSEFallVerticalSpeed,
+    MSETransportGuidByte2,
+    MSETransportTime2,
+    MSETransportVehicleId,
+    MSETransportGuidByte0,
+    MSETransportTime,
+    MSETransportSeat,
+    MSETransportPositionX,
+    MSETransportOrientation,
+    MSETransportGuidByte7,
+    MSETransportGuidByte4,
+    MSETransportGuidByte3,
+    MSETransportGuidByte5,
+    MSETransportPositionZ,
+    MSETransportGuidByte1,
+    MSETransportGuidByte6,
+    MSETransportPositionY,
+    MSESplineElevation,
+    MSEOrientation,
+    MSETimestamp,
+    MSEEnd,
+};
+
+MovementStatusElements const* WorldPackets::Movement::GetChangeSeatsExtraSequence()
+{
+    return ChangeSeatsAccessoryGuid;
+}
+
 MovementStatusElements const* WorldPackets::Movement::GetMovementSequence(uint16 opcode)
 {
     switch (opcode)
     {
+        case CMSG_DISMISS_CONTROLLED_VEHICLE:            return DismissControlledVehicle;
+        case CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE:    return ChangeSeatsOnControlledVehicle;
         case MSG_MOVE_START_BACKWARD:     return MovementStartBackward;
         case MSG_MOVE_START_FORWARD:      return MovementStartForward;
         case MSG_MOVE_START_STRAFE_LEFT:  return MovementStartStrafeLeft;
@@ -5086,7 +5283,7 @@ namespace
 }
 
 void WorldPackets::Movement::ReadGroundMovement(WorldPacket& packet, MovementInfo& info,
-    MovementStatusElements const* sequence, uint32* counter, float* extraFloat)
+    MovementStatusElements const* sequence, uint32* counter, float* extraFloat, ExtraMovementStatusElement* extras)
 {
     info = MovementInfo();
     bool hasTransportData = false;
@@ -5202,6 +5399,13 @@ void WorldPackets::Movement::ReadGroundMovement(WorldPacket& packet, MovementInf
                 else
                     packet.read_skip<float>();
                 break;
+            case MSEExtraElement:
+                if (extras)
+                    extras->ReadNextElement(packet);
+                break;
+            case MSEExtraInt8:
+            case MSEExtraTwoBits:
+                break; // only valid inside an ExtraMovementStatusElement sequence
             case MSEEnd: break;
         }
     }
@@ -5215,6 +5419,46 @@ void WorldPackets::Movement::ReadGroundMovement(WorldPacket& packet, MovementInf
 
     if (packet.rpos() != packet.size())
         throw ByteBufferInvalidValueException("ground movement payload", "trailing bytes");
+}
+
+void WorldPackets::Movement::ExtraMovementStatusElement::ReadNextElement(WorldPacket& packet)
+{
+    MovementStatusElements const element = _elements[_index++];
+
+    switch (element)
+    {
+        case MSEHasGuidByte0:
+        case MSEHasGuidByte1:
+        case MSEHasGuidByte2:
+        case MSEHasGuidByte3:
+        case MSEHasGuidByte4:
+        case MSEHasGuidByte5:
+        case MSEHasGuidByte6:
+        case MSEHasGuidByte7:
+            Data.guid[element - MSEHasGuidByte0] = packet.ReadBit();
+            break;
+        case MSEGuidByte0:
+        case MSEGuidByte1:
+        case MSEGuidByte2:
+        case MSEGuidByte3:
+        case MSEGuidByte4:
+        case MSEGuidByte5:
+        case MSEGuidByte6:
+        case MSEGuidByte7:
+            packet.ReadByteSeq(Data.guid[element - MSEGuidByte0]);
+            break;
+        case MSEExtraFloat:
+            packet >> Data.floatData;
+            break;
+        case MSEExtraInt8:
+            packet >> Data.byteData;
+            break;
+        case MSEExtraTwoBits:
+            Data.byteData = packet.ReadBits(2);
+            break;
+        default:
+            break;
+    }
 }
 
 void WorldPackets::Movement::WriteGroundMovement(WorldPacket& packet, MovementInfo const& info,
@@ -5311,6 +5555,11 @@ void WorldPackets::Movement::WriteGroundMovement(WorldPacket& packet, MovementIn
             case MSEFlushBits: packet.FlushBits(); break;
             case MSEHasTransportOneBit: if (hasTransport) packet.WriteBit(true); break;
             case MSEExtraFloat: packet.FlushBits(); packet << extraFloat; break;
+            case MSEExtraElement:
+            case MSEExtraInt8:
+            case MSEExtraTwoBits:
+                // Client-only extras; no server movement sequence writes them.
+                break;
             case MSEEnd: break;
         }
     }
