@@ -124,6 +124,9 @@ void Pet::AddToWorld()
 
 void Pet::RemoveFromWorld()
 {
+    if (Unit* owner = GetOwner())
+        owner->UnregisterPhaseSummon(this);
+
     ///- Remove the pet from the accessor
     if (IsInWorld())
     {
@@ -240,6 +243,9 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
     if (owner->IsSpectator() || owner->GetPet() || !owner->IsInWorld() || !owner->FindMap())
         return false;
 
+    // Before the pet is added to the map: its first visibility check must use the owner's shift.
+    InheritPhasesFrom(owner);
+
     bool forceLoadFromDB = false;
     sScriptMgr->OnPlayerBeforeLoadPetFromDB(owner, petEntry, petnumber, current, forceLoadFromDB);
 
@@ -271,6 +277,8 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
 
     if (!Create(guid, map, owner->GetPhaseMask(), petInfo->CreatureId, petInfo->PetNumber))
         return false;
+
+    owner->RegisterPhaseSummon(this);
 
     setPetType(petInfo->Type);
     SetFaction(owner->GetFaction());

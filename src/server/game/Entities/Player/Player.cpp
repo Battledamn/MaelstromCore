@@ -9367,6 +9367,8 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
     pet->InitStatsForLevel(GetLevel());
     // New pets start on Assist (CPP).
     pet->SetReactState(REACT_ASSIST);
+    pet->InheritPhasesFrom(this);
+    RegisterPhaseSummon(pet);
 
     SetMinion(pet, true);
 
