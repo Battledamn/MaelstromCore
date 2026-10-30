@@ -27,27 +27,43 @@ void WorldSession::HandleLearnTalentOpcode(WorldPacket& recvData)
     uint32 talent_id, requested_rank;
     recvData >> talent_id >> requested_rank;
 
-    _player->LearnTalent(talent_id, requested_rank);
-    _player->SendTalentsInfoData(false);
+    if (_player->LearnTalent(talent_id, requested_rank))
+        _player->SendTalentsInfoData(false);
 }
 
 void WorldSession::HandleLearnPreviewTalents(WorldPacket& recvPacket)
 {
     LOG_DEBUG("network", "CMSG_LEARN_PREVIEW_TALENTS");
 
+    // 4.3.4 (CPP LearnPreviewTalents): int32 primary tree tab index (-1 when it is already chosen),
+    // uint32 count, then count x (uint32 talent id, uint32 rank)
+    int32 talentTab;
     uint32 talentsCount;
-    recvPacket >> talentsCount;
-
-    uint32 talentId, talentRank;
+    recvPacket >> talentTab >> talentsCount;
 
     // Client has max 44 talents for tree for 3 trees, rounded up : 150
     uint32 const MaxTalentsCount = 150;
-
-    for (uint32 i = 0; i < talentsCount && i < MaxTalentsCount; ++i)
+    if (talentsCount > MaxTalentsCount)
     {
+        recvPacket.rfinish();
+        return;
+    }
+
+    // choosing the primary talent tree (specialization) of the active spec, as CMSG_SET_PRIMARY_TALENT_TREE did
+    if (talentTab >= 0 && !_player->LearnPrimaryTalentSpecialization(uint8(talentTab)))
+    {
+        recvPacket.rfinish();
+        _player->SendTalentsInfoData(false);
+        return;
+    }
+
+    for (uint32 i = 0; i < talentsCount; ++i)
+    {
+        uint32 talentId, talentRank;
         recvPacket >> talentId >> talentRank;
 
-        _player->LearnTalent(talentId, talentRank);
+        if (!_player->LearnTalent(talentId, talentRank))
+            break;
     }
 
     _player->SendTalentsInfoData(false);

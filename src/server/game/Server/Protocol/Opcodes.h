@@ -720,6 +720,7 @@ enum OpcodeClient : uint16
     CMSG_UPDATE_PROJECTILE_POSITION                 = 0x0E24,
     CMSG_LEARN_PREVIEW_TALENTS                      = 0x2415,
     CMSG_LEARN_PREVIEW_TALENTS_PET                  = 0x6E24,
+    CMSG_SET_PRIMARY_TALENT_TREE                    = 0x4524, // 4.0.6 leftover; 4.3.4 sends the tree in CMSG_LEARN_PREVIEW_TALENTS
     CMSG_SET_ACTIVE_TALENT_GROUP_OBSOLETE           = 0x4C3,
     CMSG_GM_GRANT_ACHIEVEMENT                       = 0x4C4,
     CMSG_GM_REMOVE_ACHIEVEMENT                      = 0x4C5,

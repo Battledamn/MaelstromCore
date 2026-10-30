@@ -57,6 +57,8 @@ MapDifficulty const* GetDownscaledMapDifficultyData(uint32 mapId, Difficulty& di
 bool IsSharedDifficultyMap(uint32 mapid);
 
 uint32 const* /*[MAX_TALENT_TABS]*/ GetTalentTabPages(uint8 cls);
+// The spells a primary talent tree teaches (TalentTreePrimarySpells.dbc), or nullptr
+std::vector<uint32> const* GetTalentTreePrimarySpells(uint32 talentTabId);
 
 uint32 GetLiquidFlags(uint32 liquidType);
 
@@ -162,6 +164,7 @@ extern DBCStorage <MapEntry>                     sMapStore;
 extern MapDifficultyMap                          sMapDifficultyMap;
 extern DBCStorage <MovieEntry>                   sMovieStore;
 extern DBCStorage <NamesReservedEntry>           sNamesReservedStore;
+extern DBCStorage <NumTalentsAtLevelEntry>       sNumTalentsAtLevelStore;
 extern DBCStorage <NamesProfanityEntry>          sNamesProfanityStore;
 extern DBCStorage <OverrideSpellDataEntry>       sOverrideSpellDataStore;
 extern DBCStorage <PhaseEntry>                   sPhaseStore;

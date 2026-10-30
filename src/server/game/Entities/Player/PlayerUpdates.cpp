@@ -700,6 +700,9 @@ void Player::UpdateRating(CombatRating cr)
         if (affectStats)
             UpdateArmorPenetration(amount);
         break;
+    case CR_MASTERY:
+        UpdateMastery();
+        break;
     }
 }
 
@@ -2346,6 +2349,10 @@ void Player::UpdateSpecCount(uint8 count)
     }
 
     CharacterDatabase.CommitTransaction(trans);
+
+    // a removed spec loses its primary talent tree
+    for (uint8 spec = count; spec < MAX_TALENT_SPECS; ++spec)
+        SetPrimaryTalentTree(spec, 0);
 
     SetSpecsCount(count);
 

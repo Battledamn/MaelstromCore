@@ -44,8 +44,43 @@ TEST_F(TalentsInfoTest, WritesPrimaryTalentTreeBeforeTheTalentCount)
 
     EXPECT_EQ(specsCount, 1);
     EXPECT_EQ(activeSpec, 0);
-    EXPECT_EQ(primaryTalentTree, 0u);                 // no learned talents yet
+    EXPECT_EQ(primaryTalentTree, 0u);                 // no tree chosen yet
     EXPECT_EQ(talentCount, 0u);
     EXPECT_EQ(glyphCount, uint8(MAX_GLYPH_SLOT_INDEX));
     EXPECT_EQ(data.rpos() + MAX_GLYPH_SLOT_INDEX * sizeof(uint16), data.size());
+}
+
+// The primary tree is the one the player chose (characters.talentTree), not derived from the points,
+// and Cataclysm sends 9 glyph slots (3 prime, 3 major, 3 minor) per spec.
+TEST_F(TalentsInfoTest, WritesTheChosenPrimaryTalentTreeAndNineGlyphs)
+{
+    TestPlayer* player = CreateTestPlayer();
+    player->SetSpecsCount(2);
+    player->SetActiveSpec(0);
+    player->SetPrimaryTalentTree(0, 746);                 // Warrior Arms
+    player->SetPrimaryTalentTree(1, 845);                 // Warrior Protection
+
+    WorldPacket data;
+    player->BuildPlayerTalentsInfoData(&data);
+
+    uint32 unspentTalentPoints = 0;
+    uint8 specsCount = 0;
+    uint8 activeSpec = 0;
+    data >> unspentTalentPoints >> specsCount >> activeSpec;
+    ASSERT_EQ(specsCount, 2);
+
+    uint32 const expectedTrees[] = { 746, 845 };
+    for (uint32 expectedTree : expectedTrees)
+    {
+        uint32 primaryTalentTree = 0;
+        uint8 talentCount = 1;
+        uint8 glyphCount = 0;
+        data >> primaryTalentTree >> talentCount >> glyphCount;
+        EXPECT_EQ(primaryTalentTree, expectedTree);
+        EXPECT_EQ(talentCount, 0u);
+        EXPECT_EQ(glyphCount, 9u);
+        data.read_skip(glyphCount * sizeof(uint16));
+    }
+
+    EXPECT_EQ(data.rpos(), data.size());
 }

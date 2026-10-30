@@ -386,7 +386,7 @@ void WorldSession::HandleGameobjectReportUse(WorldPacket& recvPacket)
 void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
 {
     uint32 spellId;
-    uint32 misc; // Cata: unused word between SpellID and SendCastFlags, present on the wire since 4.x
+    uint32 misc; // Cata: word between SpellID and SendCastFlags; the glyph slot for glyph spells (CPP CastRequest.Misc)
     uint8  castCount, castFlags;
 
     if (recvPacket.empty())
@@ -560,6 +560,7 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
     sScriptMgr->ValidateSpellAtCastSpellResult(_player, mover, spell, oldSpellId, spellId);
 
     spell->m_cast_count = castCount;                       // set count of casts
+    spell->m_glyphIndex = misc;                            // glyph slot (SPELL_EFFECT_APPLY_GLYPH)
     spell->prepare(&targets);
 }
 

@@ -458,6 +458,11 @@ int32 SpellEffectInfo::CalcValue(WorldObject const* caster, int32 const* bp, Uni
             amount += std::round(value) * frand(-delta, delta);
         }
 
+        // a specialization's mastery spell grows with the caster's mastery (CPP CalcValue)
+        if (_spellInfo->HasAttribute(SPELL_ATTR8_MASTERY_AFFECTS_POINTS))
+            if (Player const* playerCaster = caster ? caster->ToPlayer() : nullptr)
+                amount += playerCaster->GetFloatValue(PLAYER_MASTERY) * BonusMultiplier;
+
         if (casterUnit)
         {
             if (uint8 comboPoints = casterUnit->GetComboPoints())
@@ -518,6 +523,11 @@ int32 SpellEffectInfo::CalcValue(WorldObject const* caster, int32 const* bp, Uni
         {
             value += PointsPerComboPoint * comboPoints;
         }
+
+        // a specialization's mastery spell grows with the caster's mastery (CPP CalcValue)
+        if (_spellInfo->HasAttribute(SPELL_ATTR8_MASTERY_AFFECTS_POINTS))
+            if (Player const* playerCaster = casterUnit->ToPlayer())
+                value += playerCaster->GetFloatValue(PLAYER_MASTERY) * BonusMultiplier;
 
         value = casterUnit->ApplyEffectModifiers(_spellInfo, EffectIndex, value);
 

@@ -1483,6 +1483,13 @@ struct MovieEntry
     //uint32      volume                                    // 2 always 100
 };
 
+// NumTalentsAtLevel.dbc: talent points a character has at a level (Cataclysm: 1 at 10, 41 at 85)
+struct NumTalentsAtLevelEntry
+{
+    //uint32 Level;                                         // 0 index
+    float NumberOfTalents;                                  // 1
+};
+
 struct NamesReservedEntry
 {
     //uint32         ID;                                    // 0
@@ -2068,6 +2075,15 @@ struct TalentTabEntry
     uint32  tabpage;                                        // 22
     //char const* internalname;                             // 23
     std::array<uint32, 2> MasterySpellID;                   // Cata 9-10: the tree's mastery passives
+};
+
+// TalentTreePrimarySpells.dbc: the spells a primary talent tree (specialization) teaches
+struct TalentTreePrimarySpellsEntry
+{
+    //uint32 ID;                                            // 0 index
+    uint32 TalentTabID;                                     // 1 TalentTab.dbc
+    uint32 SpellID;                                         // 2
+    //uint32 Flags;                                         // 3
 };
 
 struct TaxiNodesEntry

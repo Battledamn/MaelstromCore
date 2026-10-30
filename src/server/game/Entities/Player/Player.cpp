@@ -2579,6 +2579,10 @@ void Player::InitTalentForLevel()
 {
     uint32 talentPointsForLevel = CalculateTalentsPoints();
 
+    // below level 10 there is no specialization either (CPP resets the talents)
+    if (GetLevel() < 10 && GetPrimaryTalentTree(GetActiveSpec()))
+        resetTalents(true);
+
     // if used more than have then reset
     if (m_usedTalentCount > talentPointsForLevel)
     {
@@ -3381,21 +3385,48 @@ bool Player::_addSpell(uint32 spellId, uint8 addSpecMask, bool temporary, bool l
     return true;
 }
 
+bool Player::IsCurrentSpecMasterySpell(SpellInfo const* spellInfo) const
+{
+    if (TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(GetPrimaryTalentTree(GetActiveSpec())))
+        return spellInfo->Id == talentTab->MasterySpellID[0] || spellInfo->Id == talentTab->MasterySpellID[1];
+
+    return false;
+}
+
 bool Player::IsNeedCastPassiveSpellAtLearn(SpellInfo const* spellInfo) const
 {
-    // Cataclysm mastery passives (TalentTab.dbc) belong to one specialization and are learned with
-    // the class skill by every character. Primary talent trees are not implemented yet, so none is
-    // active (CPP: only the current spec's mastery, IsCurrentSpecMasterySpell).
-    for (uint32 talentTabId = 1; talentTabId < sTalentTabStore.GetNumRows(); ++talentTabId)
-        if (TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(talentTabId))
-            if (spellInfo->Id == talentTab->MasterySpellID[0] || spellInfo->Id == talentTab->MasterySpellID[1])
-                return false;
+    // Cataclysm mastery passives (TalentTab.dbc) belong to one specialization: only the active spec's
+    // primary tree applies its own (CPP IsCurrentSpecMasterySpell)
+    if (spellInfo->HasAttribute(SPELL_ATTR8_MASTERY_AFFECTS_POINTS) && !IsCurrentSpecMasterySpell(spellInfo))
+        return false;
 
     // note: form passives activated with shapeshift spells be implemented by HandleShapeshiftBoosts instead of spell_learn_spell
     // talent dependent passives activated at form apply have proper stance data
     ShapeshiftForm form = GetShapeshiftForm();
     return (!spellInfo->Stances || (form && (spellInfo->Stances & (1 << (form - 1)))) ||
             (!form && spellInfo->HasAttribute(SPELL_ATTR2_ALLOW_WHILE_NOT_SHAPESHIFTED)));
+}
+
+// the class's "Mastery" spell, trained at level 80 (CPP MasterySpells)
+static uint32 GetClassMasterySpell(uint8 playerClass)
+{
+    static constexpr std::array<uint32, MAX_CLASSES> MasterySpells =
+    {
+        0,
+        87500,  // Warrior
+        87494,  // Paladin
+        87493,  // Hunter
+        87496,  // Rogue
+        87495,  // Priest
+        87492,  // Death Knight
+        87497,  // Shaman
+        86467,  // Mage
+        87498,  // Warlock
+        0,
+        87491   // Druid
+    };
+
+    return playerClass < MAX_CLASSES ? MasterySpells[playerClass] : 0;
 }
 
 void Player::learnSpell(uint32 spellId, bool temporary /*= false*/, bool learnFromSkill /*= false*/)
@@ -3423,6 +3454,10 @@ void Player::learnSpell(uint32 spellId, bool temporary /*= false*/, bool learnFr
         if (IsInWorld())
             SendLearnPacket(spellId, true);
     }
+
+    // Mastery trained: the active specialization's mastery comes with it
+    if (added && spellId == GetClassMasterySpell(getClass()))
+        _addPrimaryTalentTreeSpells();
 
     // pussywizard: rank stuff at the end!
     if (uint32 nextSpell = sSpellMgr->GetNextSpellInChain(spellId))
@@ -3873,10 +3908,13 @@ bool Player::resetTalents(bool noResetCost)
     // xinef: get max available talent points amount
     uint32 talentPointsForLevel = CalculateTalentsPoints();
 
-    // xinef: no talent points are used, return
-    if (m_usedTalentCount == 0)
+    // xinef: no talent points are used and (Cataclysm) no primary talent tree chosen, return
+    uint32 const primaryTree = GetPrimaryTalentTree(GetActiveSpec());
+    if (m_usedTalentCount == 0 && !primaryTree)
+    {
+        SetFreeTalentPoints(talentPointsForLevel);
         return false;
-    m_usedTalentCount = 0;
+    }
 
     // xinef: check if we have enough money
     uint32 resetCost = 0;
@@ -3889,6 +3927,13 @@ bool Player::resetTalents(bool noResetCost)
             return false;
         }
     }
+
+    m_usedTalentCount = 0;
+
+    // Cataclysm: the specialization goes with the talents, so a new primary tree can be chosen (CPP)
+    _removePrimaryTalentTreeSpells(primaryTree);
+    SetPrimaryTalentTree(GetActiveSpec(), 0);
+    UpdateMastery();
 
     RemovePet(nullptr, PET_SAVE_NOT_IN_SLOT, true);
 
@@ -6981,6 +7026,9 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
                 break;
             case ITEM_MOD_ARMOR_PENETRATION_RATING:
                 ApplyRatingMod(CR_ARMOR_PENETRATION, int32(val), apply);
+                break;
+            case ITEM_MOD_MASTERY_RATING:
+                ApplyRatingMod(CR_MASTERY, int32(val), apply);
                 break;
             case ITEM_MOD_SPELL_POWER:
                 ApplySpellPowerBonus(int32(val), apply);
@@ -13775,25 +13823,22 @@ uint32 Player::GetBarberShopCost(uint8 newhairstyle, uint8 newhaircolor, uint8 n
 
 void Player::InitGlyphsForLevel()
 {
-    for (uint32 i = 0; i < sGlyphSlotStore.GetNumRows(); ++i)
+    // Cataclysm (CPP): the 9 GlyphSlot.dbc rows fill the slots in file order (major 21, minor 22, minor 23,
+    // major 24, minor 25, major 26, prime 41-43); GlyphSlot.Order is the position within its type, not the slot.
+    uint8 slot = 0;
+    for (uint32 i = 0; i < sGlyphSlotStore.GetNumRows() && slot < MAX_GLYPH_SLOT_INDEX; ++i)
         if (GlyphSlotEntry const* gs = sGlyphSlotStore.LookupEntry(i))
-            if (gs->Order)
-                SetGlyphSlot(gs->Order - 1, gs->Id);
+            SetGlyphSlot(slot++, gs->Id);
 
+    // one glyph of each type opens at 25, 50 and 75
     uint8 level = GetLevel();
     uint32 value = 0;
-
-    // 0x3F = 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 for 80 level
-    if (level >= 15)
-        value |= (0x01 | 0x02);
-    if (level >= 30)
-        value |= 0x08;
+    if (level >= 25)
+        value |= 0x01 | 0x02 | 0x40;
     if (level >= 50)
-        value |= 0x04;
-    if (level >= 70)
-        value |= 0x10;
-    if (level >= 80)
-        value |= 0x20;
+        value |= 0x04 | 0x08 | 0x80;
+    if (level >= 75)
+        value |= 0x10 | 0x20 | 0x100;
 
     SetUInt32Value(PLAYER_GLYPHS_ENABLED, value);
 }
@@ -14108,7 +14153,10 @@ LootItem* Player::StoreLootItem(uint8 lootSlot, Loot* loot, InventoryResult& msg
 
 uint32 Player::CalculateTalentsPoints() const
 {
-    uint32 base_talent = GetLevel() < 10 ? 0 : GetLevel() - 9;
+    // Cataclysm: NumTalentsAtLevel.dbc (first point at 10, then one every other level: 41 at 85),
+    // which has entries up to level 100 (CPP)
+    NumTalentsAtLevelEntry const* count = sNumTalentsAtLevelStore.LookupEntry(std::min<uint32>(GetLevel(), 100));
+    uint32 base_talent = count ? uint32(count->NumberOfTalents) : 0;
 
     uint32 talentPointsForLevel = 0;
     if (!IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_TALENT_POINT_CALC) || GetMapId() != MAP_EBON_HOLD)
@@ -14117,7 +14165,10 @@ uint32 Player::CalculateTalentsPoints() const
     }
     else
     {
-        talentPointsForLevel = GetLevel() < 56 ? 0 : GetLevel() - 55;
+        // Death Knights in Acherus: the points any class has at 55 come from the starting quests
+        NumTalentsAtLevelEntry const* dkBase = sNumTalentsAtLevelStore.LookupEntry(55);
+        uint32 dkBaseTalent = dkBase ? uint32(dkBase->NumberOfTalents) : 0;
+        talentPointsForLevel = base_talent > dkBaseTalent ? base_talent - dkBaseTalent : 0;
         talentPointsForLevel += m_questRewardTalentCount;
 
         if (talentPointsForLevel > base_talent)
@@ -14436,7 +14487,7 @@ void Player::CompletedAchievement(AchievementEntry const* entry)
     m_achievementMgr->CompletedAchievement(entry);
 }
 
-void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= false*/)
+bool Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= false*/)
 {
     uint32 CurTalentPoints = GetFreeTalentPoints();
 
@@ -14445,29 +14496,29 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
         // xinef: check basic data
         if (!CurTalentPoints)
         {
-            return;
+            return false;
         }
 
         if (talentRank >= MAX_TALENT_RANK)
         {
-            return;
+            return false;
         }
     }
 
     TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
     if (!talentInfo)
-        return;
+        return false;
 
     if (!sScriptMgr->OnPlayerCanLearnTalent(this, talentInfo, talentRank))
-        return;
+        return false;
 
     TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
     if (!talentTabInfo)
-        return;
+        return false;
 
     // xinef: prevent learn talent for different class (cheating)
     if ((getClassMask() & talentTabInfo->ClassMask) == 0)
-        return;
+        return false;
 
     // xinef: find current talent rank
     uint32 currentTalentRank = 0;
@@ -14482,7 +14533,7 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
 
     // xinef: we already have same or higher rank talent learned
     if (currentTalentRank >= talentRank + 1)
-        return;
+        return false;
 
     uint32 talentPointsChange = (talentRank - currentTalentRank + 1);
     if (!command)
@@ -14490,7 +14541,7 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
         // xinef: check if we have enough free talent points
         if (CurTalentPoints < talentPointsChange)
         {
-            return;
+            return false;
         }
     }
 
@@ -14511,38 +14562,57 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
 
             // xinef: does not have enough talent points spend in required talent
             if (!hasEnoughRank)
-                return;
+                return false;
         }
 
     if (!command)
     {
+        // Cataclysm (CPP): a primary talent tree must be chosen first, and the other trees open only after
+        // REQ_PRIMARY_TREE_TALENTS points in it
+        uint32 const primaryTree = GetPrimaryTalentTree(GetActiveSpec());
+        if (!primaryTree)
+            return false;
+
+        bool const isPrimaryTree = talentInfo->TalentTab == primaryTree;
+
         // xinef: check amount of points spent in current talent tree
-        // xinef: be smart and quick
         uint32 spentPoints = 0;
-        if (talentInfo->Row > 0)
+        uint32 primaryTreePoints = 0;
+        if (talentInfo->Row > 0 || !isPrimaryTree)
         {
             PlayerTalentMap const& talentMap = GetTalentMap();
             for (PlayerTalentMap::const_iterator itr = talentMap.begin(); itr != talentMap.end(); ++itr)
+            {
+                if (itr->second->State == PLAYERSPELL_REMOVED || !itr->second->IsInSpec(GetActiveSpec())) // pussywizard
+                    continue;
+
                 if (TalentSpellPos const* talentPos = GetTalentSpellPos(itr->first))
                     if (TalentEntry const* itrTalentInfo = sTalentStore.LookupEntry(talentPos->talent_id))
+                    {
                         if (itrTalentInfo->TalentTab == talentInfo->TalentTab)
-                            if (itr->second->State != PLAYERSPELL_REMOVED && itr->second->IsInSpec(GetActiveSpec())) // pussywizard
-                                spentPoints += talentPos->rank + 1;
+                            spentPoints += talentPos->rank + 1;
+                        if (itrTalentInfo->TalentTab == primaryTree)
+                            primaryTreePoints += talentPos->rank + 1;
+                    }
+            }
         }
 
         // xinef: we do not have enough talent points to add talent of this tier
         if (spentPoints < (talentInfo->Row * MAX_TALENT_RANK))
-            return;
+            return false;
+
+        if (!isPrimaryTree && primaryTreePoints < REQ_PRIMARY_TREE_TALENTS)
+            return false;
     }
 
     // xinef: hacking attempt, tries to learn unknown rank
     uint32 spellId = talentInfo->RankID[talentRank];
     if (spellId == 0)
-        return;
+        return false;
 
     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
     if (!spellInfo)
-        return;
+        return false;
 
     bool learned = false;
 
@@ -14570,6 +14640,26 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
     }
 
     sScriptMgr->OnPlayerLearnTalents(this, talentId, talentRank, spellId);
+    return true;
+}
+
+bool Player::LearnPrimaryTalentSpecialization(uint8 talentTabIndex)
+{
+    if (talentTabIndex >= MAX_TALENT_TABS || GetLevel() < 10)
+        return false;
+
+    uint32 const talentTabId = GetTalentTabPages(getClass())[talentTabIndex];
+    TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(talentTabId);
+    if (!talentTab)
+        return false;
+
+    // the client sends the chosen tree again with later points; changing it takes a talent reset
+    if (uint32 current = GetPrimaryTalentTree(GetActiveSpec()))
+        return current == talentTabId;
+
+    SetPrimaryTalentTree(GetActiveSpec(), talentTabId);
+    _addPrimaryTalentTreeSpells();
+    return true;
 }
 
 void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRank)
@@ -15275,6 +15365,11 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
 
     auto finiteAlways = [](float f) { return std::isfinite(f) ? f : 0.0f; };
 
+    // Cataclysm primary talent tree per spec, space separated (CPP characters.talentTree)
+    std::string primaryTalentTrees;
+    for (uint8 spec = 0; spec < MAX_TALENT_SPECS; ++spec)
+        primaryTalentTrees += Acore::StringFormat("{} ", GetPrimaryTalentTree(spec));
+
     if (create)
     {
         //! Insert query
@@ -15395,6 +15490,7 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
         stmt->SetData(index++, m_grantableLevels);
         stmt->SetData(index++, _innTriggerId);
         stmt->SetData(index++, m_extraBonusTalentCount);
+        stmt->SetData(index++, primaryTalentTrees);
     }
     else
     {
@@ -15535,6 +15631,7 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
         stmt->SetData(index++, m_grantableLevels);
         stmt->SetData(index++, _innTriggerId);
         stmt->SetData(index++, m_extraBonusTalentCount);
+        stmt->SetData(index++, primaryTalentTrees);
 
         stmt->SetData(index++, IsInWorld() && !GetSession()->PlayerLogout() ? 1 : 0);
         // Index
@@ -15558,12 +15655,8 @@ void Player::_LoadGlyphs(PreparedQueryResult result)
         if (spec >= m_specsCount)
             continue;
 
-        m_Glyphs[spec][0] = fields[1].Get<uint16>();
-        m_Glyphs[spec][1] = fields[2].Get<uint16>();
-        m_Glyphs[spec][2] = fields[3].Get<uint16>();
-        m_Glyphs[spec][3] = fields[4].Get<uint16>();
-        m_Glyphs[spec][4] = fields[5].Get<uint16>();
-        m_Glyphs[spec][5] = fields[6].Get<uint16>();
+        for (uint8 i = 0; i < MAX_GLYPH_SLOT_INDEX; ++i)
+            m_Glyphs[spec][i] = fields[i + 1].Get<uint16>();
     } while (result->NextRow());
 }
 
@@ -15717,6 +15810,9 @@ void Player::ActivateSpec(uint8 spec)
                 removedSpecAuras.insert(glyphEntry->SpellId);
             }
 
+    // Cataclysm: the old spec's primary tree spells and mastery go, the new spec's come below
+    _removePrimaryTalentTreeSpells(GetPrimaryTalentTree(oldSpec));
+
     // xinef: set active spec as new one
     SetActiveSpec(spec);
     uint32 spentTalents = 0;
@@ -15741,6 +15837,8 @@ void Player::ActivateSpec(uint8 spec)
 
         removedSpecAuras.erase(itr->first);
     }
+
+    _addPrimaryTalentTreeSpells();
 
     // pussywizard: remove spells that are in previous spec, but are not present in new one (or are in new spec, but not in the old one)
     for (PlayerSpellMap::iterator itr = m_spells.begin(); itr != m_spells.end(); ++itr)
@@ -15931,45 +16029,134 @@ uint8 Player::GetMostPointsTalentTree() const
 
 uint32 Player::GetPrimaryTalentTree(uint8 spec) const
 {
-    if (spec >= MAX_TALENT_SPECS)
-        return 0;
+    return spec < MAX_TALENT_SPECS ? m_primaryTalentTree[spec] : 0;
+}
 
-    uint32 specPoints[3] = { 0, 0, 0 };
-    PlayerTalentMap const& talentMap = GetTalentMap();
-    for (PlayerTalentMap::const_iterator itr = talentMap.begin(); itr != talentMap.end(); ++itr)
+void Player::SetPrimaryTalentTree(uint8 spec, uint32 talentTabId)
+{
+    if (spec < MAX_TALENT_SPECS)
+        m_primaryTalentTree[spec] = talentTabId;
+}
+
+void Player::_LoadPrimaryTalentTrees(std::string_view talentTrees)
+{
+    // characters.talentTree: one TalentTab.dbc ID per spec, space separated (CPP)
+    std::vector<std::string_view> tokens = Acore::Tokenize(talentTrees, ' ', false);
+    for (uint8 spec = 0; spec < MAX_TALENT_SPECS; ++spec)
     {
-        if (itr->second->State == PLAYERSPELL_REMOVED || !itr->second->IsInSpec(spec))
+        m_primaryTalentTree[spec] = 0;
+        if (spec >= tokens.size())
             continue;
 
-        TalentEntry const* talentInfo = sTalentStore.LookupEntry(itr->second->talentID);
-        if (!talentInfo)
+        Optional<uint32> talentTabId = Acore::StringTo<uint32>(tokens[spec]);
+        if (!talentTabId || !*talentTabId)
             continue;
 
-        TalentTabEntry const* tab = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
-        if (!tab || tab->tabpage >= 3)
-            continue;
-
-        for (uint8 rank = 0; rank < MAX_TALENT_RANK; ++rank)
-            if (talentInfo->RankID[rank] && itr->first == talentInfo->RankID[rank])
-            {
-                specPoints[tab->tabpage] += rank + 1;
-                break;
-            }
+        TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(*talentTabId);
+        if (talentTab && (talentTab->ClassMask & getClassMask()))
+            m_primaryTalentTree[spec] = *talentTabId;
     }
 
-    uint8 maxPage = 0;
-    uint32 maxPoints = specPoints[0];
-    for (uint8 i = 1; i < 3; ++i)
-        if (specPoints[i] > maxPoints)
+    // characters from before primary trees were saved: the tree holding most of a spec's points
+    for (uint8 spec = 0; spec < MAX_TALENT_SPECS; ++spec)
+    {
+        if (m_primaryTalentTree[spec])
+            continue;
+
+        uint32 specPoints[MAX_TALENT_TABS] = { 0, 0, 0 };
+        for (auto const& [spellId, talent] : m_talents)
         {
-            maxPage = i;
-            maxPoints = specPoints[i];
+            if (talent->State == PLAYERSPELL_REMOVED || !talent->IsInSpec(spec))
+                continue;
+
+            TalentSpellPos const* talentPos = GetTalentSpellPos(spellId);
+            TalentEntry const* talentInfo = talentPos ? sTalentStore.LookupEntry(talentPos->talent_id) : nullptr;
+            TalentTabEntry const* tab = talentInfo ? sTalentTabStore.LookupEntry(talentInfo->TalentTab) : nullptr;
+            if (tab && tab->tabpage < MAX_TALENT_TABS)
+                specPoints[tab->tabpage] += talentPos->rank + 1;
         }
 
-    if (!maxPoints)
-        return 0;
+        uint8 maxPage = 0;
+        for (uint8 i = 1; i < MAX_TALENT_TABS; ++i)
+            if (specPoints[i] > specPoints[maxPage])
+                maxPage = i;
 
-    return GetTalentTabPages(getClass())[maxPage];
+        if (specPoints[maxPage])
+            m_primaryTalentTree[spec] = GetTalentTabPages(getClass())[maxPage];
+    }
+}
+
+void Player::_addPrimaryTalentTreeSpells()
+{
+    uint32 const talentTabId = GetPrimaryTalentTree(GetActiveSpec());
+    TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(talentTabId);
+    if (!talentTab)
+        return;
+
+    // the specialization's own spells (CPP LearnPrimaryTalentSpecialization / ActivateSpec); temporary,
+    // so they follow the spec: re-added at login and spec switch, dropped at talent reset
+    if (std::vector<uint32> const* primarySpells = GetTalentTreePrimarySpells(talentTabId))
+        for (uint32 spellId : *primarySpells)
+            _addSpell(spellId, SPEC_MASK_ALL, true);
+
+    // the specialization's mastery, once the class's Mastery has been trained (level 80)
+    if (CanUseMastery())
+        for (uint32 masterySpellId : talentTab->MasterySpellID)
+            if (masterySpellId)
+                _addSpell(masterySpellId, SPEC_MASK_ALL, true);
+
+    UpdateMastery();
+}
+
+void Player::_removePrimaryTalentTreeSpells(uint32 talentTabId)
+{
+    TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(talentTabId);
+    if (!talentTab)
+        return;
+
+    if (std::vector<uint32> const* primarySpells = GetTalentTreePrimarySpells(talentTabId))
+        for (uint32 spellId : *primarySpells)
+            removeSpell(spellId, SPEC_MASK_ALL, true);
+
+    for (uint32 masterySpellId : talentTab->MasterySpellID)
+    {
+        if (!masterySpellId)
+            continue;
+
+        removeSpell(masterySpellId, SPEC_MASK_ALL, true);
+        RemoveAurasDueToSpell(masterySpellId);
+    }
+}
+
+bool Player::CanUseMastery() const
+{
+    uint32 const masterySpellId = GetClassMasterySpell(getClass());
+    return masterySpellId && HasSpell(masterySpellId);
+}
+
+void Player::UpdateMastery()
+{
+    // CPP Player::UpdateMastery: the base mastery aura plus mastery rating, then the active
+    // specialization's mastery passives pick up the new value
+    if (!CanUseMastery())
+    {
+        SetFloatValue(PLAYER_MASTERY, 0.0f);
+        return;
+    }
+
+    float value = GetTotalAuraModifier(SPELL_AURA_MASTERY);
+    value += GetRatingBonusValue(CR_MASTERY);
+    SetFloatValue(PLAYER_MASTERY, value);
+
+    TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(GetPrimaryTalentTree(GetActiveSpec()));
+    if (!talentTab)
+        return;
+
+    for (uint32 masterySpellId : talentTab->MasterySpellID)
+        if (masterySpellId)
+            if (Aura* aura = GetAura(masterySpellId))
+                if (aura->GetSpellInfo()->HasAttribute(SPELL_ATTR8_MASTERY_AFFECTS_POINTS))
+                    aura->RecalculateAmountOfEffects();
 }
 
 void Player::SetReputation(uint32 factionentry, float value)

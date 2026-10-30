@@ -6052,9 +6052,7 @@ void AuraEffect::HandleMastery(AuraApplication const* aurApp, uint8 mode, bool /
     if (!target)
         return;
 
-    // Only the base mastery from the aura: mastery rating and the specialization masteries need
-    // primary talent trees, which are not implemented yet (CPP: Player::UpdateMastery)
-    target->SetFloatValue(PLAYER_MASTERY, float(target->GetTotalAuraModifier(SPELL_AURA_MASTERY)));
+    target->UpdateMastery();
 }
 
 void AuraEffect::HandleOverrideSpellPowerByAttackPower(AuraApplication const* aurApp, uint8 mode, bool /*apply*/) const

@@ -1724,6 +1724,7 @@ public:
     [[nodiscard]] bool HasActiveSpell(uint32 spell) const;            // show in spellbook
     [[nodiscard]] bool IsSpellFitByClassAndRace(uint32 spell_id) const;
     bool IsNeedCastPassiveSpellAtLearn(SpellInfo const* spellInfo) const;
+    [[nodiscard]] bool IsCurrentSpecMasterySpell(SpellInfo const* spellInfo) const;
 
     void SendProficiency(ItemClass itemClass, uint32 itemSubclassMask);
     void SendCurrencies() const;
@@ -1755,7 +1756,8 @@ public:
     void BuildPlayerTalentsInfoData(WorldPacket* data);
     void BuildPetTalentsInfoData(WorldPacket* data);
     void SendTalentsInfoData(bool pet);
-    void LearnTalent(uint32 talentId, uint32 talentRank, bool command = false);
+    bool LearnTalent(uint32 talentId, uint32 talentRank, bool command = false);
+    bool LearnPrimaryTalentSpecialization(uint8 talentTabIndex);
     void LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRank);
 
     bool addTalent(uint32 spellId, uint8 addSpecMask, uint8 oldTalentRank);
@@ -1763,6 +1765,9 @@ public:
     void _removeTalent(uint32 spellId, uint8 specMask);
     void _removeTalentAurasAndSpells(uint32 spellId);
     void _addTalentAurasAndSpells(uint32 spellId);
+    // the active spec's primary tree spells and masteries, learned as temporary spells (not saved)
+    void _addPrimaryTalentTreeSpells();
+    void _removePrimaryTalentTreeSpells(uint32 talentTabId);
     [[nodiscard]] bool HasTalent(uint32 spell_id, uint8 spec) const;
 
     [[nodiscard]] uint32 CalculateTalentsPoints() const;
@@ -1783,6 +1788,10 @@ public:
     void GetTalentTreePoints(uint8 (&specPoints)[3]) const;
     [[nodiscard]] uint8 GetMostPointsTalentTree() const;
     [[nodiscard]] uint32 GetPrimaryTalentTree(uint8 spec) const;
+    void SetPrimaryTalentTree(uint8 spec, uint32 talentTabId);
+    // Cataclysm mastery: the class's "Mastery" spell (trainer, level 80) unlocks the specialization masteries
+    [[nodiscard]] bool CanUseMastery() const;
+    void UpdateMastery();
     bool HasTankSpec();
     bool HasMeleeSpec();
     bool HasCasterSpec();
@@ -2827,6 +2836,7 @@ protected:
     void _LoadEntryPointData(PreparedQueryResult result);
     void _LoadGlyphs(PreparedQueryResult result);
     void _LoadTalents(PreparedQueryResult result);
+    void _LoadPrimaryTalentTrees(std::string_view talentTrees);
     void _LoadInstanceTimeRestrictions(PreparedQueryResult result);
     void _LoadBrewOfTheMonth(PreparedQueryResult result);
     void _LoadCharacterSettings(PreparedQueryResult result);
@@ -2912,6 +2922,8 @@ protected:
     // only), so these keep the existing WotLK-era behavior as plain server-side state
     // instead of update fields that no longer exist in the real protocol.
     uint32 m_freeTalentPoints = 0;
+    // Cataclysm primary talent tree (TalentTab.dbc ID) per talent spec, 0 = none chosen yet
+    std::array<uint32, MAX_TALENT_SPECS> m_primaryTalentTree = { };
     uint32 m_freePrimaryProfessionPoints = 0;
     uint32 m_honorPoints = 0;
     uint32 m_arenaPoints = 0;

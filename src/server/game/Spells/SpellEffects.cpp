@@ -4604,25 +4604,24 @@ void Spell::EffectApplyGlyph(SpellEffIndex effIndex)
 
     Player* player = unitCaster->ToPlayer();
 
-    // glyph sockets level requirement
+    // glyph sockets level requirement (Cataclysm, CPP: see Player::InitGlyphsForLevel)
     uint8 minLevel = 0;
     switch (m_glyphIndex)
     {
         case 0:
         case 1:
-            minLevel = 15;
+        case 6:
+            minLevel = 25;
             break;
         case 2:
+        case 3:
+        case 7:
             minLevel = 50;
             break;
-        case 3:
-            minLevel = 30;
-            break;
         case 4:
-            minLevel = 70;
-            break;
         case 5:
-            minLevel = 80;
+        case 8:
+            minLevel = 75;
             break;
     }
     if (minLevel && unitCaster->GetLevel() < minLevel)
@@ -4675,6 +4674,18 @@ void Spell::EffectApplyGlyph(SpellEffIndex effIndex)
             player->SetGlyph(m_glyphIndex, glyph, !player->GetSession()->PlayerLoading());
             player->SendTalentsInfoData(false);
         }
+    }
+    // Cataclysm "Remove Glyph" (Dust of Disappearance) has no glyph: it clears the slot (CPP)
+    else if (uint32 oldGlyph = player->GetGlyph(m_glyphIndex))
+    {
+        if (GlyphPropertiesEntry const* oldGlyphEntry = sGlyphPropertiesStore.LookupEntry(oldGlyph))
+        {
+            player->RemoveAurasDueToSpell(oldGlyphEntry->SpellId);
+            player->SendLearnPacket(oldGlyphEntry->SpellId, false);
+        }
+
+        player->SetGlyph(m_glyphIndex, 0, true);
+        player->SendTalentsInfoData(false);
     }
 }
 

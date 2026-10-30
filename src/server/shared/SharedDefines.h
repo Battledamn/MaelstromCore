@@ -667,8 +667,15 @@ enum SpellAttr7 : uint32
     SPELL_ATTR7_ALWAYS_CAST_LOG                               = 0x80000000  // TITLE Client indicator (client only)
 };
 
+// Cataclysm AttributesEx8; only the flags the core uses so far
+enum SpellAttr8 : uint32
+{
+    SPELL_ATTR8_MASTERY_AFFECTS_POINTS                        = 0x20000000  // a specialization's mastery spell: its amount grows with mastery
+};
+
 #define MAX_TALENT_SPECS        2
-#define MAX_GLYPH_SLOT_INDEX    6
+#define REQ_PRIMARY_TREE_TALENTS 31                         // points in the primary tree before the other trees open
+#define MAX_GLYPH_SLOT_INDEX    9                         // Cataclysm: 3 prime, 3 major, 3 minor
 
 // Custom values
 enum SpellClickUserTypes

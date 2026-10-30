@@ -455,6 +455,7 @@ public:
     inline bool HasAttribute(SpellAttr5 attribute) const { return (AttributesEx5 & attribute) != 0; }
     inline bool HasAttribute(SpellAttr6 attribute) const { return (AttributesEx6 & attribute) != 0; }
     inline bool HasAttribute(SpellAttr7 attribute) const { return (AttributesEx7 & attribute) != 0; }
+    inline bool HasAttribute(SpellAttr8 attribute) const { return (AttributesEx8 & attribute) != 0; }
     inline bool HasAttribute(SpellCustomAttributes customAttribute) const { return (AttributesCu & customAttribute) != 0; }
 
     bool IsExplicitDiscovery() const;

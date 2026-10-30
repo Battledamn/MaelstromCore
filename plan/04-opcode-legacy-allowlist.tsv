@@ -159,7 +159,7 @@ c2s	CMSG_RECHARGE	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_REDIRECTION_AUTH_PROOF	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_REDIRECTION_FAILED	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_REFER_A_FRIEND	#182	grouping and social packets are ported with phase 9
-c2s	CMSG_REMOVE_GLYPH	#186	movement packet layout is ported with the movement work
+c2s	CMSG_REMOVE_GLYPH	#186	no 4.3.4 value in CPP or WowPacketParser; 4.3.4 clears a glyph slot by casting the Remove Glyph spell (SPELL_EFFECT_APPLY_GLYPH without a glyph)
 c2s	CMSG_RUN_SCRIPT	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_SEND_COMBAT_TRIGGER	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin
 c2s	CMSG_SEND_EVENT	#168	WotLK-only opcode with no 4.3.4 counterpart in the pin

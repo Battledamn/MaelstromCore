@@ -133,6 +133,7 @@ MapDifficultyMap sMapDifficultyMap;
 DBCStorage <MovieEntry> sMovieStore(MovieEntryfmt);
 
 DBCStorage <NamesReservedEntry> sNamesReservedStore(NamesReservedfmt);
+DBCStorage <NumTalentsAtLevelEntry> sNumTalentsAtLevelStore(NumTalentsAtLevelfmt);
 DBCStorage <NamesProfanityEntry> sNamesProfanityStore(NamesProfanityfmt);
 
 DBCStorage <OverrideSpellDataEntry> sOverrideSpellDataStore(OverrideSpellDatafmt);
@@ -197,6 +198,8 @@ DBCStorage <TalentEntry> sTalentStore(TalentEntryfmt);
 TalentSpellPosMap sTalentSpellPosMap;
 std::unordered_set<uint32> sPetTalentSpells;
 DBCStorage <TalentTabEntry> sTalentTabStore(TalentTabEntryfmt);
+static DBCStorage <TalentTreePrimarySpellsEntry> sTalentTreePrimarySpellsStore(TalentTreePrimarySpellsfmt);
+static std::unordered_map<uint32, std::vector<uint32>> sTalentTreePrimarySpellsMap;
 
 // store absolute bit position for first rank for talent inspect
 static uint32 sTalentTabPages[MAX_CLASSES][3];
@@ -376,6 +379,7 @@ void LoadDBCStores(std::string const& dataPath)
     LOAD_DBC(sMapDifficultyStore,                   "MapDifficulty.dbc",                    "mapdifficulty_dbc");
     LOAD_DBC(sMovieStore,                           "Movie.dbc",                            "movie_dbc");
     LOAD_DBC(sNamesReservedStore,                   "NamesReserved.dbc",                    "namesreserved_dbc");
+    LOAD_DBC(sNumTalentsAtLevelStore,               "NumTalentsAtLevel.dbc",                nullptr);
     LOAD_DBC(sNamesProfanityStore,                  "NamesProfanity.dbc",                   "namesprofanity_dbc");
     LOAD_DBC(sOverrideSpellDataStore,               "OverrideSpellData.dbc",                "overridespelldata_dbc");
     LOAD_DBC(sNameGenStore,                         "NameGen.dbc",                           nullptr);
@@ -427,6 +431,7 @@ void LoadDBCStores(std::string const& dataPath)
     LOAD_DBC(sSummonPropertiesStore,                "SummonProperties.dbc",                 "summonproperties_dbc");
     LOAD_DBC(sTalentStore,                          "Talent.dbc",                           "talent_dbc");
     LOAD_DBC(sTalentTabStore,                       "TalentTab.dbc",                        "talenttab_dbc");
+    LOAD_DBC(sTalentTreePrimarySpellsStore,         "TalentTreePrimarySpells.dbc",          nullptr);
     LOAD_DBC(sTaxiNodesStore,                       "TaxiNodes.dbc",                        "taxinodes_dbc");
     LOAD_DBC(sTaxiPathStore,                        "TaxiPath.dbc",                         "taxipath_dbc");
     LOAD_DBC(sTaxiPathNodeStore,                    "TaxiPathNode.dbc",                     "taxipathnode_dbc");
@@ -574,6 +579,9 @@ void LoadDBCStores(std::string const& dataPath)
             }
         }
     }
+
+    for (TalentTreePrimarySpellsEntry const* talentSpell : sTalentTreePrimarySpellsStore)
+        sTalentTreePrimarySpellsMap[talentSpell->TalentTabID].push_back(talentSpell->SpellID);
 
     // prepare fast data access to bit pos of talent ranks for use at inspecting
     {
@@ -1067,6 +1075,12 @@ PvPDifficultyEntry const* GetBattlegroundBracketById(uint32 mapid, BattlegroundB
 uint32 const* GetTalentTabPages(uint8 cls)
 {
     return sTalentTabPages[cls];
+}
+
+std::vector<uint32> const* GetTalentTreePrimarySpells(uint32 talentTabId)
+{
+    auto itr = sTalentTreePrimarySpellsMap.find(talentTabId);
+    return itr != sTalentTreePrimarySpellsMap.end() ? &itr->second : nullptr;
 }
 
 bool IsSharedDifficultyMap(uint32 mapid)

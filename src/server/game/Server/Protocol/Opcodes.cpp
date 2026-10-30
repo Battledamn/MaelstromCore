@@ -1507,6 +1507,7 @@ void OpcodeTable::Initialize()
     /*0x6F26*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_TALENTS_INFO,                                       STATUS_NEVER);
     /*0x2415*/ DEFINE_HANDLER(CMSG_LEARN_PREVIEW_TALENTS,                                            STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::HandleLearnPreviewTalents                );
     /*0x6E24*/ DEFINE_HANDLER(CMSG_LEARN_PREVIEW_TALENTS_PET,                                        STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::HandleLearnPreviewTalentsPet             );
+    /*0x4524*/ DEFINE_HANDLER(CMSG_SET_PRIMARY_TALENT_TREE,                                          STATUS_UNHANDLED,  PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x04C3*/ DEFINE_HANDLER(CMSG_SET_ACTIVE_TALENT_GROUP_OBSOLETE,                                 STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x04C4*/ DEFINE_HANDLER(CMSG_GM_GRANT_ACHIEVEMENT,                                             STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
     /*0x04C5*/ DEFINE_HANDLER(CMSG_GM_REMOVE_ACHIEVEMENT,                                            STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
