@@ -501,6 +501,9 @@ void World::SetInitialWorldSettings()
     LOG_INFO("server.loading", "Loading Spell Required Data...");
     sSpellMgr->LoadSpellRequired();
 
+    LOG_INFO("server.loading", "Loading Spell Learn Spells...");
+    sSpellMgr->LoadSpellLearnSpells();
+
     LOG_INFO("server.loading", "Loading Spell Group Types...");
     sSpellMgr->LoadSpellGroups();
 

@@ -264,7 +264,11 @@ enum Powers
     POWER_HAPPINESS                     = 4,
     POWER_RUNE                          = 5,
     POWER_RUNIC_POWER                   = 6,
-    MAX_POWERS                          = 7,
+    POWER_SOUL_SHARDS                   = 7,
+    POWER_ECLIPSE                       = 8,
+    POWER_HOLY_POWER                    = 9,
+    POWER_ALTERNATE_POWER               = 10,           // Used in some quests
+    MAX_POWERS                          = 11,
     POWER_ALL                           = 127,    // default for class?
     POWER_HEALTH                        = 0xFFFFFFFE    // (-2 as signed value)
 };
@@ -976,7 +980,25 @@ enum SpellEffects
     SPELL_EFFECT_TALENT_SPEC_SELECT                 = 162,
     SPELL_EFFECT_163                                = 163,
     SPELL_EFFECT_REMOVE_AURA                        = 164,
-    TOTAL_SPELL_EFFECTS                             = 165
+    SPELL_EFFECT_DAMAGE_FROM_MAX_HEALTH_PCT         = 165,
+    SPELL_EFFECT_GIVE_CURRENCY                      = 166,
+    SPELL_EFFECT_UPDATE_PLAYER_PHASE                = 167,
+    SPELL_EFFECT_ALLOW_CONTROL_PET                  = 168,
+    SPELL_EFFECT_DESTROY_ITEM                       = 169,
+    SPELL_EFFECT_UPDATE_ZONE_AURAS_AND_PHASES       = 170,
+    SPELL_EFFECT_SUMMON_PERSONAL_GAMEOBJECT         = 171, // Summons gamebject
+    SPELL_EFFECT_RESURRECT_WITH_AURA                = 172,
+    SPELL_EFFECT_UNLOCK_GUILD_VAULT_TAB             = 173, // Guild tab unlocked (guild perk)
+    SPELL_EFFECT_APPLY_AURA_2                       = 174,
+    SPELL_EFFECT_175                                = 175, // Unused (4.3.4)
+    SPELL_EFFECT_SANCTUARY_2                        = 176, // Some kind of sanctuary effect (Vanish)
+    SPELL_EFFECT_177                                = 177,
+    SPELL_EFFECT_178                                = 178, // Unused (4.3.4)
+    SPELL_EFFECT_CREATE_AREATRIGGER                 = 179,
+    SPELL_EFFECT_UPDATE_AREATRIGGER                 = 180, // Unused (4.3.4)
+    SPELL_EFFECT_REMOVE_TALENT                      = 181, // Unused (4.3.4)
+    SPELL_EFFECT_182                                = 182,
+    TOTAL_SPELL_EFFECTS                             = 183
 };
 
 // EnumUtils: DESCRIBE THIS
@@ -1291,6 +1313,8 @@ enum SpellCustomErrors
     SPELL_CUSTOM_ERROR_MAX_NUMBER_OF_VOLUNTEERS         = 97, // You already have the max number of volunteers.
     SPELL_CUSTOM_ERROR_FROSTMOURNE_RENDERED_RESURRECT   = 98, // Frostmourne has rendered you unable to resurrect.
     SPELL_CUSTOM_ERROR_CANT_MOUNT_WITH_SHAPESHIFT       = 99, // You can't mount while affected by that shapeshift.
+    // 4.3.4 additions (CPP), only those in use
+    SPELL_CUSTOM_ERROR_PET_MUST_BE_ATTACKING            = 129, // Your pet must be attacking a target.
 };
 
 enum StealthType
@@ -1578,6 +1602,23 @@ enum Targets
     TARGET_UNK_DEST_AREA_UNK_107       = 107, // not enough info - only generic spells avalible
     TARGET_GAMEOBJECT_CONE             = 108,
     TARGET_DEST_UNK_110                = 110, // 1 spell
+    TARGET_UNK_111                     = 111,
+    TARGET_DEST_TARGET_ANY_2           = 112, // 1 Spell
+    TARGET_UNK_113                     = 113,
+    TARGET_UNK_114                     = 114,
+    TARGET_UNK_115                     = 115,
+    TARGET_UNK_116                     = 116,
+    TARGET_UNK_117                     = 117,
+    TARGET_UNIT_TARGET_ALLY_OR_RAID    = 118, // If target is in your party or raid, all party and raid members will be affected
+    TARGET_CORPSE_SRC_AREA_RAID        = 119,
+    TARGET_UNIT_CASTER_AND_SUMMONS     = 120,
+    TARGET_CORPSE_TARGET_ALLY          = 121,
+    TARGET_UNIT_AREA_THREAT_LIST       = 122,
+    TARGET_UNIT_AREA_TAP_LIST          = 123,
+    TARGET_UNIT_TARGET_TAP_LIST        = 124,
+    TARGET_DEST_CASTER_GROUND_2        = 125, // 1 spell in 4.3.4
+    TARGET_UNIT_AREA_ENEMY             = 126, // 1 spell in 4.3.4 (checked up until 8.3.0)
+    TARGET_UNK_127                     = 127,
     TOTAL_SPELL_TARGETS
 };
 
@@ -4005,7 +4046,7 @@ enum PetTameFailure
     PET_TAME_DEAD                   = 10,
     PET_TAME_NOTDEAD                = 11,
     PET_TAME_CANT_CONTROL_EXOTIC    = 12,
-    PET_TAME_UNKNOWNERROR           = 13
+    PET_TAME_SLOT_LOCKED            = 13  // 4.3.4: the free active slot's Call Pet is not known
 };
 
 enum DungeonStatusFlag

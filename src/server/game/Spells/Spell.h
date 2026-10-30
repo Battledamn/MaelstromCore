@@ -348,6 +348,7 @@ public:
     void EffectEnchantItemTmp(SpellEffIndex effIndex);
     void EffectTameCreature(SpellEffIndex effIndex);
     void EffectSummonPet(SpellEffIndex effIndex);
+    void SummonHunterPet(Player* owner, uint8 slot);
     void EffectLearnPetSpell(SpellEffIndex effIndex);
     void EffectWeaponDmg(SpellEffIndex effIndex);
     void EffectForceCast(SpellEffIndex effIndex);
@@ -427,6 +428,10 @@ public:
     void EffectRemoveAura(SpellEffIndex effIndex);
     void EffectCastButtons(SpellEffIndex effIndex);
     void EffectRechargeManaGem(SpellEffIndex effIndex);
+    // Cataclysm
+    void EffectDamageFromMaxHealthPCT(SpellEffIndex effIndex);
+    void EffectDestroyItem(SpellEffIndex effIndex);
+    void EffectUpdateZoneAurasAndPhases(SpellEffIndex effIndex);
 
     typedef std::set<Aura*> UsedSpellMods;
 
@@ -463,6 +468,7 @@ public:
     void _cast(bool skipCheck);
     void finish(bool ok = true);
     void TakePower();
+    void HandleHolyPower(Player* caster);
     void TakeAmmo();
 
     void TakeRunePower(bool didHit);

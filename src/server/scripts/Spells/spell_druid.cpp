@@ -1486,77 +1486,244 @@ class spell_dru_glyph_of_rejuvenation : public AuraScript
     }
 };
 
-// -48516 - Eclipse
+enum DruidEclipseSpells
+{
+    SPELL_DRUID_STARSURGE_ENERGIZE          = 86605,
+    SPELL_DRUID_ECLIPSE_GENERAL_ENERGIZE    = 89265,
+    SPELL_DRUID_SOLAR_ECLIPSE_MARKER        = 67483, // points the eclipse bar arrow to the solar side
+    SPELL_DRUID_LUNAR_ECLIPSE_MARKER        = 67484, // points the eclipse bar arrow to the lunar side
+    SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE       = 94338,
+    SPELL_DRUID_SUNFIRE                     = 93402,
+    SPELL_DRUID_EUPHORIA_ENERGIZE           = 81069,
+    SPELL_DRUID_EUPHORIA_MANA_ENERGIZE      = 81070,
+    SPELL_DRUID_NATURES_GRACE               = 16880,
+    SPELL_DRUID_LUNAR_SHOWER                = 33603,
+    SPELL_DRUID_ITEM_T11_BALANCE_4P_BONUS   = 90163,
+    SPELL_DRUID_ASTRAL_ALIGNMENT            = 90164
+};
+
+enum DruidEclipseIcons
+{
+    SPELL_ICON_ID_EUPHORIA                  = 4431,
+    SPELL_ICON_ID_SUNFIRE                   = 3262
+};
+
+// 48517 - Eclipse (Solar)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46).
 class spell_dru_eclipse : public AuraScript
 {
     PrepareAuraScript(spell_dru_eclipse);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_DRUID_ECLIPSE_LUNAR, SPELL_DRUID_ECLIPSE_SOLAR });
+        return ValidateSpellInfo({ SPELL_DRUID_ECLIPSE_SOLAR, SPELL_DRUID_SUNFIRE, SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE });
     }
 
-    bool CheckProc(ProcEventInfo& eventInfo)
+    void ApplyEffect(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        if (!spellInfo)
-            return false;
-
         Unit* target = GetTarget();
-        if (!target->IsPlayer())
-            return false;
 
-        bool isWrathSpell = (spellInfo->SpellFamilyFlags[0] & 1);
-        bool isStarfireSpell = (spellInfo->SpellFamilyFlags[0] & 4);
-
-        // Must be Wrath or Starfire
-        if (!isWrathSpell && !isStarfireSpell)
-            return false;
-
-        // Check 30 second internal cooldown
-        uint32 now = GameTime::GetGameTimeMS().count();
-        if (isWrathSpell && _lunarProcCooldownEnd > now)
-            return false;
-        if (isStarfireSpell && _solarProcCooldownEnd > now)
-            return false;
-
-        // Don't proc if already have any eclipse aura
-        if (target->HasAura(SPELL_DRUID_ECLIPSE_LUNAR) || target->HasAura(SPELL_DRUID_ECLIPSE_SOLAR))
-            return false;
-
-        // Check proc chance (60% for Wrath, 100% for Starfire)
-        if (!roll_chance_f(GetSpellInfo()->ProcChance * (isWrathSpell ? 0.6f : 1.0f)))
-            return false;
-
-        return true;
+        // Sunfire talent: Moonfire becomes Sunfire during Solar Eclipse
+        if (GetSpellInfo()->Id == SPELL_DRUID_ECLIPSE_SOLAR && target->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_SUNFIRE, EFFECT_0))
+            if (!target->HasAura(SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE))
+                target->CastCustomSpell(SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE, SPELLVALUE_BASE_POINT0, SPELL_DRUID_SUNFIRE, target, true);
     }
 
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    void RemoveEffect(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
-        PreventDefaultAction();
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        bool isWrathSpell = (spellInfo->SpellFamilyFlags[0] & 1);
-        uint32 triggeredSpell = isWrathSpell ? SPELL_DRUID_ECLIPSE_LUNAR : SPELL_DRUID_ECLIPSE_SOLAR;
-
-        // Set 30 second internal cooldown
-        uint32 now = GameTime::GetGameTimeMS().count();
-        if (isWrathSpell)
-            _lunarProcCooldownEnd = now + 30000;
-        else
-            _solarProcCooldownEnd = now + 30000;
-
-        GetTarget()->CastSpell(GetTarget(), triggeredSpell, true, nullptr, aurEff);
+        if (GetSpellInfo()->Id == SPELL_DRUID_ECLIPSE_SOLAR)
+            GetTarget()->RemoveAurasDueToSpell(SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE);
     }
 
     void Register() override
     {
-        DoCheckProc += AuraCheckProcFn(spell_dru_eclipse::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_dru_eclipse::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_eclipse::ApplyEffect, EFFECT_0, SPELL_AURA_MOD_DAMAGE_PERCENT_DONE, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dru_eclipse::RemoveEffect, EFFECT_0, SPELL_AURA_MOD_DAMAGE_PERCENT_DONE, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 79577 - Eclipse Mastery Driver Passive
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46). Wrath moves the
+// eclipse power towards -100 (lunar), Starfire towards +100 (solar); SPELL_AURA_PROC_ON_POWER_AMOUNT
+// then casts the eclipse at +-100, and the marker flips so the bar runs back the other way.
+class spell_dru_eclipse_mastery_driver_passive : public AuraScript
+{
+    PrepareAuraScript(spell_dru_eclipse_mastery_driver_passive);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DRUID_ECLIPSE_LUNAR,
+                SPELL_DRUID_LUNAR_ECLIPSE_MARKER,
+                SPELL_DRUID_ECLIPSE_SOLAR,
+                SPELL_DRUID_SOLAR_ECLIPSE_MARKER,
+                SPELL_DRUID_EUPHORIA_ENERGIZE,
+                SPELL_DRUID_EUPHORIA_MANA_ENERGIZE,
+                SPELL_DRUID_STARSURGE_ENERGIZE,
+                SPELL_DRUID_ECLIPSE_GENERAL_ENERGIZE,
+                SPELL_DRUID_NATURES_GRACE,
+                SPELL_DRUID_LUNAR_SHOWER
+            });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        Player* player = GetTarget()->ToPlayer();
+        if (!player || player->GetPrimaryTalentTree(player->GetActiveSpec()) != TALENT_TREE_DRUID_BALANCE)
+            return false;
+
+        return eventInfo.GetSpellInfo() != nullptr;
+    }
+
+    bool CheckSolarEclipseProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    {
+        _eclipseMarker = GetEclipseMarker();
+        if (_eclipseMarker && _eclipseMarker->GetId() != SPELL_DRUID_SOLAR_ECLIPSE_MARKER)
+            return false;
+
+        _energyAmount = GetEnergyGainFromSpellInfo(eventInfo.GetSpellInfo());
+        return _energyAmount > 0;
+    }
+
+    bool CheckLunarEclipseProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    {
+        _eclipseMarker = GetEclipseMarker();
+        if (_eclipseMarker && _eclipseMarker->GetId() != SPELL_DRUID_LUNAR_ECLIPSE_MARKER)
+            return false;
+
+        _energyAmount = GetEnergyGainFromSpellInfo(eventInfo.GetSpellInfo());
+        return _energyAmount < 0;
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        Unit* target = GetTarget();
+
+        // Apply the eclipse marker if not present
+        if (!_eclipseMarker)
+            target->CastSpell(target, aurEff->GetEffIndex() == EFFECT_0 ? SPELL_DRUID_SOLAR_ECLIPSE_MARKER : SPELL_DRUID_LUNAR_ECLIPSE_MARKER, true);
+
+        // Energy gain (negative values move the bar towards lunar)
+        uint32 energizeSpell = (eventInfo.GetSpellInfo()->SpellFamilyFlags[2] & 0x2000000) != 0 ? SPELL_DRUID_STARSURGE_ENERGIZE : SPELL_DRUID_ECLIPSE_GENERAL_ENERGIZE;
+        target->CastCustomSpell(energizeSpell, SPELLVALUE_BASE_POINT0, _energyAmount, target, true);
+
+        // Euphoria bonus
+        if (_euphoriaEnergyAmount)
+            target->CastCustomSpell(SPELL_DRUID_EUPHORIA_ENERGIZE, SPELLVALUE_BASE_POINT0, _euphoriaEnergyAmount, target, true);
+    }
+
+    void HandleEclipseProc(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+    {
+        Unit* target = GetTarget();
+        uint32 newMarkerSpellId = 0;
+        int32 eclipsePower = int32(target->GetPower(POWER_ECLIPSE));
+
+        if (AuraEffect* eclipse = target->GetAuraEffect(SPELL_AURA_MOD_DAMAGE_PERCENT_DONE, SPELLFAMILY_DRUID, 0x0, 0x0, 0x4000))
+        {
+            if (_eclipseMarker)
+            {
+                if (eclipse->GetId() == SPELL_DRUID_ECLIPSE_LUNAR && _eclipseMarker->GetId() == SPELL_DRUID_LUNAR_ECLIPSE_MARKER)
+                    newMarkerSpellId = SPELL_DRUID_SOLAR_ECLIPSE_MARKER;
+                else if (eclipse->GetId() == SPELL_DRUID_ECLIPSE_SOLAR && _eclipseMarker->GetId() == SPELL_DRUID_SOLAR_ECLIPSE_MARKER)
+                    newMarkerSpellId = SPELL_DRUID_LUNAR_ECLIPSE_MARKER;
+            }
+
+            // An eclipse lasts until the bar crosses back over the middle
+            if ((eclipse->GetId() == SPELL_DRUID_ECLIPSE_LUNAR && eclipsePower >= 0) ||
+                (eclipse->GetId() == SPELL_DRUID_ECLIPSE_SOLAR && eclipsePower <= 0))
+                eclipse->GetBase()->Remove();
+        }
+
+        if (!newMarkerSpellId)
+            return;
+
+        if (_eclipseMarker)
+            _eclipseMarker->GetBase()->Remove();
+
+        target->CastSpell(target, newMarkerSpellId, true);
+
+        // Reset Nature's Grace proc cooldown
+        if (Aura* aura = target->GetAuraOfRankedSpell(SPELL_DRUID_NATURES_GRACE))
+            aura->ResetProcCooldown();
+
+        // Euphoria mana bonus
+        if (AuraEffect const* euphoria = target->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_EUPHORIA, EFFECT_2))
+            target->CastCustomSpell(SPELL_DRUID_EUPHORIA_MANA_ENERGIZE, SPELLVALUE_BASE_POINT0, euphoria->GetAmount(), target, true);
+
+        // T11 Balance 4P bonus
+        if (target->GetAuraEffect(SPELL_DRUID_ITEM_T11_BALANCE_4P_BONUS, EFFECT_0))
+            target->CastCustomSpell(SPELL_DRUID_ASTRAL_ALIGNMENT, SPELLVALUE_AURA_STACK, 3, target, true);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_dru_eclipse_mastery_driver_passive::CheckProc);
+        DoCheckEffectProc += AuraCheckEffectProcFn(spell_dru_eclipse_mastery_driver_passive::CheckSolarEclipseProc, EFFECT_0, SPELL_AURA_PROC_ON_POWER_AMOUNT);
+        DoCheckEffectProc += AuraCheckEffectProcFn(spell_dru_eclipse_mastery_driver_passive::CheckLunarEclipseProc, EFFECT_1, SPELL_AURA_PROC_ON_POWER_AMOUNT);
+        OnEffectProc += AuraEffectProcFn(spell_dru_eclipse_mastery_driver_passive::HandleProc, EFFECT_0, SPELL_AURA_PROC_ON_POWER_AMOUNT);
+        OnEffectProc += AuraEffectProcFn(spell_dru_eclipse_mastery_driver_passive::HandleProc, EFFECT_1, SPELL_AURA_PROC_ON_POWER_AMOUNT);
+        AfterEffectProc += AuraEffectProcFn(spell_dru_eclipse_mastery_driver_passive::HandleEclipseProc, EFFECT_0, SPELL_AURA_PROC_ON_POWER_AMOUNT);
+        AfterEffectProc += AuraEffectProcFn(spell_dru_eclipse_mastery_driver_passive::HandleEclipseProc, EFFECT_1, SPELL_AURA_PROC_ON_POWER_AMOUNT);
     }
 
 private:
-    uint32 _lunarProcCooldownEnd = 0;
-    uint32 _solarProcCooldownEnd = 0;
+    AuraEffect* GetEclipseMarker() const
+    {
+        return GetTarget()->GetAuraEffect(SPELL_AURA_DUMMY, SPELLFAMILY_DRUID, 0x0, 0x0, 0x100000, GetTarget()->GetGUID());
+    }
+
+    int32 GetEnergyGainFromSpellInfo(SpellInfo const* spell)
+    {
+        Unit* target = GetTarget();
+        int32 energyAmount = 0;
+        int32 bonusEnergyAmount = 0;
+
+        // Wrath (towards lunar) and Starfire (towards solar)
+        if ((spell->SpellFamilyFlags[0] & 0x1) != 0)
+            energyAmount = -spell->Effects[EFFECT_1].CalcValue(target);
+        else if ((spell->SpellFamilyFlags[0] & 0x4) != 0)
+            energyAmount = spell->Effects[EFFECT_1].CalcValue(target);
+
+        // Euphoria talent: chance to double the gain while no eclipse is active
+        if (energyAmount != 0 && !target->GetAuraEffect(SPELL_AURA_MOD_DAMAGE_PERCENT_DONE, SPELLFAMILY_DRUID, 0x0, 0x0, 0x4000))
+            if (AuraEffect const* euphoria = target->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_EUPHORIA, EFFECT_0))
+                if (roll_chance_i(euphoria->GetAmount()))
+                    bonusEnergyAmount = energyAmount;
+
+        // Starsurge moves the bar in the marker's direction
+        if ((spell->SpellFamilyFlags[2] & 0x2000000) != 0)
+        {
+            int32 bp = spell->Effects[EFFECT_1].CalcValue(target);
+            if (_eclipseMarker)
+                energyAmount += _eclipseMarker->GetId() == SPELL_DRUID_LUNAR_ECLIPSE_MARKER ? -bp : bp;
+            else
+                energyAmount -= bp;
+        }
+
+        // Lunar Shower bonus for Moonfire and Sunfire
+        if ((spell->SpellFamilyFlags[0] & 0x2) != 0)
+        {
+            if (Aura const* lunarShower = target->GetAuraOfRankedSpell(SPELL_DRUID_LUNAR_SHOWER, target->GetGUID()))
+            {
+                if (target->HasAura(lunarShower->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell))
+                {
+                    int32 bp = sSpellMgr->AssertSpellInfo(SPELL_DRUID_LUNAR_SHOWER)->Effects[EFFECT_2].CalcValue(target);
+                    if (_eclipseMarker)
+                        energyAmount += _eclipseMarker->GetId() == SPELL_DRUID_LUNAR_ECLIPSE_MARKER ? -bp : bp;
+                    else
+                        energyAmount -= bp;
+                }
+            }
+        }
+
+        _euphoriaEnergyAmount = bonusEnergyAmount;
+        return energyAmount;
+    }
+
+    AuraEffect* _eclipseMarker = nullptr;
+    int32 _energyAmount = 0;
+    int32 _euphoriaEnergyAmount = 0;
 };
 
 // -48539 - Revitalize
@@ -2151,6 +2318,7 @@ void AddSC_druid_spell_scripts()
     RegisterSpellScript(spell_dru_leader_of_the_pack);
     RegisterSpellScript(spell_dru_glyph_of_rejuvenation);
     RegisterSpellScript(spell_dru_eclipse);
+    RegisterSpellScript(spell_dru_eclipse_mastery_driver_passive);
     RegisterSpellScript(spell_dru_revitalize);
     RegisterSpellScript(spell_dru_t3_2p_bonus);
     RegisterSpellScript(spell_dru_t3_6p_bonus);

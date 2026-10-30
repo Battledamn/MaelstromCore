@@ -568,6 +568,9 @@ typedef std::pair<SpellRequiredMap::const_iterator, SpellRequiredMap::const_iter
 typedef std::multimap<uint32, uint32> SpellsRequiringSpellMap;
 typedef std::pair<SpellsRequiringSpellMap::const_iterator, SpellsRequiringSpellMap::const_iterator> SpellsRequiringSpellMapBounds;
 
+//                   spell_id  learned spell (spell_learn_spell)
+typedef std::multimap<uint32, uint32> SpellLearnSpellMap;
+
 // Spell learning properties (accessed using SpellMgr functions)
 struct CreatureImmunities
 {
@@ -687,6 +690,9 @@ public:
     [[nodiscard]] SpellsRequiringSpellMapBounds GetSpellsRequiringSpellBounds(uint32 spell_id) const;
     [[nodiscard]] bool IsSpellRequiringSpell(uint32 spellid, uint32 req_spellid) const;
 
+    // spell_learn_spell (TrinityCore/CPP): spells a player learns together with a spell
+    [[nodiscard]] Acore::IteratorPair<SpellLearnSpellMap::const_iterator> GetSpellLearnSpells(uint32 spell_id) const;
+
     // Spell learning
     [[nodiscard]] SpellLearnSkillNode const* GetSpellLearnSkill(uint32 spell_id) const;
     [[nodiscard]] std::vector<uint32> GetSkillRankSpells(uint32 skillId) const;
@@ -785,6 +791,7 @@ public:
     void LoadSpellTalentRanks();
     void LoadSpellRanks();
     void LoadSpellRequired();
+    void LoadSpellLearnSpells();
     void LoadSpellLearnSkills();
     void LoadSpellTargetPositions();
     void LoadSpellCones();
@@ -818,6 +825,7 @@ private:
     SpellChainMap              mSpellChains;
     SpellsRequiringSpellMap    mSpellsReqSpell;
     SpellRequiredMap           mSpellReq;
+    SpellLearnSpellMap         mSpellLearnSpells;
     SpellLearnSkillMap         mSpellLearnSkills;
     SpellTargetPositionMap     mSpellTargetPositions;
     SpellConeMap               mSpellCones;

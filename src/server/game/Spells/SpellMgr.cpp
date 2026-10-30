@@ -16,6 +16,7 @@
  */
 
 #include "SpellMgr.h"
+#include <deque>
 #include "Log.h"
 #include "BattlefieldMgr.h"
 #include "BattlegroundIC.h"
@@ -662,6 +663,11 @@ Acore::IteratorPair<SpellRequiredMap::const_iterator> SpellMgr::GetSpellsRequire
 SpellsRequiringSpellMapBounds SpellMgr::GetSpellsRequiringSpellBounds(uint32 spell_id) const
 {
     return mSpellsReqSpell.equal_range(spell_id);
+}
+
+Acore::IteratorPair<SpellLearnSpellMap::const_iterator> SpellMgr::GetSpellLearnSpells(uint32 spell_id) const
+{
+    return Acore::Containers::MapEqualRange(mSpellLearnSpells, spell_id);
 }
 
 bool SpellMgr::IsSpellRequiringSpell(uint32 spellid, uint32 req_spellid) const
@@ -1399,6 +1405,58 @@ void SpellMgr::LoadSpellRanks()
     LOG_INFO("server.loading", " ");
 }
 
+// spell_learn_spell, as TrinityCore and CPP use it: learning `entry` also teaches `SpellID`, e.g. the 4.3.4
+// trainer's Control Pet (79682) the passive that lets a hunter command the pet (93321).
+void SpellMgr::LoadSpellLearnSpells()
+{
+    uint32 oldMSTime = getMSTime();
+
+    mSpellLearnSpells.clear();                                 // need for reload case
+
+    //                                                  0      1
+    QueryResult result = WorldDatabase.Query("SELECT entry, SpellID FROM spell_learn_spell");
+    if (!result)
+    {
+        LOG_WARN("server.loading", ">> Loaded 0 spell learn spells. DB table `spell_learn_spell` is empty.");
+        LOG_INFO("server.loading", " ");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 spellId = fields[0].Get<uint32>();
+        uint32 learnedSpellId = fields[1].Get<uint32>();
+
+        if (!GetSpellInfo(spellId))
+        {
+            LOG_ERROR("sql.sql", "Spell {} listed in `spell_learn_spell` does not exist", spellId);
+            continue;
+        }
+
+        if (!GetSpellInfo(learnedSpellId))
+        {
+            LOG_ERROR("sql.sql", "Spell {} listed in `spell_learn_spell` learns not existing spell {}",
+                spellId, learnedSpellId);
+            continue;
+        }
+
+        if (spellId == learnedSpellId)
+        {
+            LOG_ERROR("sql.sql", "Spell {} listed in `spell_learn_spell` learns itself", spellId);
+            continue;
+        }
+
+        mSpellLearnSpells.emplace(spellId, learnedSpellId);
+        ++count;
+    } while (result->NextRow());
+
+    LOG_INFO("server.loading", ">> Loaded {} Spell Learn Spells in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
+    LOG_INFO("server.loading", " ");
+}
+
 void SpellMgr::LoadSpellRequired()
 {
     uint32 oldMSTime = getMSTime();
@@ -2019,6 +2077,7 @@ bool InitTriggerAuraData()
     isTriggerAura[SPELL_AURA_RAID_PROC_FROM_CHARGE] = true;
     isTriggerAura[SPELL_AURA_RAID_PROC_FROM_CHARGE_WITH_VALUE] = true;
     isTriggerAura[SPELL_AURA_PROC_TRIGGER_SPELL_WITH_VALUE] = true;
+    isTriggerAura[SPELL_AURA_PROC_ON_POWER_AMOUNT] = true;
     isTriggerAura[SPELL_AURA_MOD_SPELL_CRIT_CHANCE] = true;
     isTriggerAura[SPELL_AURA_ADD_FLAT_MODIFIER] = true;
     isTriggerAura[SPELL_AURA_ADD_PCT_MODIFIER] = true;
@@ -3079,26 +3138,44 @@ void SpellMgr::LoadSpellInfoStore()
         slot = effect;
     }
 
-    uint32 unsupported = 0;
+    // The effect, aura and target enums cover every value in the 4.3.4 client data (unimplemented
+    // ones have no-op handlers). Values past them (none in 4.3.4) are neutralised (none / no aura /
+    // no target) on a copy of the effect row, so the spell still loads and runs its supported
+    // effects instead of failing the asserts below. The copies must outlive the SpellInfos.
+    static std::deque<SpellEffectEntry> neutralisedEffects;
+    neutralisedEffects.clear();
+    uint32 partial = 0;
     for (SpellEntry const* spellEntry : sSpellStore)
     {
-        auto const& spellEffects = effects[spellEntry->Id];
-        bool supported = std::all_of(spellEffects.begin(), spellEffects.end(), [](SpellEffectEntry const* effect)
+        std::array<SpellEffectEntry const*, MAX_SPELL_EFFECTS> spellEffects = effects[spellEntry->Id];
+        bool neutralised = false;
+        for (SpellEffectEntry const*& effect : spellEffects)
         {
-            return !effect || (effect->Effect < TOTAL_SPELL_EFFECTS && effect->EffectAura < TOTAL_AURAS
+            if (!effect || (effect->Effect < TOTAL_SPELL_EFFECTS && effect->EffectAura < TOTAL_AURAS
                 && effect->EffectImplicitTargetA < TOTAL_SPELL_TARGETS
-                && effect->EffectImplicitTargetB < TOTAL_SPELL_TARGETS);
-        });
-        if (!supported)
-        {
-            LOG_DEBUG("dbc", "Spell {} requires unimplemented Cataclysm effect, aura or target dispatch", spellEntry->Id);
-            ++unsupported;
-            continue;
+                && effect->EffectImplicitTargetB < TOTAL_SPELL_TARGETS))
+                continue;
+
+            SpellEffectEntry& copy = neutralisedEffects.emplace_back(*effect);
+            if (copy.Effect >= TOTAL_SPELL_EFFECTS)
+                copy.Effect = 0; // no effect
+            if (copy.EffectAura >= TOTAL_AURAS)
+                copy.EffectAura = SPELL_AURA_NONE;
+            if (copy.EffectImplicitTargetA >= TOTAL_SPELL_TARGETS)
+                copy.EffectImplicitTargetA = 0;
+            if (copy.EffectImplicitTargetB >= TOTAL_SPELL_TARGETS)
+                copy.EffectImplicitTargetB = 0;
+            LOG_DEBUG("dbc", "Spell {} effect {}: unknown effect {} / aura {} neutralised",
+                spellEntry->Id, effect->EffectIndex, effect->Effect, effect->EffectAura);
+            effect = &copy;
+            neutralised = true;
         }
+        if (neutralised)
+            ++partial;
         mSpellInfoMap[spellEntry->Id] = new SpellInfo(spellEntry, spellEffects);
     }
-    if (unsupported)
-        LOG_WARN("dbc", "Excluded {} spells requiring unimplemented Cataclysm dispatch; see dbc debug log", unsupported);
+    if (partial)
+        LOG_WARN("dbc", "{} spells use effect, aura or target types past the known ones; those effects do nothing (see dbc debug log)", partial);
 
     for (uint32 spellIndex = 0; spellIndex < GetSpellInfoStoreSize(); ++spellIndex)
     {
@@ -3487,6 +3564,7 @@ void SpellMgr::LoadSpellInfoCustomAttributes()
                             continue;
                         case SPELL_EFFECT_PERSISTENT_AREA_AURA:
                         case SPELL_EFFECT_APPLY_AURA:
+                        case SPELL_EFFECT_APPLY_AURA_2:
                         case SPELL_EFFECT_APPLY_AREA_AURA_PARTY:
                         case SPELL_EFFECT_APPLY_AREA_AURA_RAID:
                         case SPELL_EFFECT_APPLY_AREA_AURA_FRIEND:

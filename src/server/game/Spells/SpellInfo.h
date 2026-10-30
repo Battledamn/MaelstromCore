@@ -554,7 +554,8 @@ public:
 
     // Cataclysm SpellScaling.dbc: per-level values from gtSpellScaling, reduced below the
     // cast-time and nerf levels.
-    float GetSpellScalingMultiplier(int32 level) const;
+    // powerCostRelated: only the cast-time reduction (costs), not the low-level nerf (amounts).
+    float GetSpellScalingMultiplier(int32 level, bool powerCostRelated = false) const;
     static float GetSpellScalingValue(int32 level, int32 scalingClass);
     uint32 GetRecoveryTime() const;
 

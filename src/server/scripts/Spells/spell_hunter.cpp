@@ -79,7 +79,23 @@ enum HunterSpells
     SPELL_HUNTER_RAPID_RECUPERATION_MANA_R2         = 58882,
     SPELL_HUNTER_PIERCING_SHOTS                     = 63468,
     SPELL_HUNTER_T9_4P_GREATNESS                    = 68130,
-    SPELL_HUNTER_COBRA_STRIKES_TRIGGERED            = 53257
+    SPELL_HUNTER_COBRA_STRIKES_TRIGGERED            = 53257,
+
+    // 4.3.4 Call Pet 1-5: one per active pet slot
+    SPELL_HUNTER_CALL_PET_1                         = 883,
+    SPELL_HUNTER_CALL_PET_2                         = 83242,
+    SPELL_HUNTER_CALL_PET_3                         = 83243,
+    SPELL_HUNTER_CALL_PET_4                         = 83244,
+    SPELL_HUNTER_CALL_PET_5                         = 83245
+};
+
+constexpr std::array<uint32, MAX_ACTIVE_PETS> CallPetSpellIdBySlot =
+{
+    SPELL_HUNTER_CALL_PET_1,
+    SPELL_HUNTER_CALL_PET_2,
+    SPELL_HUNTER_CALL_PET_3,
+    SPELL_HUNTER_CALL_PET_4,
+    SPELL_HUNTER_CALL_PET_5
 };
 
 enum HunterSpellIcons
@@ -1000,74 +1016,61 @@ class spell_hun_disengage : public SpellScript
 };
 
 // 1515 - Tame Beast
+// 4.3.4 checks from CPP: the tamed pet needs a free active slot whose Call Pet the hunter knows.
 class spell_hun_tame_beast : public SpellScript
 {
     PrepareSpellScript(spell_hun_tame_beast);
 
+    SpellCastResult SendTameFailure(PetTameFailure reason)
+    {
+        GetCaster()->ToPlayer()->SendTameFailure(reason);
+        return SPELL_FAILED_DONT_REPORT;
+    }
+
     SpellCastResult CheckCast()
     {
-        Unit* caster = GetCaster();
-        if (!caster->IsPlayer())
-            return SPELL_FAILED_DONT_REPORT;
-
         Player* player = GetCaster()->ToPlayer();
+        if (!player)
+            return SPELL_FAILED_DONT_REPORT;
 
         if (!GetExplTargetUnit())
-        {
-            player->SendTameFailure(PET_TAME_INVALID_CREATURE);
-            return SPELL_FAILED_DONT_REPORT;
-        }
+            return SPELL_FAILED_BAD_IMPLICIT_TARGETS;
 
-        if (Creature* target = GetExplTargetUnit()->ToCreature())
-        {
-            if (target->GetLevel() > player->GetLevel())
-            {
-                player->SendTameFailure(PET_TAME_TOO_HIGHLEVEL);
-                return SPELL_FAILED_DONT_REPORT;
-            }
+        if (!player->IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))
+            return SendTameFailure(PET_TAME_UNITS_CANT_TAME);
 
-            if (target->GetCreatureTemplate()->IsExotic() && !player->CanTameExoticPets())
-            {
-                player->SendTameFailure(PET_TAME_CANT_CONTROL_EXOTIC);
-                return SPELL_FAILED_DONT_REPORT;
-            }
+        PetStable const* petStable = player->GetPetStable();
+        Optional<uint8> freeSlot = PET_SLOT_FIRST_ACTIVE_SLOT;
+        if (petStable)
+            freeSlot = petStable->GetFirstFreeActiveSlot();
+        if (!freeSlot)
+            return SendTameFailure(PET_TAME_TOO_MANY);
 
-            if (!target->GetCreatureTemplate()->IsTameable(player->CanTameExoticPets()))
-            {
-                player->SendTameFailure(PET_TAME_NOT_TAMEABLE);
-                return SPELL_FAILED_DONT_REPORT;
-            }
+        if (!player->HasSpell(CallPetSpellIdBySlot[*freeSlot]))
+            return SendTameFailure(PET_TAME_SLOT_LOCKED);
 
-            PetStable const* petStable = player->GetPetStable();
-            if (petStable)
-            {
-                if (petStable->CurrentPet)
-                    return SPELL_FAILED_ALREADY_HAVE_SUMMON;
+        Creature* target = GetExplTargetUnit()->ToCreature();
+        if (!target)
+            return SendTameFailure(PET_TAME_INVALID_CREATURE);
 
-                if (petStable->GetUnslottedHunterPet())
-                {
-                    caster->SendTameFailure(PET_TAME_TOO_MANY);
-                    return SPELL_FAILED_DONT_REPORT;
-                }
-            }
+        if (target->GetLevel() > player->GetLevel())
+            return SendTameFailure(PET_TAME_TOO_HIGHLEVEL);
 
-            if (player->GetCharmGUID())
-            {
-                player->SendTameFailure(PET_TAME_ANOTHER_SUMMON_ACTIVE);
-                return SPELL_FAILED_DONT_REPORT;
-            }
+        if (target->GetCreatureTemplate()->IsExotic() && !player->CanTameExoticPets())
+            return SendTameFailure(PET_TAME_CANT_CONTROL_EXOTIC);
 
-            if (target->GetOwnerGUID())
-            {
-                player->SendTameFailure(PET_TAME_CREATURE_ALREADY_OWNED);
-                return SPELL_FAILED_DONT_REPORT;
-            }
-        }
-        else
-        {
-            player->SendTameFailure(PET_TAME_INVALID_CREATURE);
-            return SPELL_FAILED_DONT_REPORT;
-        }
+        if (!target->GetCreatureTemplate()->IsTameable(player->CanTameExoticPets()))
+            return SendTameFailure(PET_TAME_NOT_TAMEABLE);
+
+        // a pet out, or one only unsummoned for a moment (mounted)
+        if (player->GetPetGUID() || (petStable && petStable->CurrentPet))
+            return SendTameFailure(PET_TAME_ANOTHER_SUMMON_ACTIVE);
+
+        if (player->GetCharmGUID())
+            return SendTameFailure(PET_TAME_ANOTHER_SUMMON_ACTIVE);
+
+        if (target->GetOwnerGUID())
+            return SendTameFailure(PET_TAME_CREATURE_ALREADY_OWNED);
 
         return SPELL_CAST_OK;
     }
@@ -1519,27 +1522,53 @@ class spell_hun_explosive_shot : public SpellScript
     }
 };
 
-// 34026 - Kill Command
+// 34026 - Kill Command (CPP): the pet attacks its victim with 83381 at once
 class spell_hun_kill_command : public SpellScript
 {
     PrepareSpellScript(spell_hun_kill_command);
 
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer();
+    }
+
+    bool Validate(SpellInfo const* spellInfo) override
+    {
+        return ValidateSpellInfo({ uint32(spellInfo->Effects[EFFECT_1].BasePoints) });
+    }
+
     SpellCastResult CheckCast()
     {
-        Unit* caster = GetCaster();
-        if (!caster || !caster->IsPlayer())
-            return SPELL_FAILED_NO_VALID_TARGETS;
-
-        Pet* pet = caster->ToPlayer()->GetPet();
+        // no pet: SPELL_FAILED_NO_PET from the effect's TARGET_UNIT_PET
+        Pet* pet = GetCaster()->ToPlayer()->GetPet();
         if (!pet)
             return SPELL_FAILED_NO_PET;
 
+        Unit* victim = pet->GetVictim();
+        if (!victim)
+        {
+            SetCustomCastResultMessage(SPELL_CUSTOM_ERROR_PET_MUST_BE_ATTACKING);
+            return SPELL_FAILED_CUSTOM_ERROR;
+        }
+
+        // the pet's 83381 is a melee range (5 yard) attack
+        if (!pet->IsWithinMeleeRange(victim))
+            return SPELL_FAILED_OUT_OF_RANGE;
+
         return SPELL_CAST_OK;
+    }
+
+    void HandleScriptEffect(SpellEffIndex effIndex)
+    {
+        if (Pet* pet = GetCaster()->ToPlayer()->GetPet())
+            if (Unit* victim = pet->GetVictim())
+                pet->CastSpell(victim, uint32(GetSpellInfo()->Effects[effIndex].BasePoints), false);
     }
 
     void Register() override
     {
         OnCheckCast += SpellCheckCastFn(spell_hun_kill_command::CheckCast);
+        OnEffectHitTarget += SpellEffectFn(spell_hun_kill_command::HandleScriptEffect, EFFECT_1, SPELL_EFFECT_SCRIPT_EFFECT);
     }
 };
 

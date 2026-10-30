@@ -34,9 +34,21 @@ enum PetType : uint8
     MAX_PET_TYPE                = 4
 };
 
-constexpr auto MAX_PET_STABLES = 4;
+// 4.3.4 hunter pet slots (CPP PetSlot): five active slots, called by Call Pet 1-5, and twenty stable slots.
+enum PetSlot : uint8
+{
+    PET_SLOT_FIRST_ACTIVE_SLOT  = 0,
+    PET_SLOT_LAST_ACTIVE_SLOT   = 4,
+    PET_SLOT_FIRST_STABLE_SLOT  = 5,
+    PET_SLOT_LAST_STABLE_SLOT   = 24
+};
 
-// stored in character_pet.slot
+constexpr uint8 MAX_ACTIVE_PETS = PET_SLOT_LAST_ACTIVE_SLOT - PET_SLOT_FIRST_ACTIVE_SLOT + 1;
+constexpr auto MAX_PET_STABLES = PET_SLOT_LAST_STABLE_SLOT - PET_SLOT_FIRST_STABLE_SLOT + 1;
+
+// How a pet is saved. character_pet.slot stores it as is for other pets; for hunter pets it stores the
+// pet's 4.3.4 slot instead (see Pet::GetDBSlot): 0-4 the summoned pet's active slot, 100-104 an
+// active slot whose pet is not summoned, 5-24 a stable slot.
 enum PetSaveMode : int8
 {
     PET_SAVE_AS_DELETED         = -1,                        // not saved in fact
@@ -230,16 +242,64 @@ public:
         ReactStates ReactState = ReactStates(0);
         PetType Type = MAX_PET_TYPE;
         bool WasRenamed = false;
+        uint8 Slot = PET_SLOT_FIRST_ACTIVE_SLOT;                    // hunter pets: PetSlot
     };
 
+    // Hunter pets: CurrentPet is the summoned pet (or the one to summon again, e.g. after a mount), the
+    // other pets of the active slots are in UnslottedPets (the last unsummoned one first), and
+    // StabledPets[i] holds stable slot PET_SLOT_FIRST_STABLE_SLOT + i.
     Optional<PetInfo> CurrentPet;                                   // PET_SAVE_AS_CURRENT
     std::array<Optional<PetInfo>, MAX_PET_STABLES> StabledPets;     // PET_SAVE_FIRST_STABLE_SLOT - PET_SAVE_LAST_STABLE_SLOT
-    uint32 MaxStabledPets = 0;
+    uint32 MaxStabledPets = MAX_PET_STABLES;
     std::vector<PetInfo> UnslottedPets;                             // PET_SAVE_NOT_IN_SLOT
 
+    // The last unsummoned hunter pet (Revive Pet's pet when none is summoned)
     [[nodiscard]] PetInfo const* GetUnslottedHunterPet() const
     {
-        return UnslottedPets.size() == 1 && UnslottedPets[0].Type == HUNTER_PET ? &UnslottedPets[0] : nullptr;
+        return !UnslottedPets.empty() && UnslottedPets.front().Type == HUNTER_PET ? &UnslottedPets.front() : nullptr;
+    }
+
+    // The hunter pet in an active slot (PET_SLOT_FIRST_ACTIVE_SLOT - PET_SLOT_LAST_ACTIVE_SLOT)
+    [[nodiscard]] PetInfo const* GetActivePet(uint8 slot) const
+    {
+        if (CurrentPet && CurrentPet->Type == HUNTER_PET && CurrentPet->Slot == slot)
+            return &CurrentPet.value();
+
+        for (PetInfo const& pet : UnslottedPets)
+            if (pet.Type == HUNTER_PET && pet.Slot == slot)
+                return &pet;
+
+        return nullptr;
+    }
+
+    [[nodiscard]] Optional<uint8> GetFirstFreeActiveSlot() const
+    {
+        for (uint8 slot = PET_SLOT_FIRST_ACTIVE_SLOT; slot <= PET_SLOT_LAST_ACTIVE_SLOT; ++slot)
+            if (!GetActivePet(slot))
+                return slot;
+
+        return {};
+    }
+
+    [[nodiscard]] PetInfo* GetPet(uint32 petNumber)
+    {
+        if (CurrentPet && CurrentPet->PetNumber == petNumber)
+            return &CurrentPet.value();
+
+        for (PetInfo& pet : UnslottedPets)
+            if (pet.PetNumber == petNumber)
+                return &pet;
+
+        for (Optional<PetInfo>& pet : StabledPets)
+            if (pet && pet->PetNumber == petNumber)
+                return &pet.value();
+
+        return nullptr;
+    }
+
+    [[nodiscard]] PetInfo const* GetPet(uint32 petNumber) const
+    {
+        return const_cast<PetStable*>(this)->GetPet(petNumber);
     }
 };
 

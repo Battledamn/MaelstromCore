@@ -234,6 +234,24 @@ pEffect SpellEffects[TOTAL_SPELL_EFFECTS] =
     &Spell::EffectActivateSpec,                             //162 SPELL_EFFECT_TALENT_SPEC_SELECT       activate primary/secondary spec
     &Spell::EffectNULL,                                     //163 unused
     &Spell::EffectRemoveAura,                               //164 SPELL_EFFECT_REMOVE_AURA
+    &Spell::EffectDamageFromMaxHealthPCT,                   //165 SPELL_EFFECT_DAMAGE_FROM_MAX_HEALTH_PCT
+    &Spell::EffectNULL,                                     //166 SPELL_EFFECT_GIVE_CURRENCY needs Cataclysm currencies
+    &Spell::EffectNULL,                                     //167 SPELL_EFFECT_UPDATE_PLAYER_PHASE needs condition phasing
+    &Spell::EffectNULL,                                     //168 SPELL_EFFECT_ALLOW_CONTROL_PET
+    &Spell::EffectDestroyItem,                              //169 SPELL_EFFECT_DESTROY_ITEM
+    &Spell::EffectUpdateZoneAurasAndPhases,                 //170 SPELL_EFFECT_UPDATE_ZONE_AURAS_AND_PHASES
+    &Spell::EffectNULL,                                     //171 SPELL_EFFECT_SUMMON_PERSONAL_GAMEOBJECT needs private objects
+    &Spell::EffectNULL,                                     //172 SPELL_EFFECT_RESURRECT_WITH_AURA
+    &Spell::EffectNULL,                                     //173 SPELL_EFFECT_UNLOCK_GUILD_VAULT_TAB needs guild perks
+    &Spell::EffectApplyAura,                                //174 SPELL_EFFECT_APPLY_AURA_2
+    &Spell::EffectUnused,                                   //175 SPELL_EFFECT_175 unused
+    &Spell::EffectSanctuary,                                //176 SPELL_EFFECT_SANCTUARY_2
+    &Spell::EffectNULL,                                     //177 SPELL_EFFECT_177
+    &Spell::EffectUnused,                                   //178 SPELL_EFFECT_178 unused
+    &Spell::EffectNULL,                                     //179 SPELL_EFFECT_CREATE_AREATRIGGER needs area triggers
+    &Spell::EffectUnused,                                   //180 SPELL_EFFECT_UPDATE_AREATRIGGER unused
+    &Spell::EffectUnused,                                   //181 SPELL_EFFECT_REMOVE_TALENT unused
+    &Spell::EffectNULL,                                     //182 SPELL_EFFECT_182
 };
 
 void Spell::EffectNULL(SpellEffIndex /*effIndex*/)
@@ -2040,7 +2058,8 @@ void Spell::EffectEnergize(SpellEffIndex effIndex)
     if (level_diff > 0)
         damage -= level_multiplier * level_diff;
 
-    if (damage < 0)
+    // Eclipse and alternate power energizes may be negative (pinned TrinityCore-Cata EffectEnergize)
+    if (damage < 0 && power != POWER_ECLIPSE && power != POWER_ALTERNATE_POWER)
         return;
 
     unitCaster->EnergizeBySpell(unitTarget, m_spellInfo->Id, damage, power);
@@ -3367,6 +3386,8 @@ void Spell::EffectTameCreature(SpellEffIndex /*effIndex*/)
     {
         pet->SavePetToDB(PET_SAVE_AS_CURRENT);
         unitCaster->ToPlayer()->PetSpellInitialize();
+        // the new pet's Call Pet entry in the flyout (CPP sends SMSG_PET_ADDED)
+        unitCaster->ToPlayer()->GetSession()->SendStablePet(ObjectGuid::Empty);
     }
 }
 
@@ -3399,6 +3420,14 @@ void Spell::EffectSummonPet(SpellEffIndex effIndex)
                 oldPet->UnSummon();
             SummonGuardian(effIndex, petentry, properties, 1, false);
         }
+        return;
+    }
+
+    // 4.3.4 Call Pet 1-5: no creature entry, BasePoints is the hunter pet's active slot (CPP)
+    if (!petentry && m_spellInfo->Effects[effIndex].BasePoints >= PET_SLOT_FIRST_ACTIVE_SLOT
+        && m_spellInfo->Effects[effIndex].BasePoints <= PET_SLOT_LAST_ACTIVE_SLOT)
+    {
+        SummonHunterPet(owner, uint8(m_spellInfo->Effects[effIndex].BasePoints));
         return;
     }
 
@@ -3483,6 +3512,34 @@ void Spell::EffectSummonPet(SpellEffIndex effIndex)
         pet->SetName(new_name);
 
     // ExecuteLogEffectSummonObject(effectInfo->EffectIndex, pet);
+}
+
+void Spell::SummonHunterPet(Player* owner, uint8 slot)
+{
+    PetStable* petStable = owner->GetPetStable();
+    PetStable::PetInfo const* petInfo = petStable ? petStable->GetActivePet(slot) : nullptr;
+    if (!petInfo)
+        return;
+
+    uint32 petNumber = petInfo->PetNumber;
+    if (Pet* oldPet = owner->GetPet())
+    {
+        // the slot's pet is already out (CheckCast refuses that unless the pet is dead)
+        if (oldPet->GetCharmInfo()->GetPetNumber() == petNumber)
+            return;
+
+        // calling another slot's pet sends the current one back (CPP lets a player replace the summon)
+        owner->RemovePet(oldPet, PET_SAVE_NOT_IN_SLOT);
+    }
+
+    Pet* pet = new Pet(owner, HUNTER_PET);
+    if (!pet->LoadPetFromDB(owner, 0, petNumber, false))
+    {
+        delete pet;
+        return;
+    }
+
+    pet->SetUInt32Value(UNIT_CREATED_BY_SPELL, m_spellInfo->Id);
 }
 
 void Spell::EffectLearnPetSpell(SpellEffIndex effIndex)
@@ -6189,6 +6246,7 @@ void Spell::EffectCreateTamedPet(SpellEffIndex effIndex)
     {
         pet->SavePetToDB(PET_SAVE_AS_CURRENT);
         unitTarget->ToPlayer()->PetSpellInitialize();
+        unitTarget->ToPlayer()->GetSession()->SendStablePet(ObjectGuid::Empty);
     }
 }
 
@@ -6710,4 +6768,42 @@ void Spell::EffectSummonRaFFriend(SpellEffIndex  /*effIndex*/)
     data << uint32(unitCaster->GetZoneId());
     data << uint32(MAX_PLAYER_SUMMON_DELAY * IN_MILLISECONDS); // auto decline after msecs
     player->SendDirectMessage(&data);
+}
+
+void Spell::EffectDamageFromMaxHealthPCT(SpellEffIndex /*effIndex*/)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)
+        return;
+
+    if (!unitTarget)
+        return;
+
+    m_damage += unitTarget->CountPctFromMaxHealth(damage);
+}
+
+void Spell::EffectDestroyItem(SpellEffIndex effIndex)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)
+        return;
+
+    Player* player = unitTarget ? unitTarget->ToPlayer() : nullptr;
+    if (!player)
+        return;
+
+    if (Item* item = player->GetItemByEntry(m_spellInfo->Effects[effIndex].ItemType))
+        player->DestroyItem(item->GetBagSlot(), item->GetSlot(), true);
+}
+
+void Spell::EffectUpdateZoneAurasAndPhases(SpellEffIndex /*effIndex*/)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)
+        return;
+
+    Player* player = unitTarget ? unitTarget->ToPlayer() : nullptr;
+    if (!player)
+        return;
+
+    // Phases come from spell_area auras here, so refreshing the zone and area auras refreshes the phase as well
+    player->UpdateZoneDependentAuras(player->GetZoneId());
+    player->UpdateAreaDependentAuras(player->GetAreaId());
 }

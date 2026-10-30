@@ -321,6 +321,23 @@ std::array<SpellImplicitTargetInfo::StaticData, TOTAL_SPELL_TARGETS> SpellImplic
     {TARGET_OBJECT_TYPE_GOBJ, TARGET_REFERENCE_TYPE_CASTER, TARGET_SELECT_CATEGORY_CONE,    TARGET_CHECK_DEFAULT,  TARGET_DIR_FRONT},       // 108 TARGET_GAMEOBJECT_CONE
     {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 109
     {TARGET_OBJECT_TYPE_DEST, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 110 TARGET_DEST_UNK_110
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 111 TARGET_UNK_111
+    {TARGET_OBJECT_TYPE_DEST, TARGET_REFERENCE_TYPE_TARGET, TARGET_SELECT_CATEGORY_DEFAULT, TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 112 TARGET_DEST_TARGET_ANY_2
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 113 TARGET_UNK_113
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 114 TARGET_UNK_114
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 115 TARGET_UNK_115
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 116 TARGET_UNK_116
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 117 TARGET_UNK_117
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 118 TARGET_UNIT_TARGET_ALLY_OR_RAID (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 119 TARGET_CORPSE_SRC_AREA_RAID (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 120 TARGET_UNIT_CASTER_AND_SUMMONS (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 121 TARGET_CORPSE_TARGET_ALLY (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 122 TARGET_UNIT_AREA_THREAT_LIST (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 123 TARGET_UNIT_AREA_TAP_LIST (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 124 TARGET_UNIT_TARGET_TAP_LIST (NYI)
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 125 TARGET_DEST_CASTER_GROUND_2 (NYI)
+    {TARGET_OBJECT_TYPE_UNIT, TARGET_REFERENCE_TYPE_CASTER, TARGET_SELECT_CATEGORY_AREA,    TARGET_CHECK_ENEMY,    TARGET_DIR_NONE},        // 126 TARGET_UNIT_AREA_ENEMY
+    {TARGET_OBJECT_TYPE_NONE, TARGET_REFERENCE_TYPE_NONE,   TARGET_SELECT_CATEGORY_NYI,     TARGET_CHECK_DEFAULT,  TARGET_DIR_NONE},        // 127 TARGET_UNK_127
 } };
 
 SpellEffectInfo::SpellEffectInfo(SpellEffectEntry const* effect, SpellInfo const* spellInfo, uint8 effIndex)
@@ -406,7 +423,7 @@ bool SpellEffectInfo::IsFarDestTargetEffect() const
 
 bool SpellEffectInfo::IsUnitOwnedAuraEffect() const
 {
-    return IsAreaAuraEffect() || Effect == SPELL_EFFECT_APPLY_AURA;
+    return IsAreaAuraEffect() || Effect == SPELL_EFFECT_APPLY_AURA || Effect == SPELL_EFFECT_APPLY_AURA_2;
 }
 
 int32 SpellEffectInfo::CalcValue(WorldObject const* caster, int32 const* bp, Unit const* /*target*/) const
@@ -830,6 +847,24 @@ std::array<SpellEffectInfo::StaticData, TOTAL_SPELL_EFFECTS> SpellEffectInfo::_d
     {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 162 SPELL_EFFECT_TALENT_SPEC_SELECT
     {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 163 SPELL_EFFECT_163
     {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 164 SPELL_EFFECT_REMOVE_AURA
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 165 SPELL_EFFECT_DAMAGE_FROM_MAX_HEALTH_PCT
+    {EFFECT_IMPLICIT_TARGET_CASTER,   TARGET_OBJECT_TYPE_UNIT}, // 166 SPELL_EFFECT_GIVE_CURRENCY
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 167 SPELL_EFFECT_UPDATE_PLAYER_PHASE
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 168 SPELL_EFFECT_ALLOW_CONTROL_PET
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_ITEM}, // 169 SPELL_EFFECT_DESTROY_ITEM
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 170 SPELL_EFFECT_UPDATE_ZONE_AURAS_AND_PHASES
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_DEST}, // 171 SPELL_EFFECT_SUMMON_PERSONAL_GAMEOBJECT
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_CORPSE_ALLY}, // 172 SPELL_EFFECT_RESURRECT_WITH_AURA
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_NONE}, // 173 SPELL_EFFECT_UNLOCK_GUILD_VAULT_TAB
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 174 SPELL_EFFECT_APPLY_AURA_2
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_NONE}, // 175 SPELL_EFFECT_175
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 176 SPELL_EFFECT_SANCTUARY_2
+    {EFFECT_IMPLICIT_TARGET_EXPLICIT, TARGET_OBJECT_TYPE_UNIT}, // 177 SPELL_EFFECT_177
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_NONE}, // 178 SPELL_EFFECT_178
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_DEST}, // 179 SPELL_EFFECT_CREATE_AREATRIGGER
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_NONE}, // 180 SPELL_EFFECT_UPDATE_AREATRIGGER
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_NONE}, // 181 SPELL_EFFECT_REMOVE_TALENT
+    {EFFECT_IMPLICIT_TARGET_NONE,     TARGET_OBJECT_TYPE_UNIT}, // 182 SPELL_EFFECT_182
 } };
 
 SpellInfo::SpellInfo(SpellEntry const* spellEntry, std::array<SpellEffectEntry const*, MAX_SPELL_EFFECTS> const& effects)
@@ -2309,7 +2344,7 @@ SpellSpecificType SpellInfo::LoadSpellSpecific() const
 
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
     {
-        if (Effects[i].Effect == SPELL_EFFECT_APPLY_AURA)
+        if (Effects[i].Effect == SPELL_EFFECT_APPLY_AURA || Effects[i].Effect == SPELL_EFFECT_APPLY_AURA_2)
         {
             switch (Effects[i].ApplyAuraName)
             {
@@ -2785,7 +2820,7 @@ bool SpellInfo::CanSpellCastOverrideAuraEffect(AuraEffect const* aurEff) const
         if (!effectInfo.Effect)
             continue;
 
-        if (effectInfo.Effect != SPELL_EFFECT_APPLY_AURA)
+        if (effectInfo.Effect != SPELL_EFFECT_APPLY_AURA && effectInfo.Effect != SPELL_EFFECT_APPLY_AURA_2)
             continue;
 
         uint32 const miscValue = static_cast<uint32>(effectInfo.MiscValue);
@@ -2887,7 +2922,7 @@ uint32 SpellInfo::CalcCastTime(WorldObject* caster, Spell* spell) const
     return (castTime > 0) ? uint32(castTime) : 0;
 }
 
-float SpellInfo::GetSpellScalingMultiplier(int32 level) const
+float SpellInfo::GetSpellScalingMultiplier(int32 level, bool powerCostRelated) const
 {
     if (!ScalingEntry || level <= 0 || !ScalingEntry->Class)
         return 1.0f;
@@ -2901,7 +2936,7 @@ float SpellInfo::GetSpellScalingMultiplier(int32 level) const
     }
 
     float scalingMultiplier = multiplier;
-    if (level < ScalingEntry->NerfMaxLevel && ScalingEntry->NerfMaxLevel > 1)
+    if (!powerCostRelated && level < ScalingEntry->NerfMaxLevel && ScalingEntry->NerfMaxLevel > 1)
         scalingMultiplier = ((((1.0f - ScalingEntry->NerfFactor) * (level - 1)) / (ScalingEntry->NerfMaxLevel - 1)) +
             ScalingEntry->NerfFactor) * multiplier;
 
@@ -2930,7 +2965,7 @@ uint32 SpellInfo::GetMaxTicks() const
 
     for (uint8 x = 0; x < MAX_SPELL_EFFECTS; x++)
     {
-        if (Effects[x].Effect == SPELL_EFFECT_APPLY_AURA)
+        if (Effects[x].Effect == SPELL_EFFECT_APPLY_AURA || Effects[x].Effect == SPELL_EFFECT_APPLY_AURA_2)
             switch (Effects[x].ApplyAuraName)
             {
                 case SPELL_AURA_PERIODIC_DAMAGE:
@@ -2991,6 +3026,10 @@ int32 SpellInfo::CalcPowerCost(WorldObject const* caster, SpellSchoolMask school
             case POWER_FOCUS:
             case POWER_ENERGY:
             case POWER_HAPPINESS:
+            case POWER_SOUL_SHARDS:
+            case POWER_ECLIPSE:
+            case POWER_HOLY_POWER:
+            case POWER_ALTERNATE_POWER:
                 powerCost += int32(CalculatePct(unitCaster->GetMaxPower(Powers(PowerType)), ManaCostPercentage));
                 break;
             case POWER_RUNE:
@@ -3002,6 +3041,12 @@ int32 SpellInfo::CalcPowerCost(WorldObject const* caster, SpellSchoolMask school
                 return 0;
         }
     }
+
+    // Cataclysm: a scaled spell whose cast time is shortened at low level costs proportionally less
+    // (Smite at level 10: 1.97 of 2.5 s, 31 -> 25 mana), rounded up as the client's tooltip does
+    // (CPP SpellInfo::CalcPowerCost).
+    if (ScalingEntry && powerCost > 0)
+        powerCost = int32(std::ceil(GetSpellScalingMultiplier(unitCaster->GetLevel(), true) * double(powerCost)));
     SpellSchools school = GetFirstSchoolInMask(schoolMask);
     // Flat mod from caster auras by spell school
     powerCost += unitCaster->GetInt32Value(static_cast<uint16>(UNIT_FIELD_POWER_COST_MODIFIER) + school);
@@ -3097,7 +3142,7 @@ SpellInfo const* SpellInfo::GetAuraRankForLevel(uint8 level) const
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
     {
         if (IsPositiveEffect(i) &&
-                (Effects[i].Effect == SPELL_EFFECT_APPLY_AURA ||
+                (Effects[i].Effect == SPELL_EFFECT_APPLY_AURA || Effects[i].Effect == SPELL_EFFECT_APPLY_AURA_2 ||
                  Effects[i].Effect == SPELL_EFFECT_APPLY_AREA_AURA_PARTY ||
                  Effects[i].Effect == SPELL_EFFECT_APPLY_AREA_AURA_RAID))
         {
@@ -3240,6 +3285,7 @@ bool SpellInfo::_IsPositiveEffect(uint8 effIndex, bool deep) const
             }
         // non-positive aura use
         case SPELL_EFFECT_APPLY_AURA:
+        case SPELL_EFFECT_APPLY_AURA_2:
         case SPELL_EFFECT_APPLY_AREA_AURA_FRIEND:
             {
                 switch (Effects[effIndex].ApplyAuraName)
@@ -3251,10 +3297,14 @@ bool SpellInfo::_IsPositiveEffect(uint8 effIndex, bool deep) const
                     case SPELL_AURA_MOD_HEALING_PCT:
                     case SPELL_AURA_MOD_HEALING_DONE:
                     case SPELL_AURA_MOD_DAMAGE_PERCENT_DONE:
+                    case SPELL_AURA_MOD_MELEE_HASTE_3:
+                    case SPELL_AURA_MOD_RANGED_HASTE_2:
+                    case SPELL_AURA_MOD_MELEE_RANGED_HASTE_2:
                         if (Effects[effIndex].CalcValue() < 0)
                             return false;
                         break;
                     case SPELL_AURA_MOD_DAMAGE_TAKEN:           // dependent from bas point sign (positive -> negative)
+                    case SPELL_AURA_BYPASS_ARMOR_FOR_CASTER:
                         if (Effects[effIndex].CalcValue() > 0)
                             return false;
                         break;

@@ -241,6 +241,11 @@ uint8 Player::FindEquipSlot(ItemTemplate const* proto, uint32 slot, bool swap) c
                     if (IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_EQUIP_RELIC))
                         slots[0] = EQUIPMENT_SLOT_RANGED;
                     break;
+                case ITEM_SUBCLASS_ARMOR_RELIC:     // Cataclysm (CPP FindEquipSlot)
+                    if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_RELIC) || IsClass(CLASS_DRUID, CLASS_CONTEXT_EQUIP_RELIC) ||
+                        IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_RELIC) || IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_EQUIP_RELIC))
+                        slots[0] = EQUIPMENT_SLOT_RANGED;
+                    break;
             }
             break;
         }
@@ -5621,11 +5626,16 @@ bool Player::LoadFromDB(ObjectGuid playerGuid, CharacterDatabaseQueryHolder cons
     // restore remembered power/health values (but not more max values)
     uint32 savedHealth = fields[55].Get<uint32>();
     SetHealth(savedHealth > GetMaxHealth() ? GetMaxHealth() : savedHealth);
+    // power1..power7 hold the class power slots (see MAX_SAVED_POWER_SLOTS); SetPower clamps to the maximum
     for (uint8 i = 0; i < MAX_POWERS; ++i)
     {
-        uint32 savedPower = fields[56 + i].Get<uint32>();
-        SetPower(Powers(i), savedPower > GetMaxPower(Powers(i)) ? GetMaxPower(Powers(i)) : savedPower);
+        uint32 index = GetPowerIndex(Powers(i));
+        if (index < MAX_UNIT_POWER_FIELDS)
+            SetPower(Powers(i), fields[56 + index].Get<uint32>());
     }
+
+    // Eclipse always starts balanced (pinned TrinityCore-Cata Player::LoadFromDB)
+    SetPower(POWER_ECLIPSE, 0);
 
     LOG_DEBUG("entities.player.loading", "The value of player {} after load item and aura is: ", m_name);
     outDebugValues();
@@ -7955,8 +7965,8 @@ void Player::_SaveStats(CharacterDatabaseTransaction trans)
     stmt->SetData(index++, GetGUID().GetRawValue());
     stmt->SetData(index++, GetMaxHealth());
 
-    for (uint8 i = 0; i < MAX_POWERS; ++i)
-        stmt->SetData(index++, GetMaxPower(Powers(i)));
+    for (uint8 i = 0; i < MAX_SAVED_POWER_SLOTS; ++i)
+        stmt->SetData(index++, i < MAX_UNIT_POWER_FIELDS ? GetUInt32Value(UNIT_FIELD_MAXPOWER1 + i) : 0u);
 
     for (uint8 i = 0; i < MAX_STATS; ++i)
         stmt->SetData(index++, GetStat(Stats(i)));

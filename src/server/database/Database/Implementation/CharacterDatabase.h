@@ -548,6 +548,8 @@ enum CharacterDatabaseStatements : uint32
 
     CHAR_NO_OP_PROVIDE_REALM_CONTEXT,
 
+    CHAR_UPD_CHAR_LIST_ORDER,
+
     MAX_CHARACTERDATABASE_STATEMENTS
 };
 

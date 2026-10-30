@@ -156,6 +156,29 @@ void AuraApplication::_InitFlags(Unit* caster, uint8 effMask)
         }
         _flags |= positiveFound ? AFLAG_POSITIVE : AFLAG_NEGATIVE;
     }
+
+    // Cataclysm: the client shows aura tooltips ("Bleeding for X") from amounts the server sends
+    // when the spell asks for it (SPELL_ATTR8_AURA_POINTS_ON_CLIENT) or for override auras
+    // (CPP AuraApplication::_InitFlags / Aura::EffectTypeNeedsSendingAmount).
+    bool sendAmount = GetBase()->GetSpellInfo()->AttributesEx8 & 0x00001000;
+    for (uint8 i = 0; i < MAX_SPELL_EFFECTS && !sendAmount; ++i)
+    {
+        AuraEffect const* aurEff = GetBase()->GetEffect(i);
+        if (!aurEff || !(_effectsToApply & (1 << i)))
+            continue;
+        switch (aurEff->GetAuraType())
+        {
+            case SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS:
+            case SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS_TRIGGERED:
+            case SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN:
+                sendAmount = true;
+                break;
+            default:
+                break;
+        }
+    }
+    if (sendAmount)
+        _flags |= AFLAG_ANY_EFFECT_AMOUNT_SENT;
 }
 
 void AuraApplication::_HandleEffect(uint8 effIndex, bool apply)
@@ -224,6 +247,13 @@ void AuraApplication::BuildUpdatePacket(ByteBuffer& data, bool remove) const
         data << uint32(aura->GetMaxDuration());
         data << uint32(aura->GetDuration());
     }
+
+    // Per applied effect, in index order (the client knows which from the AFLAG_EFF_INDEX bits).
+    if (flags & AFLAG_ANY_EFFECT_AMOUNT_SENT)
+        for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+            if (AuraEffect const* effect = aura->GetEffect(i))
+                if (HasEffect(i))
+                    data << int32(effect->GetAmount());
 }
 
 void AuraApplication::ClientUpdate(bool remove)
@@ -2939,7 +2969,8 @@ void UnitAura::FillTargetMap(std::map<Unit*, uint8>& targets, Unit* caster)
             continue;
         UnitList targetList;
         // non-area aura
-        if (GetSpellInfo()->Effects[effIndex].Effect == SPELL_EFFECT_APPLY_AURA)
+        if (GetSpellInfo()->Effects[effIndex].Effect == SPELL_EFFECT_APPLY_AURA
+            || GetSpellInfo()->Effects[effIndex].Effect == SPELL_EFFECT_APPLY_AURA_2)
         {
             targetList.push_back(GetUnitOwner());
         }

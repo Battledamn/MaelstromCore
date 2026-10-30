@@ -10091,6 +10091,11 @@ void ObjectMgr::LoadTrainers()
                 continue;
             }
 
+            // TDB leaves ReqLevel 0 on some class spells (Bloodlust 2825 at 70); 0 must not mean
+            // "from level 1", so fall back to the spell's own level (recipes have none and stay 0).
+            if (!spell.ReqLevel)
+                spell.ReqLevel = uint8(std::min<uint32>(std::max(spellInfo->SpellLevel, spellInfo->BaseLevel), 255));
+
             if (GetTalentSpellCost(spell.SpellId))
             {
                 LOG_ERROR("sql.sql", "Table `trainer_spell` references non-existing spell (SpellId: {}) which is a talent, for TrainerId {}, ignoring", spell.SpellId, trainerId);

@@ -1638,8 +1638,73 @@ class spell_mage_deep_freeze_immunity_state : public AuraScript
     }
 };
 
+// 79683 - Arcane Missiles!
+// Cataclysm: Arcane Missiles (5143) needs the hidden aura 79808 on the caster (SpellAuraRestrictions),
+// which this proc buff applies while it lasts. Ported from The Cataclysm Preservation Project.
+class spell_mage_arcane_missiles_trigger : public AuraScript
+{
+    PrepareAuraScript(spell_mage_arcane_missiles_trigger);
+
+    static constexpr uint32 SPELL_MAGE_ARCANE_MISSILES_AURASTATE = 79808;
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_MAGE_ARCANE_MISSILES_AURASTATE });
+    }
+
+    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+    }
+
+    void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->CastSpell(GetTarget(), SPELL_MAGE_ARCANE_MISSILES_AURASTATE, true);
+    }
+
+    void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->RemoveAurasDueToSpell(SPELL_MAGE_ARCANE_MISSILES_AURASTATE);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_mage_arcane_missiles_trigger::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        AfterEffectApply += AuraEffectApplyFn(spell_mage_arcane_missiles_trigger::OnApply, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_mage_arcane_missiles_trigger::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 79684 - Offensive State (DND): the passive that procs Arcane Missiles!
+class spell_mage_offensive_state_dnd : public AuraScript
+{
+    PrepareAuraScript(spell_mage_offensive_state_dnd);
+
+    static constexpr uint32 SPELL_MAGE_ARCANE_MISSILES_SPELL = 5143;
+    static constexpr uint32 SPELL_MAGE_HOT_STREAK_TALENT = 44445;
+    static constexpr uint32 SPELL_MAGE_BRAIN_FREEZE_TALENT_R1 = 44546;
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        Player* player = GetTarget()->ToPlayer();
+        if (!player || !eventInfo.GetSpellInfo())
+            return false;
+
+        // Only mages who know Arcane Missiles; the Hot Streak and Brain Freeze talents replace it.
+        return player->HasSpell(SPELL_MAGE_ARCANE_MISSILES_SPELL) && !player->HasAura(SPELL_MAGE_HOT_STREAK_TALENT)
+            && !player->GetAuraOfRankedSpell(SPELL_MAGE_BRAIN_FREEZE_TALENT_R1);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_mage_offensive_state_dnd::CheckProc);
+    }
+};
+
 void AddSC_mage_spell_scripts()
 {
+    RegisterSpellScript(spell_mage_arcane_missiles_trigger);
+    RegisterSpellScript(spell_mage_offensive_state_dnd);
     RegisterSpellScript(spell_mage_arcane_blast);
     RegisterSpellScript(spell_mage_arcane_missiles);
     RegisterSpellScript(spell_mage_arcane_potency);

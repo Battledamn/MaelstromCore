@@ -568,6 +568,10 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
         SetPower(POWER_MANA, GetMaxPower(POWER_MANA));
     }
 
+    // Cataclysm: new warlocks start with all three soul shards.
+    if (HasActivePowerType(POWER_SOUL_SHARDS))
+        SetPower(POWER_SOUL_SHARDS, GetMaxPower(POWER_SOUL_SHARDS));
+
     if (HasActivePowerType(POWER_RUNIC_POWER))
     {
         SetPower(POWER_RUNE, 8);
@@ -1776,6 +1780,11 @@ void Player::RegenerateAll()
 
     Regenerate(POWER_MANA);
 
+    // Continuous like the client's prediction (see Player::Regenerate).
+    Regenerate(POWER_RAGE);
+    Regenerate(POWER_RUNIC_POWER);
+    Regenerate(POWER_HOLY_POWER);
+
     // Runes act as cooldowns, and they don't need to send any data
     if (IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_ABILITY))
         for (uint8 i = 0; i < MAX_RUNES; ++i)
@@ -1805,10 +1814,6 @@ void Player::RegenerateAll()
         {
             RegenerateHealth();
         }
-
-        Regenerate(POWER_RAGE);
-        if (IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_ABILITY))
-            Regenerate(POWER_RUNIC_POWER);
 
         m_regenTimerCount -= 2000;
     }
@@ -1896,42 +1901,46 @@ void Player::Regenerate(Powers power)
                         ManaIncreaseRate * 0.001f * m_regenTimer;
             }
             break;
-        case POWER_RAGE:                                    // Regenerate rage
-            {
-                if (!IsInCombat() && !HasInterruptRegenAura())
-                {
-                    float RageDecreaseRate = sWorld->getRate(RATE_POWER_RAGE_LOSS);
-                    addvalue += -20 * RageDecreaseRate;               // 2 rage by tick (= 2 seconds => 1 rage/sec)
-                }
-            }
-            break;
-        case POWER_ENERGY:                                  // Regenerate energy (rogue)
-            // Regen per second
-            addvalue += (GetFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index) + 10.f);
-            // Regen per millisecond
-            addvalue *= 0.001f;
-            // Milliseconds passed
-            addvalue *= m_regenTimer;
-            // Rate
-            addvalue *= sWorld->getRate(RATE_POWER_ENERGY);
-            break;
+        // Cataclysm: the client predicts these bars itself (regen field + a base rate per power type,
+        // divided by the haste-regen field), so the server applies exactly the same continuous rate on
+        // every update; WotLK's fixed 2-second chunks and rates made the bars jump back. Ported from The
+        // Cataclysm Preservation Project's Unit::GetPowerRegen / DBCManager::GetBasePowerRegen.
+        case POWER_RAGE:
+        case POWER_ENERGY:
         case POWER_RUNIC_POWER:
+        case POWER_FOCUS:
+        case POWER_HOLY_POWER:
+        {
+            bool const inCombat = IsInCombat();
+            if (HasInterruptRegenAura() && !inCombat && (power == POWER_RAGE || power == POWER_RUNIC_POWER))
+                break;
+
+            float baseRegen = 0.0f;
+            float configRate = 1.0f;
+            switch (power)
             {
-                if (!IsInCombat() && !HasInterruptRegenAura())
-                {
-                    float RunicPowerDecreaseRate = sWorld->getRate(RATE_POWER_RUNICPOWER_LOSS);
-                    addvalue += -30 * RunicPowerDecreaseRate;         // 3 RunicPower by tick
-                }
+                case POWER_RAGE:        baseRegen = inCombat ? 0.0f : -12.5f; configRate = sWorld->getRate(RATE_POWER_RAGE_LOSS); break;
+                case POWER_RUNIC_POWER: baseRegen = inCombat ? 0.0f : -12.5f; configRate = sWorld->getRate(RATE_POWER_RUNICPOWER_LOSS); break;
+                case POWER_ENERGY:      baseRegen = 10.0f; configRate = sWorld->getRate(RATE_POWER_ENERGY); break;
+                case POWER_FOCUS:       baseRegen = 5.0f; configRate = sWorld->getRate(RATE_POWER_FOCUS); break;
+                case POWER_HOLY_POWER:  baseRegen = inCombat ? 0.0f : -0.1f; break;
+                default: break;
             }
+
+            uint32 const regenField = inCombat ? UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER : UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER;
+            float perSecond = (power == POWER_HOLY_POWER ? 0.0f : GetFloatValue(regenField + index)) + baseRegen;
+            if (power == POWER_ENERGY || power == POWER_FOCUS)
+                if (float const hasteRegen = GetFloatValue(PLAYER_FIELD_MOD_HASTE_REGEN); hasteRegen > 0.0f)
+                    perSecond /= hasteRegen;
+
+            addvalue += perSecond * 0.001f * m_regenTimer * configRate;
             break;
-        case POWER_FOCUS:                                   // Regenerate focus (4.3.4 hunter)
-            // 4 per second, raised by ranged haste (m_modAttackSpeedPct below 1 when hasted)
-            addvalue += (GetFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index) + 4.f) / m_modAttackSpeedPct[RANGED_ATTACK];
-            addvalue *= 0.001f * m_regenTimer;
-            addvalue *= sWorld->getRate(RATE_POWER_FOCUS);
-            break;
+        }
         case POWER_RUNE:
         case POWER_HAPPINESS:
+        case POWER_SOUL_SHARDS:                             // refilled by spells (Soul Harvest), never by regeneration
+        case POWER_ECLIPSE:                                 // moved only by Balance spells
+        case POWER_ALTERNATE_POWER:
             break;
         case POWER_HEALTH:
             return;
@@ -1946,7 +1955,7 @@ void Player::Regenerate(Powers power)
 
         // Butchery requires combat for this effect
         if (power != POWER_RUNIC_POWER || IsInCombat())
-            addvalue += float(GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, power) * ((power != POWER_ENERGY) ? m_regenTimerCount : m_regenTimer)) / (5.0f * IN_MILLISECONDS);
+            addvalue += float(GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, power) * m_regenTimer) / (5.0f * IN_MILLISECONDS);
     }
 
     if (addvalue < 0.0f)
@@ -2652,6 +2661,9 @@ void Player::InitStatsForLevel(bool reapplyMods)
         SetInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + i, 0);
         SetFloatValue(PLAYER_FIELD_MOD_DAMAGE_DONE_PCT + i, 1.00f);
     }
+    SetFloatValue(PLAYER_FIELD_MOD_SPELL_POWER_PCT, GetTotalAuraMultiplier(SPELL_AURA_MOD_SPELL_POWER_PCT));
+    SetFloatValue(PLAYER_FIELD_OVERRIDE_SPELL_POWER_BY_AP_PCT,
+        float(GetTotalAuraModifier(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT)));
 
     //reset attack power, damage and attack speed fields
     SetFloatValue(UNIT_FIELD_BASEATTACKTIME, 2000.0f);
@@ -2772,8 +2784,13 @@ bool Player::HasActivePowerType(Powers power)
 {
     if (sScriptMgr->OnPlayerHasActivePowerType(this, power))
         return true;
-    else
-        return (getPowerType() == power);
+
+    // 4.3.4 class resources (soul shards, eclipse, holy power, alternate power) live in their own
+    // ChrClassesXPowerTypes slot beside the display power and are always active when the class has one.
+    if (power >= POWER_SOUL_SHARDS && power < MAX_POWERS)
+        return GetPowerIndex(power) != MAX_POWERS;
+
+    return getPowerType() == power;
 }
 
 void Player::SendKnownSpells(bool firstLogin)
@@ -3349,6 +3366,18 @@ bool Player::_addSpell(uint32 spellId, uint8 addSpecMask, bool temporary, bool l
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SPELL, spellId);
     }
 
+    // spell_learn_spell: spells that come with this one, also for characters that already had it
+    for (auto const& [learningSpellId, learnedSpellId] : sSpellMgr->GetSpellLearnSpells(spellId))
+    {
+        if (HasSpell(learnedSpellId))
+            continue;
+
+        if (!IsInWorld())
+            addSpell(learnedSpellId, addSpecMask, true, temporary);
+        else
+            learnSpell(learnedSpellId, temporary);
+    }
+
     return true;
 }
 
@@ -3384,6 +3413,8 @@ void Player::learnSpell(uint32 spellId, bool temporary /*= false*/, bool learnFr
     uint8 const specMask = GetLearnSpellSpecMask(spellId);
 
     bool const added = addSpell(spellId, specMask, true, temporary, learnFromSkill);
+    if (added && (spellId == 93321 || spellId == 93375) && GetPet())
+        PetSpellInitialize();                               // Control Pet / Control Demon: show the pet bar now
     if (added)
     {
         sScriptMgr->OnPlayerLearnSpell(this, spellId);
@@ -3484,6 +3515,10 @@ void Player::removeSpell(uint32 spell_id, uint8 removeSpecMask, bool onlyTempora
             removeSpell(spellsItr->second, removeSpecMask, onlyTemporary, sendPacket);
         }
     }
+
+    // spell_learn_spell: the spells learned with this one go with it
+    for (auto const& [learningSpellId, learnedSpellId] : sSpellMgr->GetSpellLearnSpells(spell_id))
+        removeSpell(learnedSpellId, removeSpecMask, onlyTemporary, sendPacket);
 
     // pussywizard: re-search, it can be corrupted in prev loop
     itr = m_spells.find(spell_id);
@@ -4787,6 +4822,11 @@ void Player::DurabilityLoss(Item* item, double percent)
 
     if (!pMaxDurability)
         return;
+
+    // SPELL_AURA_MOD_DURABILITY_LOSS: positive amounts reduce the loss (Reinforce: 10 = 10% less)
+    float durabilityLossMod = GetTotalAuraMultiplier(SPELL_AURA_MOD_DURABILITY_LOSS);
+    if (durabilityLossMod > 0.0f)
+        percent /= durabilityLossMod;
 
     uint32 pDurabilityLoss = uint32(pMaxDurability * percent);
 
@@ -9218,6 +9258,8 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
     pet->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
     pet->SetUInt32Value(UNIT_FIELD_BYTES_1, 0);
     pet->InitStatsForLevel(GetLevel());
+    // New pets start defending and assisting their owner (CPP: REACT_ASSIST, AzerothCore's Defensive).
+    pet->SetReactState(REACT_DEFENSIVE);
 
     SetMinion(pet, true);
 
@@ -9241,8 +9283,10 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
 
     map->AddToMap(pet->ToCreature(), true);
 
-    ASSERT(!petStable.CurrentPet && (petType != HUNTER_PET || !petStable.GetUnslottedHunterPet()));
+    ASSERT(!petStable.CurrentPet);
+    Optional<uint8> activeSlot = petStable.GetFirstFreeActiveSlot();
     pet->FillPetInfo(&petStable.CurrentPet.emplace());
+    petStable.CurrentPet->Slot = activeSlot.value_or(PET_SLOT_FIRST_ACTIVE_SLOT);
 
     if (petType == SUMMON_PET)
     {
@@ -9320,13 +9364,10 @@ void Player::RemovePet(Pet* pet, PetSaveMode mode, bool returnreagent)
         if (mode == PET_SAVE_NOT_IN_SLOT && m_petStable && m_petStable->CurrentPet)
         {
             // Handle removing pet while it is in "temporarily unsummoned" state, for example on mount
-            CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_PET_SLOT_BY_ID);
-            stmt->SetData(0, PET_SAVE_NOT_IN_SLOT);
-            stmt->SetData(1, GetGUID().GetRawValue());
-            stmt->SetData(2, m_petStable->CurrentPet->PetNumber);
-            CharacterDatabase.Execute(stmt);
+            PetStable::PetInfo const& currentPet = *m_petStable->CurrentPet;
+            UpdatePetDBSlot(currentPet.PetNumber, Pet::GetDBSlot(&currentPet, currentPet.Type, PET_SAVE_NOT_IN_SLOT));
 
-            m_petStable->UnslottedPets.push_back(std::move(*m_petStable->CurrentPet));
+            m_petStable->UnslottedPets.insert(m_petStable->UnslottedPets.begin(), std::move(*m_petStable->CurrentPet));
             m_petStable->CurrentPet.reset();
         }
 
@@ -9343,11 +9384,19 @@ void Player::RemovePet(Pet* pet, PetSaveMode mode, bool returnreagent)
         {
             if (mode == PET_SAVE_NOT_IN_SLOT)
             {
-                m_petStable->UnslottedPets.push_back(std::move(*m_petStable->CurrentPet));
+                // the last unsummoned pet goes first: Revive Pet and Call Pet without a slot use it
+                std::vector<PetStable::PetInfo>& unslottedPets = m_petStable->UnslottedPets;
+                unslottedPets.insert(unslottedPets.begin(), std::move(*m_petStable->CurrentPet));
                 m_petStable->CurrentPet.reset();
             }
             else if (mode == PET_SAVE_AS_DELETED)
+            {
                 m_petStable->CurrentPet.reset();
+
+                // abandoned: the Call Pet flyout loses the pet
+                if (pet->IsHunterPet())
+                    GetSession()->SendStablePet(ObjectGuid::Empty);
+            }
             // else if (stable slots) handled in opcode handlers due to required swaps
             // else (current pet) doesnt need to do anything
         }
@@ -9411,7 +9460,8 @@ bool Player::CanPetResurrect()
 bool Player::IsExistPet()
 {
     PetStable* const petStable = GetPetStable();
-    return petStable && (petStable->CurrentPet || petStable->GetUnslottedHunterPet());
+    // 4.3.4: a new hunter pet needs a free active slot, and no pet may be out
+    return petStable && (petStable->CurrentPet || !petStable->GetFirstFreeActiveSlot());
 }
 
 Pet* Player::CreatePet(Creature* creatureTarget, uint32 spellID /*= 0*/)
@@ -9462,6 +9512,7 @@ Pet* Player::CreatePet(Creature* creatureTarget, uint32 spellID /*= 0*/)
 
     pet->SavePetToDB(PET_SAVE_AS_CURRENT);
     PetSpellInitialize();
+    GetSession()->SendStablePet(ObjectGuid::Empty);
 
     return pet;
 }
@@ -9503,6 +9554,7 @@ Pet* Player::CreatePet(uint32 creatureEntry, uint32 spellID /*= 0*/)
 
     pet->SavePetToDB(PET_SAVE_AS_CURRENT);
     PetSpellInitialize();
+    GetSession()->SendStablePet(ObjectGuid::Empty);
 
     return pet;
 }
@@ -9730,8 +9782,22 @@ bool Player::IsChatFiltered(std::string_view text)
     return sObjectMgr->IsChatFiltered(text);
 }
 
+bool Player::CanControlPet() const
+{
+    // Ported from The Cataclysm Preservation Project (Player::CanControlPet).
+    if (getClass() == CLASS_HUNTER && !HasAura(93321))     // Control Pet
+        return false;
+    if (getClass() == CLASS_WARLOCK && !HasAura(93375))    // Control Demon
+        return false;
+    return true;
+}
+
 void Player::PetSpellInitialize()
 {
+    // No pet action bar until the hunter or warlock can control the pet.
+    if (!CanControlPet())
+        return;
+
     Pet* pet = GetPet();
 
     if (!pet)
@@ -11001,6 +11067,10 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
 
         // reputation discount
         price = uint32(std::floor(price * GetReputationPriceDiscount(creature)));
+
+        // SPELL_AURA_MOD_VENDOR_ITEMS_PRICES
+        if (int32 priceMod = GetTotalAuraModifier(SPELL_AURA_MOD_VENDOR_ITEMS_PRICES))
+            price = uint32(std::max<int64>(0, int64(price) - int64(price) * priceMod / 100));
     }
 
     if (crItem->ExtendedCost)
@@ -15285,8 +15355,8 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
         stmt->SetData(index++, GetDrunkValue());
         stmt->SetData(index++, GetHealth());
 
-        for (uint32 i = 0; i < MAX_POWERS; ++i)
-            stmt->SetData(index++, GetPower(Powers(i)));
+        for (uint8 i = 0; i < MAX_SAVED_POWER_SLOTS; ++i)
+            stmt->SetData(index++, i < MAX_UNIT_POWER_FIELDS ? GetUInt32Value(UNIT_FIELD_POWER1 + i) : 0u);
 
         stmt->SetData(index++, GetSession()->GetLatency());
 
@@ -15425,8 +15495,8 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
         stmt->SetData(index++, GetDrunkValue());
         stmt->SetData(index++, GetHealth());
 
-        for (uint32 i = 0; i < MAX_POWERS; ++i)
-            stmt->SetData(index++, GetPower(Powers(i)));
+        for (uint8 i = 0; i < MAX_SAVED_POWER_SLOTS; ++i)
+            stmt->SetData(index++, i < MAX_UNIT_POWER_FIELDS ? GetUInt32Value(UNIT_FIELD_POWER1 + i) : 0u);
 
         stmt->SetData(index++, GetSession()->GetLatency());
 
@@ -16428,16 +16498,11 @@ void Player::_LoadPetStable(uint8 petStableSlots, PreparedQueryResult result)
     if (!petStableSlots && !result)
         return;
 
+    // 4.3.4 has no stable slots to buy: every hunter has all of them (CPP sends PET_SLOT_LAST_STABLE_SLOT)
     m_petStable = std::make_unique<PetStable>();
-    m_petStable->MaxStabledPets = petStableSlots;
+    m_petStable->MaxStabledPets = MAX_PET_STABLES;
 
-    if (m_petStable->MaxStabledPets > MAX_PET_STABLES)
-    {
-        LOG_ERROR("entities.player", "Player::LoadFromDB: Player ({}) can't have more stable slots than {}, but has {} in DB",
-            GetGUID().ToString(), MAX_PET_STABLES, m_petStable->MaxStabledPets);
-
-        m_petStable->MaxStabledPets = MAX_PET_STABLES;
-    }
+    std::vector<PetStable::PetInfo> unplacedHunterPets;
 
     //         0      1        2      3    4           5     6     7        8          9       10            11      12        13              14       15
     // SELECT id, entry, modelid, level, exp, Reactstate, slot, name, renamed, curhealth, curmana, curhappiness, abdata, savetime, CreatedBySpell, PetType FROM character_pet WHERE owner = ?
@@ -16453,7 +16518,7 @@ void Player::_LoadPetStable(uint8 petStableSlots, PreparedQueryResult result)
             petInfo.Level = fields[3].Get<uint16>();
             petInfo.Experience = fields[4].Get<uint32>();
             petInfo.ReactState = ReactStates(fields[5].Get<uint8>());
-            PetSaveMode slot = PetSaveMode(fields[6].Get<uint8>());
+            uint8 slot = fields[6].Get<uint8>();
             petInfo.Name = fields[7].Get<std::string>();
             petInfo.WasRenamed = fields[8].Get<bool>();
             petInfo.Health = fields[9].Get<uint32>();
@@ -16464,15 +16529,74 @@ void Player::_LoadPetStable(uint8 petStableSlots, PreparedQueryResult result)
             petInfo.CreatedBySpellId = fields[14].Get<uint32>();
             petInfo.Type = PetType(fields[15].Get<uint8>());
 
-            if (slot == PET_SAVE_AS_CURRENT)
+            if (petInfo.Type != HUNTER_PET)
+            {
+                if (slot == PET_SAVE_AS_CURRENT)
+                    m_petStable->CurrentPet = std::move(petInfo);
+                else if (slot == PET_SAVE_NOT_IN_SLOT)
+                    m_petStable->UnslottedPets.push_back(std::move(petInfo));
+
+                continue;
+            }
+
+            // Hunter pets: character_pet.slot holds the 4.3.4 slot (Pet::GetDBSlot)
+            if (slot <= PET_SLOT_LAST_ACTIVE_SLOT && !m_petStable->CurrentPet && !m_petStable->GetActivePet(slot))
+            {
+                petInfo.Slot = slot;
                 m_petStable->CurrentPet = std::move(petInfo);
-            else if (slot >= PET_SAVE_FIRST_STABLE_SLOT && slot <= PET_SAVE_LAST_STABLE_SLOT)
-                m_petStable->StabledPets[slot - 1] = std::move(petInfo);
-            else if (slot == PET_SAVE_NOT_IN_SLOT)
+            }
+            else if (slot >= PET_SAVE_NOT_IN_SLOT && slot <= PET_SAVE_NOT_IN_SLOT + PET_SLOT_LAST_ACTIVE_SLOT
+                && !m_petStable->GetActivePet(slot - PET_SAVE_NOT_IN_SLOT))
+            {
+                petInfo.Slot = slot - PET_SAVE_NOT_IN_SLOT;
                 m_petStable->UnslottedPets.push_back(std::move(petInfo));
+            }
+            else if (slot >= PET_SLOT_FIRST_STABLE_SLOT && slot <= PET_SLOT_LAST_STABLE_SLOT
+                && !m_petStable->StabledPets[slot - PET_SLOT_FIRST_STABLE_SLOT])
+            {
+                petInfo.Slot = slot;
+                m_petStable->StabledPets[slot - PET_SLOT_FIRST_STABLE_SLOT] = std::move(petInfo);
+            }
+            else
+                unplacedHunterPets.push_back(std::move(petInfo));
 
         } while (result->NextRow());
     }
+
+    // A slot taken twice or out of range: the pet goes to the first free active, else stable, slot
+    // (written back on its next save)
+    for (PetStable::PetInfo& petInfo : unplacedHunterPets)
+    {
+        if (Optional<uint8> activeSlot = m_petStable->GetFirstFreeActiveSlot())
+        {
+            petInfo.Slot = *activeSlot;
+            UpdatePetDBSlot(petInfo.PetNumber, PET_SAVE_NOT_IN_SLOT + petInfo.Slot);
+            m_petStable->UnslottedPets.push_back(std::move(petInfo));
+            continue;
+        }
+
+        auto freeStableSlot = std::find_if(m_petStable->StabledPets.begin(), m_petStable->StabledPets.end(),
+            [](Optional<PetStable::PetInfo> const& pet) { return !pet; });
+        if (freeStableSlot == m_petStable->StabledPets.end())
+        {
+            LOG_ERROR("entities.player", "Player::_LoadPetStable: {} has no free slot for hunter pet {}, not loaded",
+                GetGUID().ToString(), petInfo.PetNumber);
+            continue;
+        }
+
+        petInfo.Slot = PET_SLOT_FIRST_STABLE_SLOT + std::distance(m_petStable->StabledPets.begin(), freeStableSlot);
+        UpdatePetDBSlot(petInfo.PetNumber, petInfo.Slot);
+        *freeStableSlot = std::move(petInfo);
+    }
+}
+
+void Player::UpdatePetDBSlot(uint32 petNumber, uint8 dbSlot) const
+{
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_PET_SLOT_BY_ID);
+    stmt->SetData(0, dbSlot);
+    stmt->SetData(1, GetGUID().GetCounter());
+    stmt->SetData(2, petNumber);
+    CharacterDatabase.Execute(stmt);
 }
 
 void Player::_SaveInstanceTimeRestrictions(CharacterDatabaseTransaction trans)

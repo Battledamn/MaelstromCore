@@ -785,7 +785,8 @@ class spell_rog_vanish : public SpellScript
 
     void Register() override
     {
-        OnEffectHitTarget += SpellEffectFn(spell_rog_vanish::HandleEffect, EFFECT_2, SPELL_EFFECT_SANCTUARY);
+        // Cataclysm: the sanctuary moved to EFFECT_0 as SPELL_EFFECT_SANCTUARY_2
+        OnEffectHitTarget += SpellEffectFn(spell_rog_vanish::HandleEffect, EFFECT_0, SPELL_EFFECT_SANCTUARY_2);
     }
 };
 

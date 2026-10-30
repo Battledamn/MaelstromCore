@@ -518,6 +518,9 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
     if (oldSpellId != spellId)
         spellInfo = sSpellMgr->GetSpellInfo(spellId);
 
+    // Cataclysm action bar overrides (Trap Launcher, Soulburn, ...) swap the known spell for the cast one
+    spellInfo = mover->GetCastSpellInfo(spellInfo, triggerFlag);
+
     // Client is resending autoshot cast opcode when other spell is casted during shoot rotation
     // Skip it to prevent "interrupt" message
     if (spellInfo->IsAutoRepeatRangedSpell() && _player->GetCurrentSpell(CURRENT_AUTOREPEAT_SPELL)

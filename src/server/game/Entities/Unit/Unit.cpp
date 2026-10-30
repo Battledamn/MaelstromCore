@@ -2224,6 +2224,12 @@ uint32 Unit::CalcArmorReducedDamage(Unit const* attacker, Unit const* victim, co
     // Ignore enemy armor by SPELL_AURA_MOD_TARGET_RESISTANCE aura
     if (attacker)
     {
+        // SPELL_AURA_BYPASS_ARMOR_FOR_CASTER (Colossus Smash): only the aura's caster ignores the armor
+        int32 armorBypassPct = victim->GetTotalAuraModifier(SPELL_AURA_BYPASS_ARMOR_FOR_CASTER,
+            [attacker](AuraEffect const* aurEff) { return aurEff->GetCasterGUID() == attacker->GetGUID(); });
+        if (armorBypassPct > 0)
+            armor = CalculatePct(armor, 100 - std::min(armorBypassPct, 100));
+
         armor += attacker->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_TARGET_RESISTANCE, SPELL_SCHOOL_MASK_NORMAL);
 
         if (spellInfo)
@@ -4113,12 +4119,18 @@ bool Unit::IsMovementPreventedByCasting() const
         return false;
     }
 
+    // Cataclysm: spells affected by SPELL_AURA_CAST_WHILE_WALKING are cast while moving
+    if (Spell* spell = m_currentSpells[CURRENT_GENERIC_SPELL])
+        if (HasAuraTypeWithAffectMask(SPELL_AURA_CAST_WHILE_WALKING, spell->GetSpellInfo()))
+            return false;
+
     // channeled spells during channel stage (after the initial cast timer) allow movement with a specific spell attribute
     if (Spell* spell = m_currentSpells[CURRENT_CHANNELED_SPELL])
     {
         if (spell->getState() != SPELL_STATE_FINISHED && spell->IsChannelActive())
         {
-            if (spell->GetSpellInfo()->IsActionAllowedChannel())
+            if (spell->GetSpellInfo()->IsActionAllowedChannel()
+                || HasAuraTypeWithAffectMask(SPELL_AURA_CAST_WHILE_WALKING, spell->GetSpellInfo()))
             {
                 return false;
             }
@@ -5241,12 +5253,24 @@ void Unit::RemoveAurasWithInterruptFlags(uint32 flag, uint32 except, bool isAuto
     if (!(m_interruptMask & flag))
         return;
 
+    // SPELL_AURA_CAST_WHILE_WALKING keeps the auras and channels it affects on movement
+    bool const castWhileWalking = (flag & AURA_INTERRUPT_FLAG_MOVE) && HasAuraType(SPELL_AURA_CAST_WHILE_WALKING);
+    auto interruptFlagsFor = [&](uint32 spellFlags, SpellInfo const* spellInfo) -> uint32
+    {
+        uint32 hit = spellFlags & flag;
+        if (castWhileWalking && (hit & AURA_INTERRUPT_FLAG_MOVE)
+            && HasAuraTypeWithAffectMask(SPELL_AURA_CAST_WHILE_WALKING, spellInfo))
+            hit &= ~uint32(AURA_INTERRUPT_FLAG_MOVE);
+        return hit;
+    };
+
     // interrupt auras
     for (AuraApplicationList::iterator iter = m_interruptableAuras.begin(); iter != m_interruptableAuras.end();)
     {
         Aura* aura = (*iter)->GetBase();
         ++iter;
-        if ((aura->GetSpellInfo()->AuraInterruptFlags & flag) && (!except || aura->GetId() != except))
+        if (interruptFlagsFor(aura->GetSpellInfo()->AuraInterruptFlags, aura->GetSpellInfo())
+            && (!except || aura->GetId() != except))
         {
             uint32 removedAuras = m_removedAurasCount;
             RemoveAura(aura);
@@ -5258,7 +5282,8 @@ void Unit::RemoveAurasWithInterruptFlags(uint32 flag, uint32 except, bool isAuto
     // interrupt channeled spell
     if (Spell* spell = m_currentSpells[CURRENT_CHANNELED_SPELL])
     {
-        if (spell->getState() == SPELL_STATE_CASTING && (spell->m_spellInfo->ChannelInterruptFlags & flag) && spell->m_spellInfo->Id != except)
+        if (spell->getState() == SPELL_STATE_CASTING && spell->m_spellInfo->Id != except
+            && interruptFlagsFor(spell->m_spellInfo->ChannelInterruptFlags, spell->m_spellInfo))
         {
             // Do not interrupt if auto shot
             if (!(isAutoshot && spell->m_spellInfo->HasAttribute(SPELL_ATTR2_DO_NOT_RESET_COMBAT_TIMERS)))
@@ -5832,6 +5857,33 @@ bool Unit::HasAuraTypeWithAffectMask(AuraType auratype, SpellInfo const* affecte
         if ((*i)->IsAffectedOnSpell(affectedSpell))
             return true;
     return false;
+}
+
+SpellInfo const* Unit::GetCastSpellInfo(SpellInfo const* spellInfo, TriggerCastFlags& triggerFlag) const
+{
+    // SPELL_ATTR8_IGNORE_SPELLCAST_OVERRIDE_COST
+    static constexpr uint32 IGNORE_SPELLCAST_OVERRIDE_COST = 0x00040000;
+
+    for (AuraType auraType : { SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS, SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS_TRIGGERED })
+    {
+        for (AuraEffect const* auraEffect : GetAuraEffectsByType(auraType))
+        {
+            if (uint32(auraEffect->GetMiscValue()) != spellInfo->Id && !auraEffect->IsAffectedOnSpell(spellInfo))
+                continue;
+
+            if (SpellInfo const* newInfo = sSpellMgr->GetSpellInfo(auraEffect->GetAmount()))
+            {
+                if (auraEffect->GetSpellInfo()->AttributesEx8 & IGNORE_SPELLCAST_OVERRIDE_COST)
+                    triggerFlag = TriggerCastFlags(triggerFlag | TRIGGERED_IGNORE_POWER_AND_REAGENT_COST);
+                else
+                    triggerFlag = TriggerCastFlags(triggerFlag & ~TRIGGERED_IGNORE_POWER_AND_REAGENT_COST);
+
+                return newInfo;
+            }
+        }
+    }
+
+    return spellInfo;
 }
 
 bool Unit::HasAuraTypeWithValue(AuraType auratype, int32 value) const
@@ -8173,23 +8225,24 @@ int32 Unit::HealBySpell(HealInfo& healInfo, bool critical)
     return gain;
 }
 
-void Unit::SendEnergizeSpellLog(Unit* victim, uint32 spellID, uint32 damage, Powers powerType)
+void Unit::SendEnergizeSpellLog(Unit* victim, uint32 spellID, int32 damage, Powers powerType)
 {
     WorldPacket data(SMSG_SPELLENERGIZELOG, (8 + 8 + 4 + 4 + 4 + 1));
     data << victim->GetPackGUID();
     data << GetPackGUID();
     data << uint32(spellID);
     data << uint32(powerType);
-    data << uint32(damage);
+    data << int32(damage);
     SendMessageToSet(&data, true);
 }
 
-void Unit::EnergizeBySpell(Unit* victim, uint32 spellID, uint32 damage, Powers powerType)
+void Unit::EnergizeBySpell(Unit* victim, uint32 spellID, int32 damage, Powers powerType)
 {
     victim->ModifyPower(powerType, damage, false);
 
-    // Happiness is internal hunter pet state, not combat assistance — energizing it must not generate threat
-    if (powerType != POWER_HAPPINESS)
+    // Happiness is internal hunter pet state, not combat assistance — energizing it must not generate threat.
+    // Eclipse energizes are negative (lunar direction) and generate none either.
+    if (powerType != POWER_HAPPINESS && damage > 0)
         if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellID))
             victim->GetThreatMgr().ForwardThreatForAssistingMe(this, float(damage) / 2.0f, spellInfo, true);
 
@@ -8521,6 +8574,15 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
             break;
     }
 
+    // SPELL_AURA_MOD_DAMAGE_FROM_MANA (Arcane mastery): bonus scales with the current mana
+    if (owner->HasAuraType(SPELL_AURA_MOD_DAMAGE_FROM_MANA) && owner->GetMaxPower(POWER_MANA))
+    {
+        float totalBonus = owner->GetTotalAuraMultiplierByMiscMask(SPELL_AURA_MOD_DAMAGE_FROM_MANA,
+            spellProto->GetSchoolMask()) - 1.0f;
+        totalBonus *= float(owner->GetPower(POWER_MANA)) / owner->GetMaxPower(POWER_MANA);
+        DoneTotalMod += DoneTotalMod * totalBonus;
+    }
+
     return DoneTotalMod;
 }
 
@@ -8638,7 +8700,7 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
     }
 
     // Done fixed damage bonus auras
-    DoneAdvertisedBenefit += SpellBaseDamageBonusDone(spellProto->GetSchoolMask());
+    DoneAdvertisedBenefit += SpellBaseDamageBonusDone(spellProto->GetSchoolMask(), true);
 
     // Check for table values
     float coeff = spellProto->Effects[effIndex].BonusMultiplier;
@@ -8835,8 +8897,16 @@ float Unit::processDummyAuras(float TakenTotalMod) const
     return TakenTotalMod;
 }
 
-int32 Unit::SpellBaseDamageBonusDone(SpellSchoolMask schoolMask)
+int32 Unit::SpellBaseDamageBonusDone(SpellSchoolMask schoolMask, bool withSpellPowerPctMod /*= false*/)
 {
+    // SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT replaces all other spell power (Mental Quickness)
+    if (IsPlayer())
+    {
+        int32 overrideSP = GetTotalAuraModifier(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT);
+        if (overrideSP > 0)
+            return int32(CalculatePct(GetTotalAttackPowerValue(BASE_ATTACK), overrideSP) + 0.5f);
+    }
+
     int32 DoneAdvertisedBenefit = GetTotalAuraModifier(SPELL_AURA_MOD_DAMAGE_DONE, [schoolMask](AuraEffect const* aurEff)
     {
        return aurEff->GetMiscValue() & schoolMask &&
@@ -8865,6 +8935,11 @@ int32 Unit::SpellBaseDamageBonusDone(SpellSchoolMask schoolMask)
         }
         // ... and attack power
         DoneAdvertisedBenefit += int32(CalculatePct(GetTotalAttackPowerValue(BASE_ATTACK), GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_SPELL_DAMAGE_OF_ATTACK_POWER, schoolMask)));
+
+        // SPELL_AURA_MOD_SPELL_POWER_PCT; the client applies it to the displayed value itself
+        if (withSpellPowerPctMod)
+            DoneAdvertisedBenefit = int32(DoneAdvertisedBenefit
+                * GetTotalAuraMultiplier(SPELL_AURA_MOD_SPELL_POWER_PCT));
     }
     return DoneAdvertisedBenefit;
 }
@@ -9349,6 +9424,17 @@ float Unit::SpellPctHealingModsDone(Unit* victim, SpellInfo const* spellProto, D
             break;
     }
 
+    // SPELL_AURA_MOD_HEALING_DONE_PCT_VERSUS_TARGET_HEALTH (Deep Healing): more healing on more injured targets
+    if (victim)
+    {
+        float healthPctDiff = 100.0f - victim->GetHealthPct();
+        AuraEffectList const& healingVsHealth =
+            owner->GetAuraEffectsByType(SPELL_AURA_MOD_HEALING_DONE_PCT_VERSUS_TARGET_HEALTH);
+        for (AuraEffect const* aurEff : healingVsHealth)
+            if (aurEff->IsAffectedOnSpell(spellProto))
+                AddPct(DoneTotalMod, CalculatePct(float(aurEff->GetAmount()), healthPctDiff));
+    }
+
     return DoneTotalMod;
 }
 
@@ -9404,7 +9490,7 @@ uint32 Unit::SpellHealingBonusDone(Unit* victim, SpellInfo const* spellProto, ui
     }
 
     // Done fixed damage bonus auras
-    DoneAdvertisedBenefit += SpellBaseHealingBonusDone(spellProto->GetSchoolMask());
+    DoneAdvertisedBenefit += SpellBaseHealingBonusDone(spellProto->GetSchoolMask(), true);
     float coeff = spellProto->Effects[effIndex].BonusMultiplier;
 
     // Check for table values
@@ -9602,8 +9688,16 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
     return uint32(std::max(heal, 0.0f));
 }
 
-int32 Unit::SpellBaseHealingBonusDone(SpellSchoolMask schoolMask)
+int32 Unit::SpellBaseHealingBonusDone(SpellSchoolMask schoolMask, bool withSpellPowerPctMod /*= false*/)
 {
+    // SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT replaces all other spell power (Mental Quickness)
+    if (IsPlayer())
+    {
+        int32 overrideSP = GetTotalAuraModifier(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT);
+        if (overrideSP > 0)
+            return int32(CalculatePct(GetTotalAttackPowerValue(BASE_ATTACK), overrideSP) + 0.5f);
+    }
+
     int32 AdvertisedBenefit = 0;
 
     AdvertisedBenefit += GetTotalAuraModifier(SPELL_AURA_MOD_HEALING_DONE, [schoolMask](AuraEffect const* aurEff)
@@ -9629,6 +9723,10 @@ int32 Unit::SpellBaseHealingBonusDone(SpellSchoolMask schoolMask)
 
         // ... and attack power
         AdvertisedBenefit += int32(CalculatePct(GetTotalAttackPowerValue(BASE_ATTACK), GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_SPELL_HEALING_OF_ATTACK_POWER, schoolMask)));
+
+        // SPELL_AURA_MOD_SPELL_POWER_PCT; the client applies it to the displayed value itself
+        if (withSpellPowerPctMod)
+            AdvertisedBenefit = int32(AdvertisedBenefit * GetTotalAuraMultiplier(SPELL_AURA_MOD_SPELL_POWER_PCT));
     }
     return AdvertisedBenefit;
 }
@@ -10044,6 +10142,17 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
     {
         return (victim->HasAuraState(AuraStateType(aurEff->GetMiscValue())) && (!spellProto || spellProto->ValidateAttribute6SpellDamageMods(this, aurEff, false)));
     });
+
+    // Cataclysm auto attack bonuses
+    if (!spellProto)
+    {
+        // SPELL_AURA_MOD_AUTOATTACK_DAMAGE
+        AddPct(DoneTotalMod, GetTotalAuraModifier(SPELL_AURA_MOD_AUTOATTACK_DAMAGE));
+
+        // SPELL_AURA_MOD_MELEE_DAMAGE_FROM_CASTER: auto attacks of the aura's caster on the aura's target
+        AddPct(DoneTotalMod, victim->GetTotalAuraModifier(SPELL_AURA_MOD_MELEE_DAMAGE_FROM_CASTER,
+            [this](AuraEffect const* aurEff) { return aurEff->GetCasterGUID() == GetGUID(); }));
+    }
 
     // done scripted mod (take it from owner)
     Unit* owner = GetOwner() ? GetOwner() : this;
@@ -10839,10 +10948,11 @@ int32 Unit::ModifyPower(Powers power, int32 dVal, bool withPowerUpdate /*= true*
     int32 curPower = (int32)GetPower(power);
 
     int32 val = dVal + curPower;
-    if (val <= 0)
+    int32 minPower = GetMinPower(power);
+    if (val <= minPower)
     {
-        SetPower(power, 0, withPowerUpdate);
-        return -curPower;
+        SetPower(power, uint32(minPower), withPowerUpdate);
+        return minPower - curPower;
     }
 
     int32 maxPower = (int32)GetMaxPower(power);
@@ -11749,6 +11859,10 @@ void Unit::UpdateUnitMod(UnitMods unitMod)
         case UNIT_MOD_HAPPINESS:
         case UNIT_MOD_RUNE:
         case UNIT_MOD_RUNIC_POWER:
+        case UNIT_MOD_SOUL_SHARDS:
+        case UNIT_MOD_ECLIPSE:
+        case UNIT_MOD_HOLY_POWER:
+        case UNIT_MOD_ALTERNATE_POWER:
             UpdateMaxPower(GetPowerTypeByAuraGroup(unitMod));
             break;
 
@@ -11974,6 +12088,14 @@ Powers Unit::GetPowerTypeByAuraGroup(UnitMods unitMod) const
             return POWER_RUNE;
         case UNIT_MOD_RUNIC_POWER:
             return POWER_RUNIC_POWER;
+        case UNIT_MOD_SOUL_SHARDS:
+            return POWER_SOUL_SHARDS;
+        case UNIT_MOD_ECLIPSE:
+            return POWER_ECLIPSE;
+        case UNIT_MOD_HOLY_POWER:
+            return POWER_HOLY_POWER;
+        case UNIT_MOD_ALTERNATE_POWER:
+            return POWER_ALTERNATE_POWER;
         default:
         case UNIT_MOD_MANA:
             return POWER_MANA;
@@ -12158,7 +12280,10 @@ void Unit::SetPower(Powers power, uint32 val, bool withPowerUpdate /*= true*/, b
         return;
 
     uint32 maxPower = GetMaxPower(power);
-    if (maxPower < val)
+    // Eclipse runs from -100 (lunar) to 100 (solar); its field holds the signed value.
+    if (power == POWER_ECLIPSE)
+        val = uint32(std::clamp(int32(val), -int32(maxPower), int32(maxPower)));
+    else if (maxPower < val)
         val = maxPower;
 
     if (fromRegenerate)
@@ -12167,7 +12292,7 @@ void Unit::SetPower(Powers power, uint32 val, bool withPowerUpdate /*= true*/, b
         AddToObjectUpdateIfNeeded();
     }
     else
-        SetStatInt32Value(UNIT_FIELD_POWER1 + index, val);
+        SetUInt32Value(UNIT_FIELD_POWER1 + index, val); // not SetStatInt32Value: it would zero a lunar eclipse
 
     if (withPowerUpdate)
     {
@@ -12259,6 +12384,14 @@ uint32 Unit::GetCreatePowers(Powers power) const
             return 1000;
         case POWER_RUNE:
             return 0;
+        // 4.3.4 class resources (pinned TrinityCore-Cata Unit::GetCreatePowerValue); the alternate
+        // power's maximum comes from the UnitPowerBar that SPELL_AURA_ENABLE_ALT_POWER applies.
+        case POWER_SOUL_SHARDS:
+            return 3;
+        case POWER_ECLIPSE:
+            return 100;
+        case POWER_HOLY_POWER:
+            return 3;
         case POWER_HEALTH:
             return 0;
         default:
@@ -13248,6 +13381,7 @@ uint32 Unit::GetCastingTimeForBonus(SpellInfo const* spellProto, DamageEffectTyp
                 DirectDamage = true;
                 break;
             case SPELL_EFFECT_APPLY_AURA:
+            case SPELL_EFFECT_APPLY_AURA_2:
                 switch (spellProto->Effects[i].ApplyAuraName)
                 {
                     case SPELL_AURA_PERIODIC_DAMAGE:
@@ -13539,7 +13673,12 @@ bool Unit::InitTamedPet(Pet* pet, uint8 level, uint32 spell_id)
 {
     Player* player = ToPlayer();
     PetStable& petStable = player->GetOrInitPetStable();
-    if (petStable.CurrentPet || petStable.GetUnslottedHunterPet())
+    if (petStable.CurrentPet)
+        return false;
+
+    // 4.3.4: the tamed pet takes the first free active slot (CPP Player::GetFirstUnusedActivePetSlot)
+    Optional<uint8> activeSlot = petStable.GetFirstFreeActiveSlot();
+    if (!activeSlot)
         return false;
 
     pet->SetCreatorGUID(GetGUID());
@@ -13560,6 +13699,7 @@ bool Unit::InitTamedPet(Pet* pet, uint8 level, uint32 spell_id)
     pet->InitPetCreateSpells();
     pet->SetFullHealth();
     pet->FillPetInfo(&petStable.CurrentPet.emplace());
+    petStable.CurrentPet->Slot = *activeSlot;
     return true;
 }
 

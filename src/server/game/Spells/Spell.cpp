@@ -3344,7 +3344,8 @@ SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleA
     for (uint32 effectNumber = 0; effectNumber < MAX_SPELL_EFFECTS; ++effectNumber)
     {
         // handle sanctuary effects after aura apply!
-        if (m_spellInfo->Effects[effectNumber].Effect == SPELL_EFFECT_SANCTUARY)
+        if (m_spellInfo->Effects[effectNumber].Effect == SPELL_EFFECT_SANCTUARY
+            || m_spellInfo->Effects[effectNumber].Effect == SPELL_EFFECT_SANCTUARY_2)
         {
             sanct_effect = effectNumber;
             continue;
@@ -3487,7 +3488,8 @@ bool Spell::UpdateChanneledTargetList()
     uint8 channelTargetEffectMask = m_channelTargetEffectMask;
     uint8 channelAuraMask = 0;
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
-        if (m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AURA)
+        if (m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AURA
+            || m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AURA_2)
             channelAuraMask |= 1 << i;
 
     channelAuraMask &= channelTargetEffectMask;
@@ -3592,6 +3594,7 @@ SpellCastResult Spell::prepare(SpellCastTargets const* targets, AuraEffect const
         for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
         {
             if (m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AURA ||
+                    m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AURA_2 ||
                     m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AREA_AURA_PARTY ||
                     m_spellInfo->Effects[i].Effect == SPELL_EFFECT_APPLY_AREA_AURA_RAID)
             {
@@ -3692,7 +3695,9 @@ SpellCastResult Spell::prepare(SpellCastTargets const* targets, AuraEffect const
 
     // don't allow channeled spells / spells with cast time to be casted while moving
     // (even if they are interrupted on moving, spells with almost immediate effect get to have their effect processed before movement interrupter kicks in)
-    if ((m_spellInfo->IsChanneled() || m_casttime) && unitCaster && unitCaster->IsPlayer() && unitCaster->isMoving() && m_spellInfo->InterruptFlags & SPELL_INTERRUPT_FLAG_MOVEMENT && !IsTriggered())
+    // (Cataclysm: unless a SPELL_AURA_CAST_WHILE_WALKING effect affects the spell)
+    if ((m_spellInfo->IsChanneled() || m_casttime) && unitCaster && unitCaster->IsPlayer() && unitCaster->isMoving() && m_spellInfo->InterruptFlags & SPELL_INTERRUPT_FLAG_MOVEMENT && !IsTriggered()
+        && !unitCaster->HasAuraTypeWithAffectMask(SPELL_AURA_CAST_WHILE_WALKING, m_spellInfo))
     {
         // 1. Has casttime, 2. Or doesn't have flag to allow action during channel
         if (m_casttime || !m_spellInfo->IsActionAllowedChannel())
@@ -4438,6 +4443,10 @@ void Spell::_handle_finish_phase()
             unitCaster->AddComboPoints(m_comboTarget, m_comboPointGain);
         }
 
+        // Holy power spells consume every remaining charge once the cast is done
+        if (m_spellInfo->PowerType == POWER_HOLY_POWER && unitCaster->IsPlayer() && unitCaster->IsClass(CLASS_PALADIN))
+            HandleHolyPower(unitCaster->ToPlayer());
+
         if (m_spellInfo->HasEffect(SPELL_EFFECT_ADD_EXTRA_ATTACKS))
         {
             unitCaster->SetLastExtraAttackSpell(m_spellInfo->Id);
@@ -4567,7 +4576,8 @@ void Spell::update(uint32 difftime)
     // xinef: added preparing state (real cast, skip channels as they have other flags for this)
     if ((unitCaster && unitCaster->IsPlayer() && m_timer != 0) &&
             unitCaster->isMoving() && (m_spellInfo->InterruptFlags & SPELL_INTERRUPT_FLAG_MOVEMENT) && m_spellState == SPELL_STATE_PREPARING &&
-            (m_spellInfo->Effects[0].Effect != SPELL_EFFECT_STUCK || !unitCaster->HasUnitMovementFlag(MOVEMENTFLAG_FALLING_FAR)))
+            (m_spellInfo->Effects[0].Effect != SPELL_EFFECT_STUCK || !unitCaster->HasUnitMovementFlag(MOVEMENTFLAG_FALLING_FAR)) &&
+            !unitCaster->HasAuraTypeWithAffectMask(SPELL_AURA_CAST_WHILE_WALKING, m_spellInfo))
     {
         // don't cancel for melee, autorepeat, triggered and instant spells
         if (!IsNextMeleeSwingSpell() && !IsAutoRepeat() && !IsTriggered())
@@ -5567,6 +5577,31 @@ void Spell::TakePower()
     }
 }
 
+// Ported from the pinned TrinityCore-Cata Spell::HandleHolyPower. TakePower already took the base
+// cost (1); scripts scale on GetPower(POWER_HOLY_POWER) + 1 while the effects launch, and the rest
+// is spent here unless the target dodged, parried or was immune.
+void Spell::HandleHolyPower(Player* caster)
+{
+    if (!caster || m_CastItem || m_triggeredByAuraSpell || caster->GetCommandStatus(CHEAT_POWER))
+        return;
+
+    int32 extraCost = int32(caster->GetPower(POWER_HOLY_POWER));
+    Player* modOwner = caster->GetSpellModOwner();
+    if (!extraCost || !modOwner)
+        return;
+
+    if (ObjectGuid targetGUID = m_targets.GetUnitTargetGUID())
+        for (TargetInfo const& targetInfo : m_UniqueTargetInfo)
+            if (targetInfo.targetGUID == targetGUID && targetInfo.missCondition != SPELL_MISS_NONE
+                && targetInfo.missCondition != SPELL_MISS_MISS)
+                return;
+
+    // Divine Purpose and similar cost modifiers also cover the extra charges
+    modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_COST, extraCost, this);
+    if (extraCost > 0)
+        caster->ModifyPower(POWER_HOLY_POWER, -extraCost);
+}
+
 void Spell::TakeAmmo()
 {
     // Cataclysm removed ammo, and thrown weapons are no longer used up.
@@ -5699,8 +5734,22 @@ void Spell::TakeRunePower(bool didHit)
 
     // you can gain some runic power when use runes
     if (didHit)
+    {
         if (int32 rp = int32(runeCostData->runePowerGain * sWorld->getRate(RATE_POWER_RUNICPOWER_INCOME)))
-            player->ModifyPower(POWER_RUNIC_POWER, int32(rp));
+        {
+            // SPELL_AURA_MOD_RUNE_REGEN_SPEED: more runic power from runes (Frost Presence)
+            for (AuraEffect const* aurEff : player->GetAuraEffectsByType(SPELL_AURA_MOD_RUNE_REGEN_SPEED))
+            {
+                // Improved Frost Presence: only in Unholy or Blood Presence
+                if (aurEff->GetId() == 63621 && !player->HasAura(48265) && !player->HasAura(48263))
+                    continue;
+
+                AddPct(rp, aurEff->GetAmount());
+            }
+
+            player->ModifyPower(POWER_RUNIC_POWER, rp);
+        }
+    }
 }
 
 void Spell::TakeReagents()
@@ -6666,6 +6715,52 @@ SpellCastResult Spell::CheckCast(bool strict, uint32* /*param1*/, uint32* /*para
                     Unit* unitCaster = m_caster->ToUnit();
                     if (!unitCaster)
                         return SPELL_FAILED_BAD_TARGETS;
+
+                    // 4.3.4 Call Pet 1-5: no creature entry, BasePoints is the active slot whose pet is called (CPP)
+                    int32 hunterPetSlot = m_spellInfo->Effects[i].BasePoints;
+                    if (!m_spellInfo->Effects[i].MiscValue && hunterPetSlot >= PET_SLOT_FIRST_ACTIVE_SLOT
+                        && hunterPetSlot <= PET_SLOT_LAST_ACTIVE_SLOT)
+                    {
+                        Player* playerCaster = unitCaster->ToPlayer();
+                        if (!playerCaster)
+                            return SPELL_FAILED_BAD_TARGETS;
+
+                        if (playerCaster->GetCharmGUID())
+                            return SPELL_FAILED_ALREADY_HAVE_CHARM;
+
+                        PetStable const* petStable = playerCaster->GetPetStable();
+                        PetStable::PetInfo const* petInfo =
+                            petStable ? petStable->GetActivePet(uint8(hunterPetSlot)) : nullptr;
+                        if (!petInfo)
+                        {
+                            playerCaster->SendTameFailure(PET_TAME_NOPET_AVAILABLE);
+                            return SPELL_FAILED_DONT_REPORT;
+                        }
+
+                        // another slot's pet may be out: it is sent back (CPP lets a player replace the summon)
+                        if (Pet* pet = playerCaster->GetPet())
+                            if (pet->GetCharmInfo()->GetPetNumber() == petInfo->PetNumber)
+                                return SPELL_FAILED_ALREADY_HAVE_SUMMON;
+
+                        if (!petInfo->Health)
+                        {
+                            playerCaster->SendTameFailure(PET_TAME_DEAD);
+                            return SPELL_FAILED_DONT_REPORT;
+                        }
+
+                        CreatureTemplate const* creatureInfo = sObjectMgr->GetCreatureTemplate(petInfo->CreatureId);
+                        if (!creatureInfo || !creatureInfo->IsTameable(playerCaster->CanTameExoticPets()))
+                        {
+                            if (creatureInfo && creatureInfo->IsTameable(true))
+                                playerCaster->SendTameFailure(PET_TAME_CANT_CONTROL_EXOTIC);
+                            else
+                                playerCaster->SendTameFailure(PET_TAME_NOPET_AVAILABLE);
+
+                            return SPELL_FAILED_DONT_REPORT;
+                        }
+
+                        break;
+                    }
 
                     if (!m_spellInfo->HasAttribute(SPELL_ATTR1_DISMISS_PET_FIRST))
                     {

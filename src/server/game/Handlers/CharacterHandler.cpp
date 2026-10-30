@@ -415,6 +415,39 @@ void WorldSession::HandleCharEnumOpcode(WorldPackets::Character::EnumCharacters&
 
 // Character-creation dice button: a whole name from NameGen.dbc for the chosen race and sex
 // (pinned TrinityCore HandleRandomizeCharNameOpcode).
+// Cataclysm character screen drag-and-drop order, stored in characters.order and sent back as the
+// list position in SMSG_CHAR_ENUM. Ported from The Cataclysm Preservation Project; only this
+// account's characters are updated.
+void WorldSession::HandleReorderCharacters(WorldPacket& recvData)
+{
+    uint32 const charactersCount = std::min<uint32>(recvData.ReadBits(10), sWorld->getIntConfig(CONFIG_CHARACTERS_PER_REALM));
+
+    std::vector<ObjectGuid> guids(charactersCount);
+    for (ObjectGuid& guid : guids)
+        for (uint8 index : { 1, 4, 5, 3, 0, 7, 6, 2 })
+            guid[index] = recvData.ReadBit();
+
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+    for (ObjectGuid& guid : guids)
+    {
+        for (uint8 index : { 6, 5, 1, 4, 0, 3 })
+            recvData.ReadByteSeq(guid[index]);
+
+        uint8 position;
+        recvData >> position;
+
+        recvData.ReadByteSeq(guid[2]);
+        recvData.ReadByteSeq(guid[7]);
+
+        CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_LIST_ORDER);
+        stmt->SetData(0, position);
+        stmt->SetData(1, guid.GetCounter());
+        stmt->SetData(2, GetAccountId());
+        trans->Append(stmt);
+    }
+    CharacterDatabase.CommitTransaction(trans);
+}
+
 void WorldSession::HandleRandomizeCharNameOpcode(WorldPackets::Character::GenerateRandomCharacterName& packet)
 {
     if (!sChrRacesStore.LookupEntry(packet.Race) || !Player::IsValidGender(packet.Sex))
@@ -1300,6 +1333,10 @@ void WorldSession::HandlePlayerLoginFromDB(LoginQueryHolder const& holder)
 
     // Load pet if any (if player not alive and in taxi flight or another then pet will remember as temporary unsummoned)
     pCurrChar->LoadPet();
+
+    // 4.3.4: the client fills the Call Pet flyout from the hunter's pet list (CPP sends it at login)
+    if (pCurrChar->IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))
+        SendStablePet(ObjectGuid::Empty);
 
     if (pCurrChar->GetSession()->GetRecruiterId() != 0 || pCurrChar->GetSession()->IsARecruiter())
     {

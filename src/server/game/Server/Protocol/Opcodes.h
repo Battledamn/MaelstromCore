@@ -411,6 +411,7 @@ enum OpcodeClient : uint16
     CMSG_CANCEL_AUTO_REPEAT_SPELL                   = 0x6C35,
     MSG_GM_ACCOUNT_ONLINE                           = 0x26E,
     MSG_LIST_STABLED_PETS                           = 0x0834,
+    CMSG_SET_PET_SLOT                               = 0x3A04,
     CMSG_STABLE_PET                                 = 0x270,
     CMSG_UNSTABLE_PET                               = 0x271,
     CMSG_BUY_STABLE_SLOT                            = 0x272,
@@ -773,6 +774,7 @@ enum OpcodeClient : uint16
     CMSG_LOADING_SCREEN_NOTIFY                      = 0x2422,
     CMSG_VIOLENCE_LEVEL                             = 0x7816,
     CMSG_GENERATE_RANDOM_CHARACTER_NAME             = 0x2413,
+    CMSG_REORDER_CHARACTERS                         = 0x0593,
     CMSG_AUTH_CONTINUED_SESSION                     = 0x044D,
     CMSG_CONNECT_TO_FAILED                          = 0x2533,
 };
@@ -1056,6 +1058,7 @@ enum OpcodeServer : uint16
     SMSG_SET_PCT_SPELL_MODIFIER                     = 0x0224,
     SMSG_CORPSE_RECLAIM_DELAY                       = 0x0D34,
     SMSG_STABLE_RESULT                              = 0x2204,
+    SMSG_PET_SLOT_UPDATED                           = 0x51A3,
     SMSG_PLAY_MUSIC                                 = 0x4B06,
     SMSG_PLAY_OBJECT_SOUND                          = 0x2635,
     SMSG_SPELLDISPELLOG                             = 0x4516,

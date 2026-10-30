@@ -161,13 +161,6 @@ enum PaladinProcSpells
     SPELL_PALADIN_T8_HOLY_4P_BONUS               = 64895
 };
 
-static bool IsJudgementDamageSpell(SpellInfo const* spellInfo)
-{
-    return spellInfo &&
-        spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN &&
-        (spellInfo->SpellFamilyFlags[0] & 0x800000);
-}
-
 static bool HasJudgementsOfTheJust(Unit const* caster)
 {
     return caster && caster->GetAuraEffect(
@@ -948,76 +941,106 @@ class spell_pal_holy_shock : public SpellScript
     }
 };
 
-// 53407 - Judgement of Justice
-// 20271 - Judgement of Light
-// 53408 - Judgement of Wisdom
+enum PaladinCataSpells
+{
+    SPELL_PALADIN_CENSURE                               = 31803,
+    SPELL_PALADIN_DIVINE_PURPOSE_PROC                   = 90174,
+    SPELL_PALADIN_ETERNAL_GLORY_PROC                    = 88676,
+    SPELL_PALADIN_ITEM_T11_RETRIBUTION_4P_BONUS         = 90299,
+    SPELL_PALADIN_JUDGEMENT_DEFAULT                     = 54158,
+    SPELL_PALADIN_JUDGEMENT_OF_RIGHTEOUSNESS            = 20187,
+    SPELL_PALADIN_JUDGEMENT_OF_TRUTH                    = 31804,
+    SPELL_PALADIN_LONG_ARM_OF_THE_LAW                   = 87173,
+    SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE          = 25742,
+    SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE_AOE      = 101423,
+    SPELL_PALADIN_TWO_HANDED_WEAPON_SPECIALIZATION      = 20113
+};
+
+enum PaladinCataSpellIcons
+{
+    PALADIN_ICON_ID_ETERNAL_GLORY                       = 2944,
+    PALADIN_ICON_ID_GLYPH_OF_THE_LONG_WORD              = 4127,
+    PALADIN_ICON_ID_GUARDED_BY_THE_LIGHT                = 3026,
+    PALADIN_ICON_ID_LONG_ARM_OF_THE_LAW                 = 3013,
+    PALADIN_ICON_ID_SEALS_OF_COMMAND                    = 561,
+    PALADIN_ICON_ID_SELFLESS_HEALER                     = 3924
+};
+
+// 20271 - Judgement
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46). In 4.3.4 effect 0 is a
+// dummy: the damage spell comes from the active seal's effect 2 (Judgement of Righteousness for Seal of
+// Righteousness, Judgement of Truth for Seal of Truth, the default Judgement otherwise).
 class spell_pal_judgement : public SpellScript
 {
     PrepareSpellScript(spell_pal_judgement);
 
-public:
-    spell_pal_judgement(uint32 spellId) : SpellScript(), _spellId(spellId) { }
-
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_PALADIN_JUDGEMENT_DAMAGE, _spellId });
+        return ValidateSpellInfo(
+            {
+                SPELL_PALADIN_JUDGEMENT_DEFAULT,
+                SPELL_PALADIN_JUDGEMENT_OF_TRUTH,
+                SPELL_PALADIN_JUDGEMENT_OF_RIGHTEOUSNESS,
+                SPELL_PALADIN_CENSURE,
+                SPELL_PALADIN_TWO_HANDED_WEAPON_SPECIALIZATION,
+                SPELL_PALADIN_LONG_ARM_OF_THE_LAW
+            });
     }
 
-    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
+    void HandleDummy(SpellEffIndex /*effIndex*/)
     {
-        uint32 spellId2 = SPELL_PALADIN_JUDGEMENT_DAMAGE;
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+        if (!target)
+            return;
 
-        // some seals have SPELL_AURA_DUMMY in EFFECT_2
-        Unit::AuraEffectList const& auras = GetCaster()->GetAuraEffectsByType(SPELL_AURA_DUMMY);
-        for (Unit::AuraEffectList::const_iterator i = auras.begin(); i != auras.end(); ++i)
+        uint32 spellId = SPELL_PALADIN_JUDGEMENT_DEFAULT;
+        float ap = caster->GetTotalAttackPowerValue(BASE_ATTACK);
+        int32 holy = caster->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY);
+
+        // Some seals have a dummy aura effect which contains the spell id of the judgement damage spell
+        for (AuraEffect const* aurEff : caster->GetAuraEffectsByType(SPELL_AURA_DUMMY))
         {
-            if ((*i)->GetSpellInfo()->GetSpellSpecific() == SPELL_SPECIFIC_SEAL && (*i)->GetEffIndex() == EFFECT_2)
-                if (sSpellMgr->GetSpellInfo((*i)->GetAmount()))
-                {
-                    spellId2 = (*i)->GetAmount();
-                    break;
-                }
+            if (aurEff->GetSpellInfo()->GetSpellSpecific() != SPELL_SPECIFIC_SEAL || aurEff->GetEffIndex() != EFFECT_2)
+                continue;
+
+            spellId = aurEff->GetAmount();
         }
 
-        GetCaster()->CastSpell(GetHitUnit(), _spellId, true);
-        GetCaster()->CastSpell(GetHitUnit(), spellId2, true);
-
-        // Tier 5 Holy - 2 Set
-        if (GetCaster()->HasAura(SPELL_IMPROVED_JUDGEMENT))
+        int32 bp = 0;
+        switch (spellId)
         {
-            GetCaster()->CastSpell(GetCaster(), SPELL_IMPROVED_JUDGEMENT_ENERGIZE, true);
+            case SPELL_PALADIN_JUDGEMENT_OF_TRUTH:
+                bp = int32(1 + (0.223f * holy + 0.142f * ap));
+                if (Aura const* censure = target->GetAura(SPELL_PALADIN_CENSURE, caster->GetGUID()))
+                    AddPct(bp, censure->GetStackAmount() * 20.f);
+                break;
+            case SPELL_PALADIN_JUDGEMENT_OF_RIGHTEOUSNESS:
+                bp = int32(1 + (0.2f * ap + 0.32f * holy));
+                break;
+            case SPELL_PALADIN_JUDGEMENT_DEFAULT:
+                bp = int32(1 + (0.25f * holy + ap * 0.16f));
+                break;
+            default:
+                break;
         }
 
-        // Judgements of the Just
-        if (HasJudgementsOfTheJust(GetCaster()))
-        {
-            GetCaster()->CastSpell(GetHitUnit(), SPELL_JUDGEMENTS_OF_THE_JUST, true);
+        // Judgement benefits from Two-Handed Weapon Specialization (logs and community research, per CPP)
+        if (AuraEffect const* twoHandedSpec = caster->GetAuraEffect(SPELL_PALADIN_TWO_HANDED_WEAPON_SPECIALIZATION, EFFECT_0))
+            AddPct(bp, twoHandedSpec->GetAmount());
 
-            // JotJ makes Judgements trigger Seal of Command's
-            // cleave effect
-            if (AuraEffect const* socEff =
-                GetCaster()->GetAuraEffect(
-                    SPELL_PALADIN_SEAL_OF_COMMAND, EFFECT_0))
-            {
-                if (GetHitUnit()->IsAlive())
-                {
-                    GetCaster()->CastCustomSpell(
-                        socEff->GetSpellInfo()->Effects[EFFECT_0]
-                            .TriggerSpell,
-                        SPELLVALUE_MAX_TARGETS, 3,
-                        GetHitUnit(), true, nullptr, socEff);
-                }
-            }
-        }
+        caster->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, bp, target, true);
+
+        // Long Arm of the Law
+        if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_LONG_ARM_OF_THE_LAW, EFFECT_0))
+            if (roll_chance_i(aurEff->GetAmount()) && caster->GetExactDist2d(target) > 15.f)
+                caster->CastSpell(caster, SPELL_PALADIN_LONG_ARM_OF_THE_LAW, true);
     }
 
     void Register() override
     {
-        OnEffectHitTarget += SpellEffectFn(spell_pal_judgement::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_judgement::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
     }
-
-private:
-    uint32 const _spellId;
 };
 
 // 20425 - Judgement of Command
@@ -1174,62 +1197,37 @@ class spell_pal_righteous_defense : public SpellScript
     }
 };
 
-// 20154, 21084 - Seal of Righteousness - melee proc dummy (addition ${$MWS*(0.022*$AP+0.044*$SPH)} damage)
+// 20154 - Seal of Righteousness - melee proc dummy (addition ${$MWS*(0.011*$AP+0.022*$SPH)} damage)
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46, updated for 4.3.4).
 class spell_pal_seal_of_righteousness : public AuraScript
 {
     PrepareAuraScript(spell_pal_seal_of_righteousness);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS });
+        return ValidateSpellInfo({ SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE, SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE_AOE });
     }
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
-        Unit* target = eventInfo.GetProcTarget();
-        if (!target)
-            return false;
-
-        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
-
-        if (!damageInfo || !damageInfo->GetDamage())
-            return false;
-
-        if (IsJudgementDamageSpell(eventInfo.GetSpellInfo()))
-            return target->IsAlive();
-
-        return target->IsAlive() && !eventInfo.GetTriggerAuraSpell() &&
-            (damageInfo->GetDamage() ||
-            (eventInfo.GetHitMask() & PROC_EX_ABSORB));
+        return eventInfo.GetProcTarget() != nullptr;
     }
 
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
     {
         PreventDefaultAction();
+        Unit* target = GetTarget();
 
-        float ap = GetTarget()->GetTotalAttackPowerValue(BASE_ATTACK);
-        int32 holy = GetTarget()->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY);
-        holy += eventInfo.GetProcTarget()->SpellBaseDamageBonusTaken(SPELL_SCHOOL_MASK_HOLY);
+        float ap = target->GetTotalAttackPowerValue(BASE_ATTACK);
+        int32 holy = target->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY);
+        // GetAttackTime is the unhasted weapon speed (CPP: GetBaseAttackTime)
+        int32 bp = int32((ap * 0.011f + 0.022f * holy) * target->GetAttackTime(BASE_ATTACK) / 1000);
 
-        // Xinef: Libram of Divine Purpose
-        if (AuraEffect* aurEffPaladin = GetTarget()->GetDummyAuraEffect(SPELLFAMILY_PALADIN, 2025, EFFECT_0))
-        {
-            holy += aurEffPaladin->GetAmount();
-        }
-
-        int32 bp = std::max<int32>(0, int32((ap * 0.022f + 0.044f * holy) * GetTarget()->GetAttackTime(BASE_ATTACK) / 1000));
-        GetTarget()->CastCustomSpell(SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS, SPELLVALUE_BASE_POINT0, bp, eventInfo.GetProcTarget(), true, nullptr, aurEff);
-
-        // Judgements of the Just: Seal of Righteousness procs
-        // twice from Judgements
-        if (IsJudgementDamageSpell(eventInfo.GetSpellInfo()) &&
-            HasJudgementsOfTheJust(GetTarget()))
-        {
-            GetTarget()->CastCustomSpell(
-                SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS,
-                SPELLVALUE_BASE_POINT0, bp,
-                eventInfo.GetProcTarget(), true, nullptr, aurEff);
-        }
+        // Seals of Command: the proc hits up to three nearby enemies
+        if (target->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_SEALS_OF_COMMAND, EFFECT_1))
+            target->CastCustomSpell(SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE_AOE, SPELLVALUE_BASE_POINT0, bp, target, true, nullptr, aurEff);
+        else
+            target->CastCustomSpell(SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE, SPELLVALUE_BASE_POINT0, bp, eventInfo.GetProcTarget(), true, nullptr, aurEff);
     }
 
     void Register() override
@@ -2275,6 +2273,230 @@ class spell_pal_light_s_beacon : public AuraScript
     }
 };
 
+enum PaladinExorcism
+{
+    PALADIN_ICON_ID_GLYPH_OF_EXORCISM = 292
+};
+
+// 879 - Exorcism
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): the damage gains 34.4%
+// of the higher of attack power and holy spell power, and the damage over time (effect 1) only comes
+// with the Glyph of Exorcism, ticking for 6.88% of the hit.
+class spell_pal_exorcism : public SpellScript
+{
+    PrepareSpellScript(spell_pal_exorcism);
+
+    void HandleDamage(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        int32 bonus = int32(std::max<float>(caster->GetTotalAttackPowerValue(BASE_ATTACK),
+            float(caster->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY))) * 0.344f);
+        SetEffectValue(GetEffectValue() + bonus);
+    }
+
+    void HandleGlyph(SpellEffIndex effIndex)
+    {
+        if (GetCaster()->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_GLYPH_OF_EXORCISM, EFFECT_0))
+            return;
+
+        PreventHitDefaultEffect(effIndex);
+        PreventHitAura();
+    }
+
+    void ApplyDotBonus()
+    {
+        Unit* target = GetHitUnit();
+        if (!target)
+            return;
+
+        if (AuraEffect* exorcismAuraEff = target->GetAuraEffect(GetSpellInfo()->Id, EFFECT_1, GetCaster()->GetGUID()))
+            exorcismAuraEff->ChangeAmount(int32(GetHitDamage() * 0.0688f));
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_pal_exorcism::HandleDamage, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_exorcism::HandleGlyph, EFFECT_1, SPELL_EFFECT_APPLY_AURA);
+        AfterHit += SpellHitFn(spell_pal_exorcism::ApplyDotBonus);
+    }
+};
+
+// Holy power spenders. Spell::TakePower takes the base cost of one charge before the effects launch and
+// Spell::HandleHolyPower spends the rest once the cast is done, so GetPower(POWER_HOLY_POWER) + 1 is
+// the number of charges a spender consumes (pinned TrinityCore-Cata / CPP).
+static uint8 GetHolyPowerSpent(Unit const* caster)
+{
+    if (caster->HasAura(SPELL_PALADIN_DIVINE_PURPOSE_PROC))
+        return 3;
+
+    return uint8(std::min<uint32>(caster->GetPower(POWER_HOLY_POWER) + 1, 3));
+}
+
+// 85673 - Word of Glory
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46).
+class spell_pal_word_of_glory : public SpellScript
+{
+    PrepareSpellScript(spell_pal_word_of_glory);
+
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer() && GetCaster()->getClass() == CLASS_PALADIN;
+    }
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_DIVINE_PURPOSE_PROC, SPELL_PALADIN_ETERNAL_GLORY_PROC });
+    }
+
+    void HandleHeal(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+        if (!target)
+            return;
+
+        int32 heal = int32(GetEffectValue() + caster->GetTotalAttackPowerValue(BASE_ATTACK) * 0.198f);
+        heal *= GetHolyPowerSpent(caster);
+
+        if (caster != target)
+        {
+            if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_SELFLESS_HEALER, EFFECT_0))
+                AddPct(heal, aurEff->GetAmount());
+        }
+        else if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_GUARDED_BY_THE_LIGHT, EFFECT_0))
+            AddPct(heal, aurEff->GetAmount());
+
+        SetEffectValue(heal);
+    }
+
+    // The heal over time (effect 1) only comes with the Glyph of Long Word
+    void HandleHotAura(SpellEffIndex effIndex)
+    {
+        if (GetCaster()->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_GLYPH_OF_THE_LONG_WORD, EFFECT_1))
+            return;
+
+        PreventHitDefaultEffect(effIndex);
+        PreventHitAura();
+    }
+
+    void HandleEternalGlory()
+    {
+        Unit* caster = GetCaster();
+        if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_ETERNAL_GLORY, EFFECT_0))
+        {
+            if (roll_chance_i(aurEff->GetAmount()))
+            {
+                int32 powerCost = 1 + GetSpell()->GetPowerCost();
+                caster->CastCustomSpell(SPELL_PALADIN_ETERNAL_GLORY_PROC, SPELLVALUE_BASE_POINT0, powerCost, caster, true, nullptr, aurEff);
+            }
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pal_word_of_glory::HandleHeal, EFFECT_0, SPELL_EFFECT_HEAL);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_word_of_glory::HandleHotAura, EFFECT_1, SPELL_EFFECT_APPLY_AURA);
+        AfterCast += SpellCastFn(spell_pal_word_of_glory::HandleEternalGlory);
+    }
+};
+
+class spell_pal_word_of_glory_aura : public AuraScript
+{
+    PrepareAuraScript(spell_pal_word_of_glory_aura);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_DIVINE_PURPOSE_PROC });
+    }
+
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
+    {
+        Unit* caster = GetCaster();
+        if (!caster)
+            return;
+
+        amount *= GetHolyPowerSpent(caster);
+
+        if (caster != GetUnitOwner())
+            if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_SELFLESS_HEALER, EFFECT_0))
+                AddPct(amount, aurEff->GetAmount());
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pal_word_of_glory_aura::CalculateAmount, EFFECT_1, SPELL_AURA_PERIODIC_HEAL);
+    }
+};
+
+// 85256 - Templar's Verdict
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): 30% weapon damage
+// for one charge, 90% for two (x3) and 235% for three (x7.83).
+class spell_pal_templar_s_verdict : public SpellScript
+{
+    PrepareSpellScript(spell_pal_templar_s_verdict);
+
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer() && GetCaster()->getClass() == CLASS_PALADIN;
+    }
+
+    void HandleDamageBonus(SpellEffIndex /*effIndex*/)
+    {
+        float damageMod = 1.f;
+
+        if (GetCaster()->HasAura(SPELL_PALADIN_DIVINE_PURPOSE_PROC))
+            damageMod = 7.83334f; // 235%
+        else
+        {
+            uint32 holyPower = GetCaster()->GetPower(POWER_HOLY_POWER);
+            if (holyPower >= 1)
+                damageMod = holyPower > 1 ? 7.83334f : 3.f;
+        }
+
+        SetEffectValue(int32(GetEffectValue() * damageMod));
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_pal_templar_s_verdict::HandleDamageBonus, EFFECT_0, SPELL_EFFECT_WEAPON_PERCENT_DAMAGE);
+    }
+};
+
+// 84963 - Inquisition
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): the duration grows
+// with every holy power charge spent.
+class spell_pal_inquisition : public SpellScript
+{
+    PrepareSpellScript(spell_pal_inquisition);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_DIVINE_PURPOSE_PROC, SPELL_PALADIN_ITEM_T11_RETRIBUTION_4P_BONUS });
+    }
+
+    void ChangeDuration()
+    {
+        Unit* caster = GetCaster();
+        if (Aura* aura = caster->GetAura(GetSpellInfo()->Id))
+        {
+            uint32 power = caster->HasAura(SPELL_PALADIN_DIVINE_PURPOSE_PROC) ? 2 : caster->GetPower(POWER_HOLY_POWER);
+
+            // T11 bonus
+            if (caster->GetAuraEffect(SPELL_PALADIN_ITEM_T11_RETRIBUTION_4P_BONUS, EFFECT_0, caster->GetGUID()))
+                power = std::min<uint32>(caster->GetPower(POWER_HOLY_POWER) + 1, caster->GetMaxPower(POWER_HOLY_POWER));
+
+            int32 duration = aura->GetDuration();
+            duration += duration * int32(power);
+            aura->SetDuration(duration);
+        }
+    }
+
+    void Register() override
+    {
+        AfterHit += SpellHitFn(spell_pal_inquisition::ChangeDuration);
+    }
+};
+
 void AddSC_paladin_spell_scripts()
 {
     RegisterSpellAndAuraScriptPair(spell_pal_seal_of_command, spell_pal_seal_of_command_aura);
@@ -2301,13 +2523,15 @@ void AddSC_paladin_spell_scripts()
     RegisterSpellScript(spell_pal_holy_shock);
     RegisterSpellScript(spell_pal_infusion_of_light);
     RegisterSpellScript(spell_pal_item_t6_trinket);
-    RegisterSpellScriptWithArgs(spell_pal_judgement, "spell_pal_judgement_of_justice", SPELL_PALADIN_JUDGEMENT_OF_JUSTICE);
-    RegisterSpellScriptWithArgs(spell_pal_judgement, "spell_pal_judgement_of_light", SPELL_PALADIN_JUDGEMENT_OF_LIGHT);
-    RegisterSpellScriptWithArgs(spell_pal_judgement, "spell_pal_judgement_of_wisdom", SPELL_PALADIN_JUDGEMENT_OF_WISDOM);
+    RegisterSpellScript(spell_pal_judgement);
     RegisterSpellScript(spell_pal_judgement_of_command);
     RegisterSpellScript(spell_pal_lay_on_hands);
     RegisterSpellScript(spell_pal_righteous_defense);
     RegisterSpellScript(spell_pal_seal_of_righteousness);
+    RegisterSpellAndAuraScriptPair(spell_pal_word_of_glory, spell_pal_word_of_glory_aura);
+    RegisterSpellScript(spell_pal_templar_s_verdict);
+    RegisterSpellScript(spell_pal_inquisition);
+    RegisterSpellScript(spell_pal_exorcism);
     RegisterSpellScriptWithArgs(spell_pal_seal_of_vengeance_aura, "spell_pal_seal_of_vengeance");
     RegisterSpellScriptWithArgs(spell_pal_seal_of_vengeance_aura, "spell_pal_seal_of_corruption");
     RegisterSpellScript(spell_pal_hand_of_protection);

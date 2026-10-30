@@ -18,7 +18,8 @@
 #include "IntegrationTestFixture.h"
 #include "gtest/gtest.h"
 
-// Haste must shorten the swing interval but never the per-swing rage reward.
+// Haste must shorten the swing interval but never the per-swing rage reward. Cataclysm rage per
+// swing comes from the unhasted weapon speed: 6.5 per second (unarmed 2.0 s = 13 rage = 130 units).
 TEST_F(IntegrationTestFixture, HasteChangesIntervalNotRage)
 {
     TestPlayer* player = CreateTestPlayer(1, "RageTest", SEC_PLAYER);
@@ -28,20 +29,16 @@ TEST_F(IntegrationTestFixture, HasteChangesIntervalNotRage)
     player->SetMaxPower(POWER_RAGE, 10000);
     player->SetAttackTime(BASE_ATTACK, 2000);
 
+    uint32 const rageNoHaste = Unit::CalcMeleeAttackRageGain(player, BASE_ATTACK);
+    EXPECT_EQ(rageNoHaste, 130u);
+
     uint32 const before = player->GetPower(POWER_RAGE);
-    player->RewardRage(1000, player->GetRageWeaponSpeedHitFactor(BASE_ATTACK), true);
-    uint32 const rageNoHaste = player->GetPower(POWER_RAGE) - before;
-    EXPECT_GT(rageNoHaste, 0u); // rage was granted
+    player->RewardRage(rageNoHaste, true);
+    EXPECT_EQ(player->GetPower(POWER_RAGE) - before, rageNoHaste); // rage was granted
 
     player->ApplyAttackTimePercentMod(BASE_ATTACK, 50.0f, true); // 50% haste
 
-    EXPECT_EQ(player->GetRageWeaponSpeedHitFactor(BASE_ATTACK), 7u); // 2000/1000 * 3.5
-
-    uint32 const beforeHasted = player->GetPower(POWER_RAGE);
-    player->RewardRage(1000, player->GetRageWeaponSpeedHitFactor(BASE_ATTACK), true);
-    uint32 const rageHasted = player->GetPower(POWER_RAGE) - beforeHasted;
-
-    EXPECT_EQ(rageHasted, rageNoHaste); // per-swing rage unaffected by haste
+    EXPECT_EQ(Unit::CalcMeleeAttackRageGain(player, BASE_ATTACK), rageNoHaste); // per-swing rage unaffected
 
     player->resetAttackTimer(BASE_ATTACK);
     EXPECT_EQ(player->getAttackTimer(BASE_ATTACK), 1333); // 2000 / 1.5 (50% haste)

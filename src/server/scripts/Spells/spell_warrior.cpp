@@ -560,7 +560,7 @@ class spell_warr_intimidating_shout : public SpellScript
     }
 };
 
-// -772 - Rend
+// 94009 - Rend (Cataclysm: 772 triggers this bleed)
 class spell_warr_rend : public AuraScript
 {
     PrepareAuraScript(spell_warr_rend);
@@ -571,9 +571,15 @@ class spell_warr_rend : public AuraScript
         {
             canBeRecalculated = false;
 
-            // $0.2 * (($MWB + $mwb) / 2 + $AP / 14 * $MWS) bonus per tick
+            // $0.25 * (($MWB + $mwb) / 2 + $AP / 14 * $MWS) bonus per tick, unhasted weapon speed
+            // (ported from The Cataclysm Preservation Project's spell_warr_rend).
             float ap = caster->GetTotalAttackPowerValue(BASE_ATTACK);
             int32 mws = caster->GetAttackTime(BASE_ATTACK);
+            if (Player* player = caster->ToPlayer())
+            {
+                Item const* weapon = player->GetWeaponForAttack(BASE_ATTACK, true);
+                mws = weapon ? weapon->GetTemplate()->Delay : BASE_ATTACK_TIME;
+            }
             float mwbMin = 0.f;
             float mwbMax = 0.f;
             for (uint8 i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
@@ -582,16 +588,8 @@ class spell_warr_rend : public AuraScript
                 mwbMax += caster->GetWeaponDamageRange(BASE_ATTACK, MAXDAMAGE, i);
             }
 
-            float mwb = ((mwbMin + mwbMax) / 2 + ap * mws / 14000) * 0.2f;
+            float mwb = ((mwbMin + mwbMax) / 2 + ap * mws / 14000) * 0.25f;
             amount += int32(caster->ApplyEffectModifiers(GetSpellInfo(), aurEff->GetEffIndex(), mwb));
-
-            // "If used while your target is above 75% health, Rend does 35% more damage."
-            // as for 3.1.3 only ranks above 9 (wrong tooltip?)
-            if (GetSpellInfo()->GetRank() >= 9)
-            {
-                if (GetUnitOwner()->HasAuraState(AURA_STATE_HEALTH_ABOVE_75_PERCENT, GetSpellInfo(), caster))
-                    AddPct(amount, GetSpellInfo()->Effects[EFFECT_2].CalcValue(caster));
-            }
         }
     }
 

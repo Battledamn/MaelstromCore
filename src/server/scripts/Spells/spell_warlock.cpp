@@ -597,75 +597,51 @@ class spell_warl_demonic_empowerment : public SpellScript
     }
 };
 
-// 6201 - Create Healthstone (and ranks)
+// 6201 - Create Healthstone
+// Cataclysm: one Healthstone (5512), created by 34130; no soul shard cost. Ported from The Cataclysm
+// Preservation Project.
 class spell_warl_create_healthstone : public SpellScript
 {
     PrepareSpellScript(spell_warl_create_healthstone);
 
-    static uint32 const iTypes[8][3];
+    static constexpr uint32 SPELL_WARLOCK_CREATE_HEALTHSTONE_ITEM = 34130;
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_WARLOCK_IMPROVED_HEALTHSTONE_R1, SPELL_WARLOCK_IMPROVED_HEALTHSTONE_R2 });
+        return ValidateSpellInfo({ SPELL_WARLOCK_CREATE_HEALTHSTONE_ITEM });
     }
 
-    SpellCastResult CheckCast()
+    bool Load() override
     {
-        if (Player* caster = GetCaster()->ToPlayer())
-        {
-            uint8 spellRank = GetSpellInfo()->GetRank();
-            ItemPosCountVec dest;
-            InventoryResult msg = caster->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, iTypes[spellRank - 1][0], 1, nullptr);
-            if (msg != EQUIP_ERR_OK)
-                return SPELL_FAILED_TOO_MANY_OF_ITEM;
-        }
-        return SPELL_CAST_OK;
+        return GetCaster()->IsPlayer();
     }
 
-    void HandleScriptEffect(SpellEffIndex effIndex)
+    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
     {
-        if (Unit* unitTarget = GetHitUnit())
-        {
-            uint32 rank = 0;
-            // Improved Healthstone
-            if (AuraEffect const* aurEff = unitTarget->GetDummyAuraEffect(SPELLFAMILY_WARLOCK, 284, 0))
-            {
-                switch (aurEff->GetId())
-                {
-                    case SPELL_WARLOCK_IMPROVED_HEALTHSTONE_R1:
-                        rank = 1;
-                        break;
-                    case SPELL_WARLOCK_IMPROVED_HEALTHSTONE_R2:
-                        rank = 2;
-                        break;
-                    default:
-                        LOG_ERROR("spells", "Unknown rank of Improved Healthstone id: {}", aurEff->GetId());
-                        break;
-                }
-            }
-            uint8 spellRank = GetSpellInfo()->GetRank();
-            if (spellRank > 0 && spellRank <= 8)
-                CreateItem(effIndex, iTypes[spellRank - 1][rank]);
-        }
+        GetCaster()->CastSpell(GetCaster(), SPELL_WARLOCK_CREATE_HEALTHSTONE_ITEM, true);
     }
 
     void Register() override
     {
         OnEffectHitTarget += SpellEffectFn(spell_warl_create_healthstone::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
-        OnCheckCast += SpellCheckCastFn(spell_warl_create_healthstone::CheckCast);
     }
 };
 
-uint32 const spell_warl_create_healthstone::spell_warl_create_healthstone::iTypes[8][3] =
+// 6262 - Healthstone: heals a percentage of the user's base health. Ported from The Cataclysm
+// Preservation Project.
+class spell_warl_healthstone_heal : public SpellScript
 {
-    { 5512, 19004, 19005},              // Minor Healthstone
-    { 5511, 19006, 19007},              // Lesser Healthstone
-    { 5509, 19008, 19009},              // Healthstone
-    { 5510, 19010, 19011},              // Greater Healthstone
-    { 9421, 19012, 19013},              // Major Healthstone
-    {22103, 22104, 22105},              // Master Healthstone
-    {36889, 36890, 36891},              // Demonic Healthstone
-    {36892, 36893, 36894}               // Fel Healthstone
+    PrepareSpellScript(spell_warl_healthstone_heal);
+
+    void HandleOnHit()
+    {
+        SetHitHeal(int32(CalculatePct(GetCaster()->GetCreateHealth(), GetHitHeal())));
+    }
+
+    void Register() override
+    {
+        OnHit += SpellHitFn(spell_warl_healthstone_heal::HandleOnHit);
+    }
 };
 
 // 47422 - Everlasting Affliction
@@ -826,11 +802,13 @@ class spell_warl_life_tap : public SpellScript
         Player* caster = GetCaster()->ToPlayer();
         if (Unit* target = GetHitUnit())
         {
-            int32 spellEffect = GetEffectValue();
-            int32 mana = int32(spellEffect + (caster->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_SHADOW) * 0.5f));
+            // Cataclysm: costs effect 2 % (15%) of max health, gives effect 1 % (120%) of that as mana
+            // (ported from The Cataclysm Preservation Project).
+            int32 damage = int32(caster->CountPctFromMaxHealth(GetSpellInfo()->Effects[EFFECT_2].CalcValue()));
+            int32 mana = CalculatePct(damage, GetSpellInfo()->Effects[EFFECT_1].CalcValue());
 
             // Shouldn't Appear in Combat Log
-            target->ModifyHealth(-spellEffect);
+            target->ModifyHealth(-damage);
 
             // Improved Life Tap mod
             if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_WARLOCK, WARLOCK_ICON_ID_IMPROVED_LIFE_TAP, 0))
@@ -853,7 +831,7 @@ class spell_warl_life_tap : public SpellScript
 
     SpellCastResult CheckCast()
     {
-        if ((int32(GetCaster()->GetHealth()) > int32(GetSpellInfo()->Effects[EFFECT_0].CalcValue())))
+        if (int32(GetCaster()->GetHealth()) > int32(GetCaster()->CountPctFromMaxHealth(GetSpellInfo()->Effects[EFFECT_2].CalcValue())))
             return SPELL_CAST_OK;
         return SPELL_FAILED_FIZZLE;
     }
@@ -1172,92 +1150,34 @@ class spell_warl_glyph_of_shadowflame : public AuraScript
     }
 };
 
-// -1120 - Drain Soul
+// 1120 - Drain Soul
 class spell_warl_drain_soul : public AuraScript
 {
     PrepareAuraScript(spell_warl_drain_soul);
 
+    // Cataclysm: a target that dies while drained and gives XP or honor restores one soul shard
+    // (the 3.3.5a shard item is gone). Ported from The Cataclysm Preservation Project.
+    static constexpr uint32 SPELL_WARLOCK_SOUL_SHARD_ENERGIZE = 95810;
+
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo(
-        {
-            SPELL_WARLOCK_IMPROVED_DRAIN_SOUL_R1,
-            SPELL_WARLOCK_IMPROVED_DRAIN_SOUL_PROC,
-            SPELL_WARLOCK_CREATE_SOULSHARD,
-            SPELL_WARLOCK_GLYPH_OF_DRAIN_SOUL_AURA,
-            SPELL_WARLOCK_GLYPH_OF_DRAIN_SOUL_PROC
-        });
+        return ValidateSpellInfo({ SPELL_WARLOCK_SOUL_SHARD_ENERGIZE });
     }
 
-    void RemoveEffect(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
-        Unit* caster = GetCaster();
-        Unit* target = GetTarget();
-        if (!(GetTargetApplication()->GetRemoveMode() == AURA_REMOVE_BY_DEATH && caster && target && caster->IsPlayer() && caster->ToPlayer()->isHonorOrXPTarget(target)))
-        {
-            PreventDefaultAction();
-        }
-    }
+        if (GetTargetApplication()->GetRemoveMode() != AURA_REMOVE_BY_DEATH)
+            return;
 
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        // Drain Soul's proc tries to happen each time the warlock lands a killing blow on a unit while channeling.
-        // Make sure that the dying unit is afflicted by the caster's Drain Soul debuff in order to avoid a false positive.
-
-        Unit* caster = GetCaster();
-        Unit* victim = eventInfo.GetProcTarget();
-
-        if (caster && victim)
-        {
-            return victim->GetAuraApplicationOfRankedSpell(SPELL_WARLOCK_DRAIN_SOUL_R1, caster->GetGUID()) != 0;
-        }
-
-        return false;
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        if (Unit* caster = eventInfo.GetActor())
-        {
-            // Improved Drain Soul.
-            if (Aura const* impDrainSoul = caster->GetAuraOfRankedSpell(SPELL_WARLOCK_IMPROVED_DRAIN_SOUL_R1, caster->GetGUID()))
-            {
-                int32 amount = CalculatePct(caster->GetMaxPower(POWER_MANA), impDrainSoul->GetSpellInfo()->Effects[EFFECT_2].CalcValue());
-                caster->CastCustomSpell(SPELL_WARLOCK_IMPROVED_DRAIN_SOUL_PROC, SPELLVALUE_BASE_POINT0, amount, caster, true, nullptr, aurEff, caster->GetGUID());
-            }
-        }
-    }
-
-    void HandleTick(AuraEffect const* aurEff)
-    {
-        Unit* caster = GetCaster();
-        Unit* target = GetTarget();
-
-        if (caster && caster->IsPlayer() && caster->ToPlayer()->isHonorOrXPTarget(target))
-        {
-            if (roll_chance_i(20))
-            {
-                caster->CastSpell(caster, SPELL_WARLOCK_CREATE_SOULSHARD, aurEff);
-                // Glyph of Drain Soul - chance to create an additional Soul Shard.
-                if (AuraEffect* aur = caster->GetAuraEffect(SPELL_WARLOCK_GLYPH_OF_DRAIN_SOUL_AURA, EFFECT_0))
-                {
-                    if (roll_chance_i(aur->GetMiscValue()))
-                    {
-                        caster->CastSpell(caster, SPELL_WARLOCK_CREATE_SOULSHARD, aur);
-                    }
-                }
-            }
-        }
+        if (Unit* caster = GetCaster())
+            if (Player* player = caster->ToPlayer())
+                if (player->isHonorOrXPTarget(GetTarget()))
+                    caster->CastSpell(caster, SPELL_WARLOCK_SOUL_SHARD_ENERGIZE, true);
     }
 
     void Register() override
     {
-        OnEffectRemove += AuraEffectRemoveFn(spell_warl_drain_soul::RemoveEffect, EFFECT_0, SPELL_AURA_CHANNEL_DEATH_ITEM, AURA_EFFECT_HANDLE_REAL);
-        DoCheckProc += AuraCheckProcFn(spell_warl_drain_soul::CheckProc);
-        OnEffectPeriodic += AuraEffectPeriodicFn(spell_warl_drain_soul::HandleTick, EFFECT_1, SPELL_AURA_PERIODIC_DAMAGE);
-        OnEffectProc += AuraEffectProcFn(spell_warl_drain_soul::HandleProc, EFFECT_2, SPELL_AURA_PROC_TRIGGER_SPELL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_warl_drain_soul::OnRemove, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE, AURA_EFFECT_HANDLE_REAL);
     }
 };
 
@@ -1795,8 +1715,74 @@ class spell_warl_nether_protection : public AuraScript
     }
 };
 
+enum WarlockSoulHarvest
+{
+    SPELL_WARLOCK_SOUL_HARVEST_ENERGIZE = 101977
+};
+
+// 79268 - Soul Harvest
+// Ported from The Cataclysm Preservation Project (spell_warlock.cpp at b061f46): the out-of-combat
+// channel restores one Soul Shard every third tick (3 seconds).
+class spell_warl_soul_harvest : public AuraScript
+{
+    PrepareAuraScript(spell_warl_soul_harvest);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_WARLOCK_SOUL_HARVEST_ENERGIZE });
+    }
+
+    void HandleDummy(AuraEffect const* aurEff)
+    {
+        if (!(aurEff->GetTickNumber() % 3))
+            GetTarget()->CastSpell(GetTarget(), SPELL_WARLOCK_SOUL_HARVEST_ENERGIZE, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_warl_soul_harvest::HandleDummy, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+    }
+};
+
+// 689 / 89420 - Drain Life: heals the caster every tick (89653). Ported from The Cataclysm Preservation Project.
+class spell_warl_drain_life : public AuraScript
+{
+    PrepareAuraScript(spell_warl_drain_life);
+
+    static constexpr uint32 SPELL_WARLOCK_DRAIN_LIFE_HEAL = 89653;
+    static constexpr uint32 WARLOCK_ICON_ID_DEATHS_EMBRACE = 3223;
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_WARLOCK_DRAIN_LIFE_HEAL });
+    }
+
+    void HandlePeriodic(AuraEffect const* aurEff)
+    {
+        Unit* caster = GetCaster();
+        if (!caster)
+            return;
+
+        SpellInfo const* healSpell = sSpellMgr->AssertSpellInfo(SPELL_WARLOCK_DRAIN_LIFE_HEAL);
+        int32 baseAmount = caster->CalculateSpellDamage(caster, healSpell, aurEff->GetEffIndex());
+
+        // Death's Embrace
+        if (AuraEffect const* deathsEmbrace = caster->GetAuraEffect(SPELL_AURA_DUMMY, SPELLFAMILY_WARLOCK, WARLOCK_ICON_ID_DEATHS_EMBRACE, 0))
+            if (caster->HealthBelowPct(caster->CalculateSpellDamage(caster, healSpell, EFFECT_2)))
+                baseAmount += deathsEmbrace->GetAmount();
+
+        caster->CastCustomSpell(caster, SPELL_WARLOCK_DRAIN_LIFE_HEAL, &baseAmount, nullptr, nullptr, true);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_warl_drain_life::HandlePeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE);
+    }
+};
+
 void AddSC_warlock_spell_scripts()
 {
+    RegisterSpellScript(spell_warl_drain_life);
     RegisterSpellScript(spell_warl_nether_protection);
     RegisterSpellScript(spell_warl_eye_of_kilrogg);
     RegisterSpellScript(spell_warl_shadowflame);
@@ -1809,6 +1795,7 @@ void AddSC_warlock_spell_scripts()
     RegisterSpellScript(spell_warl_infernal_scaling);
     RegisterSpellScript(spell_warl_banish);
     RegisterSpellScript(spell_warl_create_healthstone);
+    RegisterSpellScript(spell_warl_healthstone_heal);
     RegisterSpellScript(spell_warl_curse_of_doom);
     RegisterSpellScript(spell_warl_demonic_circle_summon);
     RegisterSpellScript(spell_warl_demonic_circle_teleport);
@@ -1837,6 +1824,7 @@ void AddSC_warlock_spell_scripts()
     RegisterSpellScript(spell_warl_improved_drain_soul);
     RegisterSpellScript(spell_warl_seed_of_corruption_dummy);
     RegisterSpellScript(spell_warl_seed_of_corruption_generic);
+    RegisterSpellScript(spell_warl_soul_harvest);
     RegisterSpellScript(spell_warl_soul_leech);
     RegisterSpellScript(spell_warl_t4_2p_bonus_fire);
     RegisterSpellScript(spell_warl_t4_2p_bonus_shadow);

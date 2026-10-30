@@ -1078,6 +1078,10 @@ struct PendingSpellCastRequest
         : spellId(spellId), category(category), requestPacket(std::move(packet)), isItem(item) , cancelInProgress(cancel) {}
 };
 
+// characters.power1..power7 and character_stats.maxpower1..maxpower7 hold the class power slots
+// (UNIT_FIELD_POWER1 + slot), as the pinned TrinityCore-Cata stores them; the last two stay 0.
+constexpr uint8 MAX_SAVED_POWER_SLOTS = 7;
+
 class Player : public Unit, public GridObject<Player>
 {
     friend class WorldSession;
@@ -1229,6 +1233,8 @@ public:
     void RemovePet(Pet* pet, PetSaveMode mode, bool returnreagent = false);
     bool CanPetResurrect();
     bool IsExistPet();
+    // character_pet.slot of a pet that is not summoned (Pet::GetDBSlot)
+    void UpdatePetDBSlot(uint32 petNumber, uint8 dbSlot) const;
     Pet* CreatePet(Creature* creatureTarget, uint32 spellID = 0);
     Pet* CreatePet(uint32 creatureEntry, uint32 spellID = 0);
 
@@ -1708,6 +1714,8 @@ public:
     }
 
     void PetSpellInitialize();
+    // Cataclysm: hunters and warlocks get the pet action bar with Control Pet / Control Demon (level 10).
+    [[nodiscard]] bool CanControlPet() const;
     void CharmSpellInitialize();
     void PossessSpellInitialize();
     void VehicleSpellInitialize();

@@ -346,6 +346,10 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
     }
 
     SetReactState(petInfo->ReactState);
+    // Below Control Pet / Control Demon (level 10) the owner has no pet bar to change the stance, so the
+    // pet defends and assists its owner (Cataclysm's Assist; AzerothCore's Defensive does the same).
+    if (owner->IsPlayer() && !owner->ToPlayer()->CanControlPet())
+        SetReactState(REACT_DEFENSIVE);
     SetCanModifyStats(true);
 
     // set current pet as current
@@ -437,6 +441,16 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
             _LoadSpellCooldowns(holder.GetPreparedResult(PetLoadQueryHolder::COOLDOWNS));
             LearnPetPassives();
             InitLevelupSpellsForLevel();
+
+            // Below Control Pet / Control Demon (level 10) the owner has no pet bar to switch autocast
+            // on, so the pet uses all its autocast spells (the imp's Firebolt) by itself.
+            if (Player* playerOwner = GetOwner(); playerOwner && !playerOwner->CanControlPet())
+                for (PetSpellMap::value_type const& petSpell : m_spells)
+                    if (petSpell.second.state != PETSPELL_REMOVED)
+                        if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(petSpell.first))
+                            if (spellInfo->IsAutocastable())
+                                ToggleAutocast(spellInfo, true);
+
             if (GetMap()->IsBattleArena())
                 RemoveArenaAuras();
 
@@ -548,15 +562,8 @@ void Pet::SavePetToDB(PetSaveMode mode)
         stmt->SetData(0, m_charmInfo->GetPetNumber());
         trans->Append(stmt);
 
-        // prevent existence another hunter pet in PET_SAVE_AS_CURRENT and PET_SAVE_NOT_IN_SLOT
-        if (getPetType() == HUNTER_PET && (mode == PET_SAVE_AS_CURRENT || mode > PET_SAVE_LAST_STABLE_SLOT))
-        {
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_PET_BY_SLOT);
-            stmt->SetData(0, ownerLowGUID);
-            stmt->SetData(1, uint8(PET_SAVE_AS_CURRENT));
-            stmt->SetData(2, uint8(PET_SAVE_LAST_STABLE_SLOT));
-            trans->Append(stmt);
-        }
+        // 4.3.4 hunters keep up to five pets in active slots, so the 3.3.5a rule that deleted every other
+        // current or unslotted hunter pet here is gone; the slot comes from the pet's stable entry.
 
         // save pet
         std::string actionBar = GenerateActionBarData();
@@ -565,6 +572,8 @@ void Pet::SavePetToDB(PetSaveMode mode)
         {
             FillPetInfo(&owner->GetPetStable()->CurrentPet.value());
         }
+
+        uint8 dbSlot = GetDBSlot(owner->GetPetStable()->GetPet(m_charmInfo->GetPetNumber()), getPetType(), mode);
 
         stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_CHAR_PET);
         stmt->SetData(0, m_charmInfo->GetPetNumber());
@@ -578,7 +587,7 @@ void Pet::SavePetToDB(PetSaveMode mode)
         stmt->SetData(8, uint8(GetReactState()));
         stmt->SetData(9, GetName());
         stmt->SetData(10, uint8(HasByteFlag(UNIT_FIELD_BYTES_2, 2, UNIT_CAN_BE_RENAMED) ? 0 : 1));
-        stmt->SetData(11, uint8(mode));
+        stmt->SetData(11, dbSlot);
         stmt->SetData(12, curhealth);
         stmt->SetData(13, curmana);
         stmt->SetData(14, GetPower(POWER_HAPPINESS));
@@ -594,6 +603,18 @@ void Pet::SavePetToDB(PetSaveMode mode)
         RemoveAllAuras();
         DeleteFromDB(m_charmInfo->GetPetNumber());
     }
+}
+
+uint8 Pet::GetDBSlot(PetStable::PetInfo const* petInfo, PetType type, PetSaveMode mode)
+{
+    if (type != HUNTER_PET || !petInfo)
+        return uint8(mode);
+
+    if (mode >= PET_SAVE_FIRST_STABLE_SLOT && mode <= PET_SAVE_LAST_STABLE_SLOT)
+        return PET_SLOT_FIRST_STABLE_SLOT + (mode - PET_SAVE_FIRST_STABLE_SLOT);
+
+    uint8 activeSlot = std::min<uint8>(petInfo->Slot, PET_SLOT_LAST_ACTIVE_SLOT);
+    return mode == PET_SAVE_AS_CURRENT ? activeSlot : PET_SAVE_NOT_IN_SLOT + activeSlot;
 }
 
 void Pet::DeleteFromDB(ObjectGuid::LowType guidlow)
@@ -1814,8 +1835,9 @@ bool Pet::addSpell(uint32 spellId, ActiveStates active /*= ACT_DECIDE*/, PetSpel
 
     if (active == ACT_DECIDE)                               // active was not used before, so we save it's autocast/passive state here
     {
+        // Cataclysm: newly learned pet spells autocast by default (CPP Pet::addSpell).
         if (spellInfo->IsAutocastable())
-            newspell.active = ACT_DISABLED;
+            newspell.active = ACT_ENABLED;
         else
             newspell.active = ACT_PASSIVE;
     }

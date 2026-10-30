@@ -377,7 +377,61 @@ enum AuraType
     SPELL_AURA_PREVENT_RESURRECTION                         = 314,
     SPELL_AURA_UNDERWATER_WALKING                           = 315,
     SPELL_AURA_PERIODIC_HASTE                               = 316,
-    TOTAL_AURAS                                             = 317
+    SPELL_AURA_MOD_SPELL_POWER_PCT                          = 317,
+    SPELL_AURA_MASTERY                                      = 318,
+    SPELL_AURA_MOD_MELEE_HASTE_3                            = 319,
+    SPELL_AURA_MOD_RANGED_HASTE_2                           = 320,
+    SPELL_AURA_MOD_NO_ACTIONS                               = 321,
+    SPELL_AURA_INTERFERE_TARGETTING                         = 322,  // NYI
+    SPELL_AURA_323                                          = 323,  // Not used in 4.3.4
+    SPELL_AURA_324                                          = 324,  // spell critical chance (probably by school mask)
+    SPELL_AURA_325                                          = 325,  // Not used in 4.3.4
+    SPELL_AURA_PHASE_GROUP                                  = 326,  // Puts the player in all the phases that are in the group with id = miscB
+    SPELL_AURA_327                                          = 327,  // Not used in 4.3.4
+    SPELL_AURA_PROC_ON_POWER_AMOUNT                         = 328,
+    SPELL_AURA_MOD_RUNE_REGEN_SPEED                         = 329,  // NYI
+    SPELL_AURA_CAST_WHILE_WALKING                           = 330,
+    SPELL_AURA_FORCE_WEATHER                                = 331,
+    SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS                    = 332,
+    SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS_TRIGGERED          = 333,  // Spells cast with this override have no cast time or power cost
+    SPELL_AURA_MOD_BLIND                                    = 334,  // NYI
+    SPELL_AURA_335                                          = 335,
+    SPELL_AURA_MOUNT_RESTRICTIONS                           = 336,
+    SPELL_AURA_MOD_VENDOR_ITEMS_PRICES                      = 337,
+    SPELL_AURA_MOD_DURABILITY_LOSS                          = 338,
+    SPELL_AURA_INCREASE_SKILL_GAIN_CHANCE                   = 339,  // NYI
+    SPELL_AURA_MOD_RESURRECTED_HEALTH_BY_GUILD_MEMBER       = 340,  // Increases health gained when resurrected by a guild member by X
+    SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN                  = 341,  // Modifies cooldown of all spells using affected category
+    SPELL_AURA_MOD_MELEE_RANGED_HASTE_2                     = 342,
+    SPELL_AURA_MOD_MELEE_DAMAGE_FROM_CASTER                 = 343,
+    SPELL_AURA_MOD_AUTOATTACK_DAMAGE                        = 344,
+    SPELL_AURA_BYPASS_ARMOR_FOR_CASTER                      = 345,
+    SPELL_AURA_ENABLE_ALT_POWER                             = 346,  // NYI
+    SPELL_AURA_MOD_SPELL_COOLDOWN_BY_HASTE                  = 347,
+    SPELL_AURA_DEPOSIT_BONUS_MONEY_IN_GUILD_BANK_ON_LOOT    = 348,
+    SPELL_AURA_MOD_CURRENCY_GAIN                            = 349,
+    SPELL_AURA_MOD_GATHERING_ITEMS_GAINED_PERCENT           = 350,  // NYI
+    SPELL_AURA_MOD_CURRENCY_CATEGORY_GAIN_PCT               = 351,
+    SPELL_AURA_ENABLE_ALTERED_FORM                          = 352,
+    SPELL_AURA_MOD_CAMOUFLAGE                               = 353,  // NYI
+    SPELL_AURA_MOD_HEALING_DONE_PCT_VERSUS_TARGET_HEALTH    = 354,  // Restoration Shaman mastery - mod healing based on target's health (less = more healing)
+    SPELL_AURA_355                                          = 355,
+    SPELL_AURA_MOD_DAMAGE_FROM_MANA                         = 356,  // Arcane Mage mastery - mod damage based on current mana
+    SPELL_AURA_ENABLE_BOSS1_UNIT_FRAME                      = 357,
+    SPELL_AURA_WORGEN_ALTERED_FORM                          = 358,
+    SPELL_AURA_359                                          = 359,
+    SPELL_AURA_PROC_TRIGGER_SPELL_COPY                      = 360,  // Procs the same spell that caused this proc (Dragonwrath, Tarecgosa's Rest)
+    SPELL_AURA_OVERRIDE_AUTOATTACK_WITH_MELEE_SPELL         = 361,
+    SPELL_AURA_362                                          = 362,  // Not used in 4.3.4
+    SPELL_AURA_MOD_NEXT_SPELL                               = 363,  // Used by 101601 Throw Totem - causes the client to initialize spell cast with specified spell
+    SPELL_AURA_364                                          = 364,  // Not used in 4.3.4
+    SPELL_AURA_MAX_FAR_CLIP_PLANE                           = 365,  // Overrides client's View Distance setting to max("Fair", current_setting) and turns off terrain display
+    SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT               = 366,  // Sets spellpower equal to % of attack power, discarding all other bonuses (from gear and buffs)
+    SPELL_AURA_OVERRIDE_AUTOATTACK_WITH_RANGED_SPELL        = 367,  // NYI
+    SPELL_AURA_368                                          = 368,  // Not used in 4.3.4
+    SPELL_AURA_ENABLE_POWER_BAR_TIMER                       = 369,
+    SPELL_AURA_SET_FAIR_FAR_CLIP                            = 370,  // Overrides client's View Distance setting to max("Fair", current_setting)
+    TOTAL_AURAS                                             = 371   // 4.3.4
 };
 
 enum AuraObjectType

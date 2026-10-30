@@ -64,6 +64,8 @@ public:
     bool LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool current, uint32 healthPct = 0, bool fullMana = false);
     bool isBeingLoaded() const override { return m_loading; }
     void SavePetToDB(PetSaveMode mode);
+    // character_pet.slot for a save in this mode: the mode itself, or a hunter pet's 4.3.4 slot
+    [[nodiscard]] static uint8 GetDBSlot(PetStable::PetInfo const* petInfo, PetType type, PetSaveMode mode);
     void FillPetInfo(PetStable::PetInfo* petInfo) const;
     void Remove(PetSaveMode mode, bool returnreagent = false);
     static void DeleteFromDB(ObjectGuid::LowType guidlow);

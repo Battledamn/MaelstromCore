@@ -168,6 +168,13 @@ void Player::ApplySpellPowerBonus(int32 amount, bool apply)
 {
     apply = _ModifyUInt32(apply, m_baseSpellPower, amount);
 
+    // SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT replaces the shown spell power
+    if (HasAuraType(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT))
+    {
+        UpdateSpellDamageAndHealingBonus();
+        return;
+    }
+
     // For speed just update for client
     ApplyModUInt32Value(PLAYER_FIELD_MOD_HEALING_DONE_POS, amount, apply);
     for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
@@ -178,6 +185,13 @@ void Player::ApplySpellDamageBonus(int32 amount, bool apply)
 {
     apply = _ModifyUInt32(apply, m_baseSpellDamage, amount);
 
+    // SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT replaces the shown spell power
+    if (HasAuraType(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT))
+    {
+        UpdateSpellDamageAndHealingBonus();
+        return;
+    }
+
     // For speed just update for client
     for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
         ApplyModInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + i, amount, apply);
@@ -186,6 +200,13 @@ void Player::ApplySpellDamageBonus(int32 amount, bool apply)
 void Player::ApplySpellHealingBonus(int32 amount, bool apply)
 {
     apply = _ModifyUInt32(apply, m_baseSpellHealing, amount);
+
+    // SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT replaces the shown spell power
+    if (HasAuraType(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT))
+    {
+        UpdateSpellDamageAndHealingBonus();
+        return;
+    }
 
     // For speed just update for client
     ApplyModUInt32Value(PLAYER_FIELD_MOD_HEALING_DONE_POS, amount, apply);
@@ -443,7 +464,8 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
         UpdateDamagePhysical(BASE_ATTACK);
         if (CanDualWield() && HasOffhandWeaponForAttack()) //allow update offhand damage only if player knows DualWield Spec and has equipped offhand weapon
             UpdateDamagePhysical(OFF_ATTACK);
-        if (IsClass(CLASS_SHAMAN, CLASS_CONTEXT_STATS) || IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS))                      // mental quickness
+        if (IsClass(CLASS_SHAMAN, CLASS_CONTEXT_STATS) || IsClass(CLASS_PALADIN, CLASS_CONTEXT_STATS)
+            || HasAuraType(SPELL_AURA_OVERRIDE_SPELL_POWER_BY_AP_PCT)) // spell power from attack power
             UpdateSpellDamageAndHealingBonus();
     }
 }
