@@ -709,8 +709,7 @@ enum RBACPermissions
     RBAC_PERM_COMMAND_ACCOUNT_INFO                           = 945,
 
     // Ranges: 1-1999 the core (AzerothCore's up to 999, MaelstromCore's from 1000), 2000+ custom
-    // (server owners, modules). Provisional: renumbered once when the core is finished, see
-    // docs/RBAC_AUDIT.md (deprecated ids are retired then, never reused).
+    // (server owners, modules). Unused and deprecated ids stay as they are (docs/RBAC_AUDIT.md).
     RBAC_PERM_COMMAND_MODIFY_CURRENCY                        = 1000,
     // custom permissions 2000+
     RBAC_PERM_MAX
