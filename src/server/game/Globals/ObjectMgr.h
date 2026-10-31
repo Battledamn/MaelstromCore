@@ -1465,7 +1465,13 @@ public:
     bool DeleteGameTele(std::string_view name);
 
     Trainer::Trainer* GetTrainer(uint32 creatureId);
-    std::vector<Trainer::Trainer const*> const& GetClassTrainers(uint8 classId) const { return _classTrainers.at(classId); }
+    std::vector<Trainer::Trainer const*> const& GetClassTrainers(uint8 classId) const
+    {
+        // a class without class trainers (e.g. world data without the class on them) has none
+        static std::vector<Trainer::Trainer const*> const none;
+        auto itr = _classTrainers.find(classId);
+        return itr != _classTrainers.end() ? itr->second : none;
+    }
 
     [[nodiscard]] VendorItemData const* GetNpcVendorItemList(uint32 entry) const
     {

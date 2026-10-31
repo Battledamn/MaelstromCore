@@ -708,9 +708,11 @@ enum RBACPermissions
     RBAC_PERM_COMMAND_ACCOUNT_FLAG_REMOVE                    = 944,
     RBAC_PERM_COMMAND_ACCOUNT_INFO                           = 945,
 
-    // MaelstromCore's own permissions: 3000 and up, clear of AzerothCore's and upstream's ids
-    RBAC_PERM_COMMAND_MODIFY_CURRENCY                        = 3000,
-    // custom permissions 1000+
+    // Ranges: 1-1999 the core (AzerothCore's up to 999, MaelstromCore's from 1000), 2000+ custom
+    // (server owners, modules). Provisional: renumbered once when the core is finished, see
+    // docs/RBAC_AUDIT.md (deprecated ids are retired then, never reused).
+    RBAC_PERM_COMMAND_MODIFY_CURRENCY                        = 1000,
+    // custom permissions 2000+
     RBAC_PERM_MAX
 };
 
