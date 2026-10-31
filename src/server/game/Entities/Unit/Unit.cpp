@@ -3084,7 +3084,8 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(Unit const* victim, WeaponAttackTy
     // parry & block chances
 
     // check if attack comes from behind, nobody can parry or block if attacker is behind
-    if (!victim->HasInArc(M_PI, this) && !victim->HasIgnoreHitDirectionAura())
+    bool const canParryOrBlock = victim->HasInArc(M_PI, this) || victim->HasIgnoreHitDirectionAura();
+    if (!canParryOrBlock)
     {
         LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: attack came from behind.");
     }
@@ -3112,24 +3113,10 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(Unit const* victim, WeaponAttackTy
                 return MELEE_HIT_PARRY;
             }
         }
-
-        if (victim->IsPlayer() || !(victim->ToCreature()->HasFlagsExtra(CREATURE_FLAG_EXTRA_NO_BLOCK)))
-        {
-            tmp = block_chance;
-
-            // xinef: cant block while casting or while stunned
-            if (victim->IsNonMeleeSpellCast(false, false, true) || victim->HasUnitState(UNIT_STATE_CONTROLLED))
-                tmp = 0;
-
-            if (tmp > 0                                          // check if unit _can_ block
-                    && (tmp -= skillBonus) > 0
-                    && roll < (sum += tmp))
-            {
-                LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: BLOCK <{}, {})", sum - tmp, sum);
-                return MELEE_HIT_BLOCK;
-            }
-        }
     }
+
+    // 4.3.4 table order (CPP): miss, dodge, parry, glancing, block, crit, crushing, hit. The order
+    // only matters once the chances fill the table: what comes last is pushed off first
 
     // Max 40% chance to score a glancing blow against mobs of the same or higher level (can do only players and pets and not with ranged weapon)
     if (attType != RANGED_ATTACK &&
@@ -3150,6 +3137,35 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(Unit const* victim, WeaponAttackTy
             LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: GLANCING <{}, {})", sum - 4000, sum);
             return MELEE_HIT_GLANCING;
         }
+    }
+
+    if (canParryOrBlock && (victim->IsPlayer() || !(victim->ToCreature()->HasFlagsExtra(CREATURE_FLAG_EXTRA_NO_BLOCK))))
+    {
+        tmp = block_chance;
+
+        // xinef: cant block while casting or while stunned
+        if (victim->IsNonMeleeSpellCast(false, false, true) || victim->HasUnitState(UNIT_STATE_CONTROLLED))
+            tmp = 0;
+
+        if (tmp > 0                                          // check if unit _can_ block
+                && (tmp -= skillBonus) > 0
+                && roll < (sum += tmp))
+        {
+            LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: BLOCK <{}, {})", sum - tmp, sum);
+            return MELEE_HIT_BLOCK;
+        }
+    }
+
+    // Critical chance
+    tmp = crit_chance;
+
+    if (tmp > 0 && roll < (sum += tmp))
+    {
+        LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: CRIT <{}, {})", sum - tmp, sum);
+        if (IsCreature() && (ToCreature()->HasFlagsExtra(CREATURE_FLAG_EXTRA_NO_CRIT)))
+            LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: CRIT DISABLED)");
+        else
+            return MELEE_HIT_CRIT;
     }
 
     // mobs can score crushing blows if they're 4 or more levels above victim
@@ -3175,18 +3191,6 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(Unit const* victim, WeaponAttackTy
                 return MELEE_HIT_CRUSHING;
             }
         }
-    }
-
-    // Critical chance
-    tmp = crit_chance;
-
-    if (tmp > 0 && roll < (sum += tmp))
-    {
-        LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: CRIT <{}, {})", sum - tmp, sum);
-        if (IsCreature() && (ToCreature()->HasFlagsExtra(CREATURE_FLAG_EXTRA_NO_CRIT)))
-            LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: CRIT DISABLED)");
-        else
-            return MELEE_HIT_CRIT;
     }
 
     LOG_DEBUG("entities.unit", "RollMeleeOutcomeAgainst: NORMAL");
