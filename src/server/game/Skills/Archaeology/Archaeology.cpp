@@ -460,6 +460,8 @@ void Archaeology::Solve(uint16 projectId)
     CharacterDatabase.Execute("REPLACE INTO character_archaeology_completed (guid, project, time, count) VALUES ({}, {}, {}, {})",
         _player->GetGUID().GetCounter(), projectId, completed.FirstCompleted, completed.Count);
 
+    _player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ARCHAEOLOGY_PROJECTS, projectId, completed.Count == 1 ? 1 : 0);
+
     WorldPackets::Archaeology::ResearchComplete packet;
     packet.Research = WorldPackets::Archaeology::ResearchHistory(projectId, completed.Count, completed.FirstCompleted);
     _player->SendDirectMessage(packet.Write());

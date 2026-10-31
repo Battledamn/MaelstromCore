@@ -1047,6 +1047,38 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
                     SetCriteriaProgress(achievementCriteria, GetPlayer()->GetRewardedQuestCount());
                     break;
                 }
+            case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ARCHAEOLOGY_PROJECTS:
+                {
+                    // 4.x archaeology (CPP counts every solve): the criteria's additional conditions
+                    // pick the artifact's rarity (Achievement_Criteria 65: 0 common, 1 rare) and race
+                    // (66: ResearchBranch); a rarity criterion counts unique artifacts, so first solves only
+                    ResearchProjectEntry const* project = miscValue1 ? sResearchProjectStore.LookupEntry(miscValue1) : nullptr;
+                    if (!project)
+                        continue;
+
+                    bool matches = true;
+                    for (uint8 r = 0; r < MAX_CRITERIA_REQUIREMENTS; ++r)
+                    {
+                        uint32 value = achievementCriteria->additionalRequirement_value[r];
+                        switch (achievementCriteria->additionalRequirement_type[r])
+                        {
+                            case 65:
+                                matches = matches && project->Rarity == value && miscValue2;
+                                break;
+                            case 66:
+                                matches = matches && project->ResearchBranchID == value;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    if (!matches)
+                        continue;
+
+                    SetCriteriaProgress(achievementCriteria, 1, PROGRESS_ACCUMULATE);
+                    break;
+                }
             case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_DAILY_QUEST_DAILY:
                 {
                     Seconds nextDailyResetTime = sWorld->GetNextDailyQuestsResetTime();
@@ -1887,6 +1919,8 @@ bool AchievementMgr::IsCompletedCriteria(AchievementCriteriaEntry const* achieve
             return progress->counter >= 1;
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_QUEST_COUNT:
             return progress->counter >= achievementCriteria->complete_quest_count.totalQuestCount;
+        case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ARCHAEOLOGY_PROJECTS:
+            return progress->counter >= achievementCriteria->raw.count;
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_DAILY_QUEST_DAILY:
             return progress->counter >= achievementCriteria->complete_daily_quest_daily.numberOfDays;
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_QUESTS_IN_ZONE:
@@ -2397,56 +2431,168 @@ void AchievementMgr::CompletedAchievement(AchievementEntry const* achievement)
     }
 }
 
+// 4.3.4 bit-packed layouts (CPP AchievementMgr<Player>::SendAllAchievementData / SendAchievementInfo):
+// the client opens the achievement window only once it has read SMSG_ALL_ACHIEVEMENT_DATA
+bool AchievementMgr::IsVisibleAchievement(uint32 achievementId) const
+{
+    // hidden achievements are not sent
+    AchievementEntry const* achievement = sAchievementStore.LookupEntry(achievementId);
+    return achievement && !(achievement->flags & ACHIEVEMENT_FLAG_HIDDEN);
+}
+
 void AchievementMgr::SendAllAchievementData() const
 {
-    WorldPacket data(SMSG_ALL_ACHIEVEMENT_DATA, _completedAchievements.size() * 8 + 4 + _criteriaProgress.size() * 38 + 4);
-    BuildAllDataPacket(&data);
+    ObjectGuid guid = GetPlayer()->GetGUID();
+    std::size_t numAchievements = std::count_if(_completedAchievements.begin(), _completedAchievements.end(),
+        [this](auto const& pair) { return IsVisibleAchievement(pair.first); });
+
+    ByteBuffer criteriaData(_criteriaProgress.size() * (4 + 4 + 4 + 4 + 8 + 8));
+    WorldPacket data(SMSG_ALL_ACHIEVEMENT_DATA, 4 + numAchievements * (4 + 4) + 4 + _criteriaProgress.size() * (4 + 4 + 4 + 4 + 8 + 8));
+    data.WriteBits(_criteriaProgress.size(), 21);
+    for (auto const& [criteriaId, progress] : _criteriaProgress)
+    {
+        ObjectGuid counter(uint64(progress.counter));
+
+        data.WriteBit(guid[4]);
+        data.WriteBit(counter[3]);
+        data.WriteBit(guid[5]);
+        data.WriteBit(counter[0]);
+        data.WriteBit(counter[6]);
+        data.WriteBit(guid[3]);
+        data.WriteBit(guid[0]);
+        data.WriteBit(counter[4]);
+        data.WriteBit(guid[2]);
+        data.WriteBit(counter[7]);
+        data.WriteBit(guid[7]);
+        data.WriteBits(0u, 2);                              // criteria progress flags
+        data.WriteBit(guid[6]);
+        data.WriteBit(counter[2]);
+        data.WriteBit(counter[1]);
+        data.WriteBit(counter[5]);
+        data.WriteBit(guid[1]);
+
+        criteriaData.WriteByteSeq(guid[3]);
+        criteriaData.WriteByteSeq(counter[5]);
+        criteriaData.WriteByteSeq(counter[6]);
+        criteriaData.WriteByteSeq(guid[4]);
+        criteriaData.WriteByteSeq(guid[6]);
+        criteriaData.WriteByteSeq(counter[2]);
+        criteriaData << uint32(0);                          // timer 2
+        criteriaData.WriteByteSeq(guid[2]);
+        criteriaData << uint32(criteriaId);
+        criteriaData.WriteByteSeq(guid[5]);
+        criteriaData.WriteByteSeq(counter[0]);
+        criteriaData.WriteByteSeq(counter[3]);
+        criteriaData.WriteByteSeq(counter[1]);
+        criteriaData.WriteByteSeq(counter[4]);
+        criteriaData.WriteByteSeq(guid[0]);
+        criteriaData.WriteByteSeq(guid[7]);
+        criteriaData.WriteByteSeq(counter[7]);
+        criteriaData << uint32(0);                          // timer 1
+        criteriaData.AppendPackedTime(progress.date);
+        criteriaData.WriteByteSeq(guid[1]);
+    }
+
+    data.WriteBits(numAchievements, 23);
+    data.FlushBits();
+    data.append(criteriaData);
+
+    for (auto const& [achievementId, completed] : _completedAchievements)
+    {
+        if (!IsVisibleAchievement(achievementId))
+            continue;
+
+        data << uint32(achievementId);
+        data.AppendPackedTime(completed.date);
+    }
+
     GetPlayer()->SendDirectMessage(&data);
 }
 
 void AchievementMgr::SendRespondInspectAchievements(Player* player) const
 {
-    WorldPacket data(SMSG_RESPOND_INSPECT_ACHIEVEMENTS, 9 + _completedAchievements.size() * 8 + 4 + _criteriaProgress.size() * 38 + 4);
-    data << GetPlayer()->GetPackGUID();
-    BuildAllDataPacket(&data);
-    player->SendDirectMessage(&data);
-}
+    ObjectGuid guid = GetPlayer()->GetGUID();
+    std::size_t numAchievements = std::count_if(_completedAchievements.begin(), _completedAchievements.end(),
+        [this](auto const& pair) { return IsVisibleAchievement(pair.first); });
 
-/**
- * used by SMSG_RESPOND_INSPECT_ACHIEVEMENT and SMSG_ALL_ACHIEVEMENT_DATA
- */
-void AchievementMgr::BuildAllDataPacket(WorldPacket* data) const
-{
-    for (CompletedAchievementMap::const_iterator iter = _completedAchievements.begin(); iter != _completedAchievements.end(); ++iter)
+    ByteBuffer criteriaData(_criteriaProgress.size() * 16);
+    WorldPacket data(SMSG_RESPOND_INSPECT_ACHIEVEMENTS, 1 + 8 + 3 + 3 + numAchievements * (4 + 4) + _criteriaProgress.size() * 16);
+    data.WriteBit(guid[7]);
+    data.WriteBit(guid[4]);
+    data.WriteBit(guid[1]);
+    data.WriteBits(numAchievements, 23);
+    data.WriteBit(guid[0]);
+    data.WriteBit(guid[3]);
+    data.WriteBits(_criteriaProgress.size(), 21);
+    data.WriteBit(guid[2]);
+    for (auto const& [criteriaId, progress] : _criteriaProgress)
     {
-        // Skip hidden achievements
-        AchievementEntry const* achievement = sAchievementStore.LookupEntry(iter->first);
-        if (!achievement || achievement->flags & ACHIEVEMENT_FLAG_HIDDEN)
+        ObjectGuid counter(uint64(progress.counter));
+
+        data.WriteBit(counter[5]);
+        data.WriteBit(counter[3]);
+        data.WriteBit(guid[1]);
+        data.WriteBit(guid[4]);
+        data.WriteBit(guid[2]);
+        data.WriteBit(counter[6]);
+        data.WriteBit(guid[0]);
+        data.WriteBit(counter[4]);
+        data.WriteBit(counter[1]);
+        data.WriteBit(counter[2]);
+        data.WriteBit(guid[3]);
+        data.WriteBit(guid[7]);
+        data.WriteBits(0u, 2);                              // criteria progress flags
+        data.WriteBit(counter[0]);
+        data.WriteBit(guid[5]);
+        data.WriteBit(guid[6]);
+        data.WriteBit(counter[7]);
+
+        criteriaData.WriteByteSeq(guid[3]);
+        criteriaData.WriteByteSeq(counter[4]);
+        criteriaData << uint32(0);                          // timer 1
+        criteriaData.WriteByteSeq(guid[1]);
+        criteriaData.AppendPackedTime(progress.date);
+        criteriaData.WriteByteSeq(counter[3]);
+        criteriaData.WriteByteSeq(counter[7]);
+        criteriaData.WriteByteSeq(guid[5]);
+        criteriaData.WriteByteSeq(counter[0]);
+        criteriaData.WriteByteSeq(guid[4]);
+        criteriaData.WriteByteSeq(guid[2]);
+        criteriaData.WriteByteSeq(guid[6]);
+        criteriaData.WriteByteSeq(guid[7]);
+        criteriaData.WriteByteSeq(counter[6]);
+        criteriaData << uint32(criteriaId);
+        criteriaData << uint32(0);                          // timer 2
+        criteriaData.WriteByteSeq(counter[1]);
+        criteriaData.WriteByteSeq(counter[5]);
+        criteriaData.WriteByteSeq(guid[0]);
+        criteriaData.WriteByteSeq(counter[2]);
+    }
+
+    data.WriteBit(guid[6]);
+    data.WriteBit(guid[5]);
+    data.FlushBits();
+    data.append(criteriaData);
+    data.WriteByteSeq(guid[1]);
+    data.WriteByteSeq(guid[6]);
+    data.WriteByteSeq(guid[3]);
+    data.WriteByteSeq(guid[0]);
+    data.WriteByteSeq(guid[2]);
+
+    for (auto const& [achievementId, completed] : _completedAchievements)
+    {
+        if (!IsVisibleAchievement(achievementId))
             continue;
 
-        *data << uint32(iter->first);
-        data->AppendPackedTime(iter->second.date);
+        data << uint32(achievementId);
+        data.AppendPackedTime(completed.date);
     }
 
-    *data << int32(-1);
-    time_t now = GameTime::GetGameTime().count();
+    data.WriteByteSeq(guid[7]);
+    data.WriteByteSeq(guid[4]);
+    data.WriteByteSeq(guid[5]);
 
-    for (CriteriaProgressMap::const_iterator iter = _criteriaProgress.begin(); iter != _criteriaProgress.end(); ++iter)
-    {
-        *data << uint32(iter->first);
-        data->appendPackGUID(iter->second.counter);
-        *data << GetPlayer()->GetPackGUID();
-        *data << uint32(0); /// @todo: This should be 1 if it is a failed timed criteria
-        data->AppendPackedTime(iter->second.date);
-        *data << uint32(now - iter->second.date);
-
-        if (sAchievementMgr->IsAverageCriteria(sAchievementCriteriaStore.LookupEntry(iter->first)))
-            *data << uint32(now - GetPlayer()->GetCreationTime().count());    // for average achievements
-        else
-            *data << uint32(now - iter->second.date);
-    }
-
-    *data << int32(-1);
+    player->SendDirectMessage(&data);
 }
 
 bool AchievementMgr::HasAchieved(uint32 achievementId) const

@@ -325,7 +325,7 @@ private:
     bool IsCompletedCriteria(AchievementCriteriaEntry const* achievementCriteria, AchievementEntry const* achievement);
     bool IsCompletedAchievement(AchievementEntry const* entry);
     bool CanUpdateCriteria(AchievementCriteriaEntry const* criteria, AchievementEntry const* achievement);
-    void BuildAllDataPacket(WorldPacket* data) const;
+    [[nodiscard]] bool IsVisibleAchievement(uint32 achievementId) const;
 
     void UpdateTimedAchievements(uint32 timeDiff);
 
