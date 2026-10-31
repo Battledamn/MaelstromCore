@@ -13292,31 +13292,74 @@ void Unit::ApplyAttackTimePercentMod(WeaponAttackType att, float val, bool apply
 {
     float amount = GetFloatValue(UNIT_FIELD_BASEATTACKTIME + AsUnderlyingType(att));
 
+    // 4.x: the character sheet shows melee and ranged haste from these fields (CPP); the off hand
+    // follows the main hand
+    uint16 const hasteField = att == BASE_ATTACK ? uint16(PLAYER_FIELD_MOD_HASTE) :
+        att == RANGED_ATTACK ? uint16(PLAYER_FIELD_MOD_RANGED_HASTE) : uint16(0);
+    float hasteAmount = IsPlayer() && hasteField ? GetFloatValue(hasteField) : 0.0f;
+
     float remainingTimePct = std::max((float)m_attackTimer[att], 0.0f) / (GetAttackTime(att) * m_modAttackSpeedPct[att]);
     if (val > 0.f)
     {
         ApplyPercentModFloatVar(m_modAttackSpeedPct[att], val, !apply);
         ApplyPercentModFloatVar(amount, val, !apply);
+        ApplyPercentModFloatVar(hasteAmount, val, !apply);
     }
     else
     {
         ApplyPercentModFloatVar(m_modAttackSpeedPct[att], -val, apply);
         ApplyPercentModFloatVar(amount, -val, apply);
+        ApplyPercentModFloatVar(hasteAmount, -val, apply);
     }
     SetFloatValue(UNIT_FIELD_BASEATTACKTIME + AsUnderlyingType(att), amount);
+    if (IsPlayer() && hasteField)
+        SetFloatValue(hasteField, hasteAmount);
     m_attackTimer[att] = uint32(GetAttackTime(att) * m_modAttackSpeedPct[att] * remainingTimePct);
 }
 
 void Unit::ApplyCastTimePercentMod(float val, bool apply)
 {
     float amount = GetFloatValue(UNIT_MOD_CAST_SPEED);
+    float hasteAmount = GetFloatValue(UNIT_MOD_CAST_HASTE);
+
+    if (val > 0.f)
+    {
+        ApplyPercentModFloatVar(amount, val, !apply);
+        ApplyPercentModFloatVar(hasteAmount, val, !apply);
+    }
+    else
+    {
+        ApplyPercentModFloatVar(amount, -val, apply);
+        ApplyPercentModFloatVar(hasteAmount, -val, apply);
+    }
+
+    SetFloatValue(UNIT_MOD_CAST_SPEED, amount);
+    // 4.x: spell haste (the character sheet, global cooldown) is a field of its own (CPP). Effects that
+    // make spells instant (1000% and more) change only the cast time, not the haste
+    if (std::abs(val) < 1000.0f)
+        SetFloatValue(UNIT_MOD_CAST_HASTE, hasteAmount);
+}
+
+void Unit::ApplyHasteRegenMod(float val, bool apply)
+{
+    // 4.x: haste speeds up energy, focus and rune regeneration. The client predicts the bars from
+    // PLAYER_FIELD_MOD_HASTE_REGEN like Player::Regenerate does, and the runes from PLAYER_RUNE_REGEN (CPP)
+    Player* player = ToPlayer();
+    if (!player)
+        return;
+
+    float amount = GetFloatValue(PLAYER_FIELD_MOD_HASTE_REGEN);
 
     if (val > 0.f)
         ApplyPercentModFloatVar(amount, val, !apply);
     else
         ApplyPercentModFloatVar(amount, -val, apply);
 
-    SetFloatValue(UNIT_MOD_CAST_SPEED, amount);
+    SetFloatValue(PLAYER_FIELD_MOD_HASTE_REGEN, amount);
+
+    if (player->IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_ABILITY))
+        for (uint8 rune = 0; rune < NUM_RUNE_TYPES; ++rune)
+            player->UpdateRuneRegen(RuneType(rune));
 }
 
 uint32 Unit::GetCastingTimeForBonus(SpellInfo const* spellProto, DamageEffectType damagetype, uint32 CastingTime) const

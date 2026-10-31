@@ -2032,6 +2032,8 @@ public:
     void ApplySpellDamageBonus(int32 amount, bool apply);
     void ApplySpellHealingBonus(int32 amount, bool apply);
     void UpdateSpellDamageAndHealingBonus();
+    void UpdateSpellHealingPercentDone();
+    void UpdateSpellHealingPercentTaken();
     void ApplyRatingMod(CombatRating cr, int32 value, bool apply);
     void UpdateRating(CombatRating cr);
     void UpdateAllRatings();

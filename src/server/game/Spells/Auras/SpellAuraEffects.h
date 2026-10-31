@@ -251,6 +251,8 @@ public:
     void HandleModSpellDamagePercentFromAttackPower(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleModSpellHealingPercentFromAttackPower(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleModHealingDone(AuraApplication const* aurApp, uint8 mode, bool apply) const;
+    void HandleModHealingPct(AuraApplication const* aurApp, uint8 mode, bool apply) const;
+    void HandleModHealingDonePct(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleModTotalPercentStat(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleAuraModResistenceOfStatPercent(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleAuraModExpertise(AuraApplication const* aurApp, uint8 mode, bool apply) const;

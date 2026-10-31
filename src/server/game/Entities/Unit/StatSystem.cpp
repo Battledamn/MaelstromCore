@@ -223,6 +223,24 @@ void Player::UpdateSpellDamageAndHealingBonus()
         SetStatInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + i, SpellBaseDamageBonusDone(SpellSchoolMask(1 << i)));
 }
 
+// 4.x: healing done and taken in percent, for the client only (the healing itself is in
+// Unit::SpellHealingPctDone and SpellHealingBonusTaken) (CPP)
+void Player::UpdateSpellHealingPercentDone()
+{
+    SetFloatValue(PLAYER_FIELD_MOD_HEALING_DONE_PCT, GetTotalAuraMultiplier(SPELL_AURA_MOD_HEALING_DONE_PERCENT));
+}
+
+void Player::UpdateSpellHealingPercentTaken()
+{
+    float taken = 1.0f;
+    if (float const minval = float(GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HEALING_PCT)))
+        AddPct(taken, minval);
+    if (float const maxval = float(GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HEALING_PCT)))
+        AddPct(taken, maxval);
+
+    SetFloatValue(PLAYER_FIELD_MOD_HEALING_PCT, taken);
+}
+
 bool Player::UpdateAllStats()
 {
     for (uint8 i = STAT_STRENGTH; i < MAX_STATS; ++i)
@@ -801,6 +819,8 @@ void Player::UpdateArmorPenetration(int32 amount)
 void Player::UpdateMeleeHitChances()
 {
     m_modMeleeHitChance = (float)GetTotalAuraModifier(SPELL_AURA_MOD_HIT_CHANCE);
+    // 4.x: the character sheet adds the hit from auras, sent here, to the one from rating (CPP)
+    SetFloatValue(PLAYER_FIELD_UI_HIT_MODIFIER, m_modMeleeHitChance);
     m_modMeleeHitChance += GetRatingBonusValue(CR_HIT_MELEE);
 }
 
@@ -813,6 +833,7 @@ void Player::UpdateRangedHitChances()
 void Player::UpdateSpellHitChances()
 {
     m_modSpellHitChance = (float)GetTotalAuraModifier(SPELL_AURA_MOD_SPELL_HIT_CHANCE);
+    SetFloatValue(PLAYER_FIELD_UI_SPELL_HIT_MODIFIER, m_modSpellHitChance);
     m_modSpellHitChance += GetRatingBonusValue(CR_HIT_SPELL);
 }
 

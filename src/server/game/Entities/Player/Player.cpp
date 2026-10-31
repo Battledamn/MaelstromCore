@@ -2623,6 +2623,11 @@ void Player::InitStatsForLevel(bool reapplyMods)
     SetFloatValue(PLAYER_FIELD_MOD_HASTE, 1.0f);
     SetFloatValue(PLAYER_FIELD_MOD_RANGED_HASTE, 1.0f);
     SetFloatValue(PLAYER_FIELD_MOD_HASTE_REGEN, 1.0f);
+    // also multipliers (CPP): healing done and taken, weapon damage of the three attack types
+    SetFloatValue(PLAYER_FIELD_MOD_HEALING_PCT, 1.0f);
+    SetFloatValue(PLAYER_FIELD_MOD_HEALING_DONE_PCT, 1.0f);
+    for (uint8 i = 0; i < MAX_ATTACK; ++i)
+        SetFloatValue(PLAYER_FIELD_WEAPON_DMG_MULTIPLIERS + i, 1.0f);
 
     // -1 means "no watched faction"; 0 is a real faction index.
     SetInt32Value(PLAYER_FIELD_WATCHED_FACTION_INDEX, -1);
@@ -5496,6 +5501,10 @@ void Player::ApplyRatingMod(CombatRating cr, int32 value, bool apply)
                 ApplyAttackTimePercentMod(OFF_ATTACK, oldVal, false);
                 ApplyAttackTimePercentMod(BASE_ATTACK, newVal, true);
                 ApplyAttackTimePercentMod(OFF_ATTACK, newVal, true);
+                // 4.x haste rating raises all three haste ratings, so the regeneration haste follows
+                // only this one (CPP)
+                ApplyHasteRegenMod(oldVal, false);
+                ApplyHasteRegenMod(newVal, true);
                 break;
             case CR_HASTE_RANGED:
                 ApplyAttackTimePercentMod(RANGED_ATTACK, oldVal, false);
@@ -14046,6 +14055,10 @@ uint32 Player::GetRuneBaseCooldown(uint8 index, bool skipGrace)
         if ((*i)->GetMiscValue() == POWER_RUNE && (*i)->GetMiscValueB() == rune)
             cooldown = cooldown * (100 - (*i)->GetAmount()) / 100;
     }
+
+    // 4.x: haste speeds up rune regeneration (Unit::ApplyHasteRegenMod)
+    if (float const hasteRegen = GetFloatValue(PLAYER_FIELD_MOD_HASTE_REGEN); hasteRegen > 0.0f)
+        cooldown = uint32(cooldown * hasteRegen);
 
     return cooldown;
 }

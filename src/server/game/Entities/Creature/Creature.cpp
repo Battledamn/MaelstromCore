@@ -559,6 +559,7 @@ bool Creature::InitEntry(uint32 Entry, CreatureData const* data)
     SetName(normalInfo->Name);                              // at normal entry always
 
     SetFloatValue(UNIT_MOD_CAST_SPEED, 1.0f);
+    SetFloatValue(UNIT_MOD_CAST_HASTE, 1.0f);
 
     SetSpeed(MOVE_WALK, cinfo->speed_walk);
     SetSpeed(MOVE_RUN, cinfo->speed_run);
