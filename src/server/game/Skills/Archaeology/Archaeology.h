@@ -24,6 +24,7 @@
 #include <array>
 #include <map>
 #include <optional>
+#include <set>
 
 class Player;
 
@@ -44,7 +45,9 @@ class Archaeology
 public:
     explicit Archaeology(Player* player) : _player(player) { }
 
-    void LoadFromDB();                         // at login, after the skills and currencies
+    // at login, after the skills and currencies; the results of the login query holder
+    void LoadFromDB(PreparedQueryResult sites, PreparedQueryResult projects, PreparedQueryResult completedProjects);
+    void SaveToDB(CharacterDatabaseTransaction trans);
     static void DeleteFromDB(ObjectGuid::LowType guid, CharacterDatabaseTransaction trans);
 
     void Learn();
@@ -71,7 +74,6 @@ private:
     };
 
     void SetSite(uint8 position, uint16 siteId, uint8 finds);
-    void SaveSite(uint8 position) const;
     void RegenerateSites();
     void ReplaceSite(uint8 position);
     [[nodiscard]] int32 GetNearestSite(float& distSq) const;
@@ -86,6 +88,9 @@ private:
     std::map<uint32, uint16> _projects;        // branch -> artifact in research
     ArchaeologyCompletedMap _completed;
     std::optional<ArchaeologySolveData> _solveData;
+    std::set<uint16> _completedChanged;        // solved since the last save
+    bool _sitesChanged = false;
+    bool _projectsChanged = false;
     bool _loaded = false;                      // LoadFromDB done: skill and currency changes before it are the login itself
 };
 

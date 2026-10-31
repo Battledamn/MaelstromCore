@@ -25,6 +25,7 @@
 #include "Player.h"
 #include "QueryResult.h"
 #include "Random.h"
+#include "ScriptMgr.h"
 #include <algorithm>
 #include <cmath>
 
@@ -48,20 +49,18 @@ constexpr uint32 FIND_DURATION        = MINUTE;
 constexpr float  DIG_SPOT_CLEARANCE   = 2.0f;               // yards a surface may stand above the bare ground
 constexpr uint32 DIG_SPOT_ATTEMPTS    = 30;
 
-static void SummonFacing(Player* player, uint32 entry, float x, float y, float z, float angle, uint32 duration)
+static GameObject* SummonFacing(Player* player, uint32 entry, float x, float y, float z, float angle, uint32 duration)
 {
-    player->SummonGameObject(entry, x, y, z, angle, 0.0f, 0.0f, std::sin(angle / 2.0f), std::cos(angle / 2.0f), duration);
+    return player->SummonGameObject(entry, x, y, z, angle, 0.0f, 0.0f, std::sin(angle / 2.0f), std::cos(angle / 2.0f), duration);
 }
 
-void Archaeology::LoadFromDB()
+void Archaeology::LoadFromDB(PreparedQueryResult sites, PreparedQueryResult projects, PreparedQueryResult completedProjects)
 {
     _loaded = true;
     if (!_player->HasSkill(SKILL_ARCHAEOLOGY))
         return;
 
-    ObjectGuid::LowType guid = _player->GetGUID().GetCounter();
-
-    if (QueryResult result = CharacterDatabase.Query("SELECT site, type, finds FROM character_archaeology_sites WHERE guid = {}", guid))
+    if (PreparedQueryResult result = sites)
     {
         do
         {
@@ -72,7 +71,7 @@ void Archaeology::LoadFromDB()
         } while (result->NextRow());
     }
 
-    if (QueryResult result = CharacterDatabase.Query("SELECT project, time, count FROM character_archaeology_completed WHERE guid = {}", guid))
+    if (PreparedQueryResult result = completedProjects)
     {
         do
         {
@@ -83,7 +82,7 @@ void Archaeology::LoadFromDB()
         } while (result->NextRow());
     }
 
-    if (QueryResult result = CharacterDatabase.Query("SELECT branch, project FROM character_archaeology_projects WHERE guid = {}", guid))
+    if (PreparedQueryResult result = projects)
     {
         do
         {
@@ -96,11 +95,72 @@ void Archaeology::LoadFromDB()
     VerifyProjects();
 }
 
+void Archaeology::SaveToDB(CharacterDatabaseTransaction trans)
+{
+    // saved with the character, like its other data: the whole set of sites or projects when one of
+    // them changed, and each artifact solved since the last save
+    ObjectGuid::LowType guid = _player->GetGUID().GetCounter();
+    CharacterDatabasePreparedStatement* stmt = nullptr;
+
+    if (_sitesChanged)
+    {
+        stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_ARCHAEOLOGY_SITES);
+        stmt->SetData(0, guid);
+        trans->Append(stmt);
+
+        for (uint8 position = 0; position < ARCHAEOLOGY_MAX_SITES; ++position)
+        {
+            if (!_sites[position].Id)
+                continue;
+
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_CHAR_ARCHAEOLOGY_SITE);
+            stmt->SetData(0, guid);
+            stmt->SetData(1, position);
+            stmt->SetData(2, _sites[position].Id);
+            stmt->SetData(3, _sites[position].Finds);
+            trans->Append(stmt);
+        }
+        _sitesChanged = false;
+    }
+
+    if (_projectsChanged)
+    {
+        stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_ARCHAEOLOGY_PROJECTS);
+        stmt->SetData(0, guid);
+        trans->Append(stmt);
+
+        for (auto const& [branchId, projectId] : _projects)
+        {
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_CHAR_ARCHAEOLOGY_PROJECT);
+            stmt->SetData(0, guid);
+            stmt->SetData(1, uint16(branchId));
+            stmt->SetData(2, projectId);
+            trans->Append(stmt);
+        }
+        _projectsChanged = false;
+    }
+
+    for (uint16 projectId : _completedChanged)
+    {
+        ArchaeologyCompletedProject const& completed = _completed[projectId];
+        stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_CHAR_ARCHAEOLOGY_COMPLETED);
+        stmt->SetData(0, guid);
+        stmt->SetData(1, projectId);
+        stmt->SetData(2, completed.FirstCompleted);
+        stmt->SetData(3, completed.Count);
+        trans->Append(stmt);
+    }
+    _completedChanged.clear();
+}
+
 void Archaeology::DeleteFromDB(ObjectGuid::LowType guid, CharacterDatabaseTransaction trans)
 {
-    trans->Append("DELETE FROM character_archaeology_sites WHERE guid = {}", guid);
-    trans->Append("DELETE FROM character_archaeology_projects WHERE guid = {}", guid);
-    trans->Append("DELETE FROM character_archaeology_completed WHERE guid = {}", guid);
+    for (CharacterDatabaseStatements statement : { CHAR_DEL_CHAR_ARCHAEOLOGY_SITES, CHAR_DEL_CHAR_ARCHAEOLOGY_PROJECTS, CHAR_DEL_CHAR_ARCHAEOLOGY_COMPLETED })
+    {
+        CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(statement);
+        stmt->SetData(0, guid);
+        trans->Append(stmt);
+    }
 }
 
 void Archaeology::Learn()
@@ -128,9 +188,8 @@ void Archaeology::UnLearn()
     for (uint32 branchId : branches)
         ShowProject(branchId);
 
-    ObjectGuid::LowType guid = _player->GetGUID().GetCounter();
-    CharacterDatabase.Execute("DELETE FROM character_archaeology_sites WHERE guid = {}", guid);
-    CharacterDatabase.Execute("DELETE FROM character_archaeology_projects WHERE guid = {}", guid);
+    _sitesChanged = true;
+    _projectsChanged = true;
 }
 
 void Archaeology::OnSkillChange()
@@ -166,16 +225,6 @@ void Archaeology::SetSite(uint8 position, uint16 siteId, uint8 finds)
         site.Id = 0;
 
     _player->SetUInt16Value(PLAYER_FIELD_RESEARCH_SITE_1 + position / 2, position % 2, site.Id);
-}
-
-void Archaeology::SaveSite(uint8 position) const
-{
-    ObjectGuid::LowType guid = _player->GetGUID().GetCounter();
-    DigSite const& site = _sites[position];
-    if (site.Id)
-        CharacterDatabase.Execute("REPLACE INTO character_archaeology_sites (guid, site, type, finds) VALUES ({}, {}, {}, {})", guid, position, site.Id, site.Finds);
-    else
-        CharacterDatabase.Execute("DELETE FROM character_archaeology_sites WHERE guid = {} AND site = {}", guid, position);
 }
 
 void Archaeology::RegenerateSites()
@@ -226,7 +275,7 @@ void Archaeology::ReplaceSite(uint8 position)
         return;
 
     SetSite(position, siteId, 0);
-    SaveSite(position);
+    _sitesChanged = true;
 }
 
 int32 Archaeology::GetNearestSite(float& distSq) const
@@ -341,16 +390,18 @@ void Archaeology::Survey()
     }
 
     // found it: the race's find, then the next find of the site, or a new site after the third
-    if (ArchaeologySite const* entry = sArchaeologyMgr->GetSite(site.Id))
-        SummonFacing(_player, entry->FindEntry, x, y, ground, frand(0.0f, 2.0f * float(M_PI)), FIND_DURATION);
+    uint16 siteId = site.Id;
+    GameObject* find = nullptr;
+    if (ArchaeologySite const* entry = sArchaeologyMgr->GetSite(siteId))
+        find = SummonFacing(_player, entry->FindEntry, x, y, ground, frand(0.0f, 2.0f * float(M_PI)), FIND_DURATION);
 
     if (++site.Finds >= ARCHAEOLOGY_FINDS_PER_SITE)
         ReplaceSite(uint8(position));
     else
-    {
         sArchaeologyMgr->RandomPointInSite(site.Id, site.X, site.Y);
-        SaveSite(uint8(position));
-    }
+    _sitesChanged = true;
+
+    sScriptMgr->OnPlayerArchaeologyFind(_player, siteId, find);
 }
 
 void Archaeology::ShowProject(uint32 branchId)
@@ -366,19 +417,13 @@ void Archaeology::ShowProject(uint32 branchId)
 
 void Archaeology::NewProject(uint32 branchId)
 {
-    ObjectGuid::LowType guid = _player->GetGUID().GetCounter();
     uint16 projectId = sArchaeologyMgr->PickProject(branchId, _completed, _player->GetSkillValue(SKILL_ARCHAEOLOGY));
     if (projectId)
-    {
         _projects[branchId] = projectId;
-        CharacterDatabase.Execute("REPLACE INTO character_archaeology_projects (guid, branch, project) VALUES ({}, {}, {})", guid, branchId, projectId);
-    }
     else
-    {
         _projects.erase(branchId);
-        CharacterDatabase.Execute("DELETE FROM character_archaeology_projects WHERE guid = {} AND branch = {}", guid, branchId);
-    }
 
+    _projectsChanged = true;
     ShowProject(branchId);
 }
 
@@ -457,14 +502,15 @@ void Archaeology::Solve(uint16 projectId)
     if (!completed.Count)
         completed.FirstCompleted = now;
     ++completed.Count;
-    CharacterDatabase.Execute("REPLACE INTO character_archaeology_completed (guid, project, time, count) VALUES ({}, {}, {}, {})",
-        _player->GetGUID().GetCounter(), projectId, completed.FirstCompleted, completed.Count);
+    _completedChanged.insert(projectId);
 
     _player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ARCHAEOLOGY_PROJECTS, projectId, completed.Count == 1 ? 1 : 0);
 
     WorldPackets::Archaeology::ResearchComplete packet;
     packet.Research = WorldPackets::Archaeology::ResearchHistory(projectId, completed.Count, completed.FirstCompleted);
     _player->SendDirectMessage(packet.Write());
+
+    sScriptMgr->OnPlayerArchaeologySolve(_player, projectId, completed.Count == 1);
 
     NewProject(project->Branch);
 }

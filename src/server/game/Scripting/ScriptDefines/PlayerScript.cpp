@@ -1004,6 +1004,21 @@ void ScriptMgr::OnPlayerAfterTrainSpell(Player* player, Creature* trainer, uint3
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_AFTER_TRAIN_SPELL, script->OnPlayerAfterTrainSpell(player, trainer, spellId));
 }
 
+void ScriptMgr::OnPlayerCurrencyChange(Player* player, uint32 currencyId, uint32 oldAmount, uint32 newAmount)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_CURRENCY_CHANGE, script->OnPlayerCurrencyChange(player, currencyId, oldAmount, newAmount));
+}
+
+void ScriptMgr::OnPlayerArchaeologyFind(Player* player, uint16 siteId, GameObject* find)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_ARCHAEOLOGY_FIND, script->OnPlayerArchaeologyFind(player, siteId, find));
+}
+
+void ScriptMgr::OnPlayerArchaeologySolve(Player* player, uint16 projectId, bool firstSolve)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_ARCHAEOLOGY_SOLVE, script->OnPlayerArchaeologySolve(player, projectId, firstSolve));
+}
+
 PlayerScript::PlayerScript(char const* name, std::vector<uint16> enabledHooks)
     : ScriptObject(name, PLAYERHOOK_END)
 {

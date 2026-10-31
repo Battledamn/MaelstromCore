@@ -5625,7 +5625,9 @@ bool Player::LoadFromDB(ObjectGuid playerGuid, CharacterDatabaseQueryHolder cons
     }
 
     // dig sites and artifacts, after the skills and currencies they depend on
-    _archaeology->LoadFromDB();
+    _archaeology->LoadFromDB(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_ARCHAEOLOGY_SITES),
+        holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_ARCHAEOLOGY_PROJECTS),
+        holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_ARCHAEOLOGY_COMPLETED));
 
     // has to be called after last Relocate() in Player::LoadFromDB
     SetFallInformation(GameTime::GetGameTime().count(), GetPositionZ());
@@ -7335,6 +7337,8 @@ void Player::SaveToDB(CharacterDatabaseTransaction trans, bool create, bool logo
         currencyStmt->SetData(2, quantity);
         trans->Append(currencyStmt);
     }
+
+    _archaeology->SaveToDB(trans);
 
     // check if stats should only be saved on logout
     // save stats can be out of transaction

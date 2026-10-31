@@ -27,6 +27,8 @@
 #include "AchievementMgr.h"
 #include "KillRewarder.h"
 
+class GameObject;
+
 namespace Trainer
 {
     enum class SpellState : uint8;
@@ -235,6 +237,9 @@ enum PlayerHook
     PLAYERHOOK_ON_BEFORE_RECEIVE_SPELL_LIST_FROM_TRAINER,
     PLAYERHOOK_ON_GET_TRAINER_SPELL_STATE,
     PLAYERHOOK_ON_AFTER_TRAIN_SPELL,
+    PLAYERHOOK_ON_CURRENCY_CHANGE,
+    PLAYERHOOK_ON_ARCHAEOLOGY_FIND,
+    PLAYERHOOK_ON_ARCHAEOLOGY_SOLVE,
     PLAYERHOOK_END
 };
 
@@ -966,6 +971,36 @@ public:
      * @param spellId The id of the trainer spell that was bought
      */
     virtual void OnPlayerAfterTrainSpell(Player* /*player*/, Creature* /*trainer*/, uint32 /*spellId*/) {}
+
+    /**
+     * @brief This hook is called after a 4.x currency amount changed (quest rewards and costs, loot,
+     *        archaeology solves, GM commands), once the client has been told.
+     *
+     * @param player Contains information about the Player
+     * @param currencyId The CurrencyTypes.dbc id
+     * @param oldAmount The amount before, in the stored units (1/100 for currencies with precision)
+     * @param newAmount The amount after, capped, in the same units
+     */
+    virtual void OnPlayerCurrencyChange(Player* /*player*/, uint32 /*currencyId*/, uint32 /*oldAmount*/, uint32 /*newAmount*/) {}
+
+    /**
+     * @brief This hook is called when a Survey found a dig site's find and its gameobject was summoned.
+     *
+     * @param player Contains information about the Player
+     * @param siteId The ResearchSite.dbc id of the dig site
+     * @param find The summoned find (can be nullptr if it could not be summoned)
+     */
+    virtual void OnPlayerArchaeologyFind(Player* /*player*/, uint16 /*siteId*/, GameObject* /*find*/) {}
+
+    /**
+     * @brief This hook is called after an artifact was solved: fragments and keystones spent, the
+     *        artifact item created, and before the race's next artifact is picked.
+     *
+     * @param player Contains information about the Player
+     * @param projectId The ResearchProject.dbc id of the solved artifact
+     * @param firstSolve True the first time this player solves it
+     */
+    virtual void OnPlayerArchaeologySolve(Player* /*player*/, uint16 /*projectId*/, bool /*firstSolve*/) {}
 };
 
 #endif

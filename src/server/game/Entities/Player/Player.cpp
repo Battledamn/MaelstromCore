@@ -10514,6 +10514,8 @@ void Player::ModifyCurrency(uint32 currencyId, int32 amount, bool suppressChatLo
     // a race's first fragments start its archaeology research (CPP)
     if (!current)
         _archaeology->OnCurrencyGained(currencyId);
+
+    sScriptMgr->OnPlayerCurrencyChange(this, currencyId, uint32(current), uint32(updated));
 }
 
 void Player::SendBindPointUpdate() const
