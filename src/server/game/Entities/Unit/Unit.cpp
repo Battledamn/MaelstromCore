@@ -1574,10 +1574,11 @@ void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 dama
                 // Spell weapon based damage CAN BE crit & blocked at same time
                 if (blocked)
                 {
-                    damageInfo->blocked = victim->GetShieldBlockValue();
-                    // double blocked amount if block is critical
+                    // 4.x: a share of the hit, doubled if the block is critical (CPP)
+                    uint32 blockPct = victim->GetBlockPercent();
                     if (victim->isBlockCritical())
-                        damageInfo->blocked *= 2;
+                        blockPct *= 2;
+                    damageInfo->blocked = CalculatePct(uint32(damage), blockPct);
                     if (damage < int32(damageInfo->blocked))
                         damageInfo->blocked = uint32(damage);
 
@@ -1870,10 +1871,14 @@ void Unit::CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, Weapon
         {
             damageInfo->TargetState = VICTIMSTATE_HIT;
             damageInfo->HitInfo |= HITINFO_BLOCK;
-            damageInfo->blocked_amount = damageInfo->target->GetShieldBlockValue();
-            // double blocked amount if block is critical
+            // 4.x: a share of the hit, doubled if the block is critical (CPP)
+            uint32 blockPct = damageInfo->target->GetBlockPercent();
             if (damageInfo->target->isBlockCritical())
-                damageInfo->blocked_amount += damageInfo->blocked_amount;
+                blockPct *= 2;
+            uint32 hitDamage = 0;
+            for (uint8 i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+                hitDamage += damageInfo->damages[i].damage;
+            damageInfo->blocked_amount = CalculatePct(hitDamage, blockPct);
 
             uint32 remainingBlock = damageInfo->blocked_amount;
             uint8 fullBlockMask = 0;
@@ -3606,7 +3611,8 @@ float Unit::GetUnitBlockChance() const
         if (player->CanBlock())
         {
             Item* tmpitem = player->GetUseableItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
-            if (tmpitem && !tmpitem->IsBroken() && tmpitem->GetTemplate()->Block)
+            // 4.x shields have no block value any more (ItemTemplate::Block is 0), so test for a shield
+            if (tmpitem && !tmpitem->IsBroken() && tmpitem->GetTemplate()->InventoryType == INVTYPE_SHIELD)
                 return GetFloatValue(PLAYER_BLOCK_PERCENTAGE);
         }
         // is player but has no block ability or no not broken shield equipped

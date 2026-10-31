@@ -474,7 +474,10 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
 
 void Player::UpdateShieldBlockValue()
 {
-    SetUInt32Value(PLAYER_SHIELD_BLOCK, GetShieldBlockValue());
+    // 4.x: the share of a hit a block stops, which the client shows (not 3.3.5a's block value): the
+    // base plus SPELL_AURA_MOD_SHIELD_BLOCKVALUE_PCT in percentage points (Holy Shield: 30 + 20)
+    int32 const percent = int32(BASE_BLOCK_PERCENT) + GetTotalAuraModifier(SPELL_AURA_MOD_SHIELD_BLOCKVALUE_PCT);
+    SetUInt32Value(PLAYER_SHIELD_BLOCK, uint32(std::clamp(percent, 0, 100)));
 }
 
 void Player::CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, bool addTotalPct, float& minDamage, float& maxDamage, uint8 damageIndex)
@@ -572,10 +575,8 @@ void Player::UpdateBlockPercentage()
     float value = 0.0f;
     if (CanBlock())
     {
-        // Base value
+        // Base value (4.0.1 removed the Defense skill and its block bonus)
         value = 5.0f;
-        // Modify value from defense skill
-        value += (int32(GetDefenseSkillValue()) - int32(GetMaxSkillValueForLevel())) * 0.04f;
         // Increase from SPELL_AURA_MOD_BLOCK_PERCENT aura
         value += GetTotalAuraModifier(SPELL_AURA_MOD_BLOCK_PERCENT);
         // Increase from rating
@@ -688,14 +689,15 @@ float Player::GetMissPercentageFromDefence() const
 
 void Player::UpdateParryPercentage()
 {
+    // 4.3.4 diminishing return caps (CPP)
     const float parry_cap[MAX_CLASSES] =
     {
-        47.003525f,     // Warrior
-        47.003525f,     // Paladin
+        65.631440f,     // Warrior
+        65.631440f,     // Paladin
         145.560408f,    // Hunter
         145.560408f,    // Rogue
         0.0f,           // Priest
-        47.003525f,     // DK
+        65.631440f,     // DK
         145.560408f,    // Shaman
         0.0f,           // Mage
         0.0f,           // Warlock
@@ -712,21 +714,17 @@ void Player::UpdateParryPercentage()
         float nondiminishing  = 5.0f;
         // Parry from rating
         float diminishing = GetRatingBonusValue(CR_PARRY);
-        // Modify value from defense skill (only bonus from defense rating diminishes)
-        nondiminishing += (GetSkillValue(SKILL_DEFENSE) - GetMaxSkillValueForLevel()) * 0.04f;
-        diminishing += (int32(GetRatingBonusValue(CR_DEFENSE_SKILL))) * 0.04f;
         // Parry from SPELL_AURA_MOD_PARRY_PERCENT aura
         nondiminishing += GetTotalAuraModifier(SPELL_AURA_MOD_PARRY_PERCENT);
         // apply diminishing formula to diminishing parry chance
         m_realParry = nondiminishing + diminishing * parry_cap[pclass] / (diminishing + parry_cap[pclass] * m_diminishing_k[pclass]);
         m_realParry = m_realParry < 0.0f ? 0.0f : m_realParry;
 
-        value = std::max(diminishing + nondiminishing, 0.0f);
-
         if (sConfigMgr->GetOption<bool>("Stats.Limits.Enable", false))
-        {
-            value = value > sConfigMgr->GetOption<float>("Stats.Limits.Parry", 95.0f) ? sConfigMgr->GetOption<float>("Stats.Limits.Parry", 95.0f) : value;
-        }
+            m_realParry = std::min(m_realParry, sConfigMgr->GetOption<float>("Stats.Limits.Parry", 95.0f));
+
+        // the character sheet shows the chance after diminishing returns, the one combat uses (CPP)
+        value = m_realParry;
     }
 
     SetStatFloatValue(PLAYER_PARRY_PERCENTAGE, value);
@@ -734,14 +732,15 @@ void Player::UpdateParryPercentage()
 
 void Player::UpdateDodgePercentage()
 {
+    // 4.3.4 diminishing return caps (CPP)
     const float dodge_cap[MAX_CLASSES] =
     {
-        88.129021f,     // Warrior
-        88.129021f,     // Paladin
+        65.631440f,     // Warrior
+        65.631440f,     // Paladin
         145.560408f,    // Hunter
         145.560408f,    // Rogue
         150.375940f,    // Priest
-        88.129021f,     // DK
+        65.631440f,     // DK
         145.560408f,    // Shaman
         150.375940f,    // Mage
         150.375940f,    // Warlock
@@ -751,9 +750,6 @@ void Player::UpdateDodgePercentage()
 
     float diminishing = 0.0f, nondiminishing = 0.0f;
     GetDodgeFromAgility(diminishing, nondiminishing);
-    // Modify value from defense skill (only bonus from defense rating diminishes)
-    nondiminishing += (GetSkillValue(SKILL_DEFENSE) - GetMaxSkillValueForLevel()) * 0.04f;
-    diminishing += (int32(GetRatingBonusValue(CR_DEFENSE_SKILL))) * 0.04f;
     // Dodge from SPELL_AURA_MOD_DODGE_PERCENT aura
     nondiminishing += GetTotalAuraModifier(SPELL_AURA_MOD_DODGE_PERCENT);
     // Dodge from rating
@@ -763,14 +759,12 @@ void Player::UpdateDodgePercentage()
     m_realDodge = nondiminishing + (diminishing * dodge_cap[pclass] / (diminishing + dodge_cap[pclass] * m_diminishing_k[pclass]));
 
     m_realDodge = m_realDodge < 0.0f ? 0.0f : m_realDodge;
-    float value = std::max(diminishing + nondiminishing, 0.0f);
 
     if (sConfigMgr->GetOption<bool>("Stats.Limits.Enable", false))
-    {
-        value = value > sConfigMgr->GetOption<float>("Stats.Limits.Dodge", 95.0f) ? sConfigMgr->GetOption<float>("Stats.Limits.Dodge", 95.0f) : value;
-    }
+        m_realDodge = std::min(m_realDodge, sConfigMgr->GetOption<float>("Stats.Limits.Dodge", 95.0f));
 
-    SetStatFloatValue(PLAYER_DODGE_PERCENTAGE, value);
+    // the character sheet shows the chance after diminishing returns, the one combat uses (CPP)
+    SetStatFloatValue(PLAYER_DODGE_PERCENTAGE, m_realDodge);
 }
 
 void Player::UpdateSpellCritChance(uint32 school)

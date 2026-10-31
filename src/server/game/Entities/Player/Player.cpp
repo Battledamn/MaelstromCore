@@ -2693,7 +2693,7 @@ void Player::InitStatsForLevel(bool reapplyMods)
 
     SetFloatValue(PLAYER_PARRY_PERCENTAGE, 0.0f);
     SetFloatValue(PLAYER_BLOCK_PERCENTAGE, 0.0f);
-    SetUInt32Value(PLAYER_SHIELD_BLOCK, 0);
+    SetUInt32Value(PLAYER_SHIELD_BLOCK, BASE_BLOCK_PERCENT);
 
     // Dodge percentage
     SetFloatValue(PLAYER_DODGE_PERCENTAGE, 0.0f);
@@ -5318,35 +5318,42 @@ float Player::GetMeleeCritFromAgility()
 
 void Player::GetDodgeFromAgility(float& diminishing, float& nondiminishing)
 {
-    // Table for base dodge values
+    // Patch 4.2.0: death knights, paladins and warriors get no dodge from Agility; their base chance
+    // to dodge is a fixed 5% (CPP)
+    if (getClass() == CLASS_WARRIOR || getClass() == CLASS_PALADIN || getClass() == CLASS_DEATH_KNIGHT)
+    {
+        nondiminishing += 5.0f;
+        return;
+    }
+
+    // 4.3.4 base dodge and crit-to-dodge coefficients (CPP)
     const float dodge_base[MAX_CLASSES] =
     {
-        0.036640f, // Warrior
-        0.034943f, // Paladi
-        -0.040873f, // Hunter
-        0.020957f, // Rogue
-        0.034178f, // Priest
-        0.036640f, // DK
-        0.021080f, // Shaman
-        0.036587f, // Mage
-        0.024211f, // Warlock
-        0.0f,      // ??
-        0.056097f  // Druid
+        0.037580f,  // Warrior (unused since 4.2)
+        0.036520f,  // Paladin (unused since 4.2)
+        -0.054500f, // Hunter
+        -0.005900f, // Rogue
+        0.031830f,  // Priest
+        0.036640f,  // DK (unused since 4.2)
+        0.016750f,  // Shaman
+        0.034575f,  // Mage
+        0.020350f,  // Warlock
+        0.0f,       // ??
+        0.049510f   // Druid
     };
-    // Crit/agility to dodge/agility coefficient multipliers; 3.2.0 increased required agility by 15%
     const float crit_to_dodge[MAX_CLASSES] =
     {
-        0.85f / 1.15f,  // Warrior
-        1.00f / 1.15f,  // Paladin
-        1.11f / 1.15f,  // Hunter
-        2.00f / 1.15f,  // Rogue
-        1.00f / 1.15f,  // Priest
-        0.85f / 1.15f,  // DK
-        1.60f / 1.15f,  // Shaman
-        1.00f / 1.15f,  // Mage
-        0.97f / 1.15f,  // Warlock (?)
-        0.0f,           // ??
-        2.00f / 1.15f   // Druid
+        0.0f,   // Warrior (unused since 4.2)
+        0.0f,   // Paladin (unused since 4.2)
+        0.74f,  // Hunter
+        1.33f,  // Rogue
+        0.67f,  // Priest
+        0.0f,   // DK (unused since 4.2)
+        1.07f,  // Shaman
+        0.66f,  // Mage
+        0.65f,  // Warlock
+        0.0f,   // ??
+        1.32f   // Druid
     };
 
     uint8 level = GetLevel();

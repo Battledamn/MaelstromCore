@@ -2272,6 +2272,7 @@ public:
     void SendCorpseReclaimDelay(uint32 delay);
 
     [[nodiscard]] uint32 GetShieldBlockValue() const override;                 // overwrite Unit version (virtual)
+    [[nodiscard]] uint32 GetBlockPercent() const override { return GetUInt32Value(PLAYER_SHIELD_BLOCK); }
     [[nodiscard]] bool CanParry() const { return m_canParry; }
     void SetCanParry(bool value);
     [[nodiscard]] bool CanBlock() const { return m_canBlock; }

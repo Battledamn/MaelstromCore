@@ -60,20 +60,22 @@ char constexpr GlyphPropertiesfmt[] = "niix";
 char constexpr GlyphSlotfmt[] = "nii";
 // The one-column gt*.dbc files are indexed by row; their gt*_dbc tables add that row as ID
 char constexpr GtDatabasefmt[] = "df";
-char constexpr GtBarberShopCostBasefmt[] = "f";
-char constexpr GtCombatRatingsfmt[] = "f";
-char constexpr GtChanceToMeleeCritBasefmt[] = "f";
-char constexpr GtChanceToMeleeCritfmt[] = "f";
-char constexpr GtChanceToSpellCritBasefmt[] = "f";
-char constexpr GtChanceToSpellCritfmt[] = "f";
-char constexpr GtNPCManaCostScalerfmt[] = "f";
+// 4.3.4 gt files have two columns, the row id and the value (3.3.5a had the value only); with "f"
+// the files were rejected and only the 3.3.5a world DB copies (gt*_dbc) were loaded
+char constexpr GtBarberShopCostBasefmt[] = "df";
+char constexpr GtCombatRatingsfmt[] = "df";
+char constexpr GtChanceToMeleeCritBasefmt[] = "df";
+char constexpr GtChanceToMeleeCritfmt[] = "df";
+char constexpr GtChanceToSpellCritBasefmt[] = "df";
+char constexpr GtChanceToSpellCritfmt[] = "df";
+char constexpr GtNPCManaCostScalerfmt[] = "df";
 char constexpr GtOCTClassCombatRatingScalarfmt[] = "df";
 char constexpr GtOCTRegenHPfmt[] = "f";
 char constexpr GtSpellScalingfmt[] = "xf";
 char constexpr GtOCTHpPerStaminafmt[] = "xf";
 //char constexpr GtOCTRegenMPfmt[] = "f";
 char constexpr GtRegenHPPerSptfmt[] = "f";
-char constexpr GtRegenMPPerSptfmt[] = "f";
+char constexpr GtRegenMPPerSptfmt[] = "df";
 char constexpr Holidaysfmt[] = "niiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiixxsiix";
 char constexpr Itemfmt[] = "niiiiiii";
 char constexpr NameGenfmt[] = "nsii";

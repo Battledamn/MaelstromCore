@@ -190,6 +190,9 @@ enum UnitMods
     UNIT_MOD_POWER_END = UNIT_MOD_ALTERNATE_POWER + 1
 };
 
+// 4.x: the share of a hit a block stops, before SPELL_AURA_MOD_SHIELD_BLOCKVALUE_PCT (Holy Shield +20)
+constexpr uint32 BASE_BLOCK_PERCENT = 30;
+
 enum BaseModGroup
 {
     CRIT_PERCENTAGE,
@@ -1206,7 +1209,11 @@ public:
     [[nodiscard]] bool CanApplyResilience() const { return m_applyResilience; }
 
     // Skills values
+    // 3.3.5a block value; in 4.x only the WotLK class spells still read it (Shield Slam, Shield of
+    // Righteousness in SpellEffects.cpp) until the class script port
     [[nodiscard]] virtual uint32 GetShieldBlockValue() const = 0;
+    // 4.x: a block stops a share of the hit (doubled by a critical block) (CPP)
+    [[nodiscard]] virtual uint32 GetBlockPercent() const { return BASE_BLOCK_PERCENT; }
     [[nodiscard]] uint32 GetShieldBlockValue(uint32 soft_cap, uint32 hard_cap) const
     {
         uint32 value = GetShieldBlockValue();

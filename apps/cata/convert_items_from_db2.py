@@ -7,8 +7,8 @@ underived (block, second damage, scaling value), the schema default is kept and 
 them so the gap stays visible. The item's PageText is copied, and the emitted SQL clears references whose
 page the target's page_text does not carry (the pages are world data; TDB 434 lacks Cata's later pages).
 Cata-only stat types are translated where AC has a column:
-50 extra armor -> armor, 51-56 resistances -> *_res; 49 mastery has no AC counterpart and is dropped
-rather than left for the loader to reinterpret as mana.
+50 extra armor -> armor, 51-56 resistances -> *_res; 49 mastery is kept (MaelstromCore's loader and
+ITEM_MOD_MASTERY_RATING apply it).
 
 Item ids come from the command line or, for any zone, from an import_starter_content.py JSON report
 (--ids-from-report): its closure.missing_items lists the item ids the zone's quests reference that
@@ -77,8 +77,7 @@ DERIVED = ["armor", "MaxDurability", "dmg_min1", "dmg_max1", "dmg_type1", "Disen
 # columns, and PageText is world data (#259).
 UNRESOLVED = ["block", "dmg_min2", "dmg_max2", "dmg_type2", "ScalingStatValue"]
 # Cata stat types above AC's highest ItemModType (48) that have their own item_template column. Mastery (49)
-# has no AC counterpart and is dropped instead of passed through, where the loader would zero the type and
-# apply the value as mana.
+# stays a stat: MaelstromCore's MAX_ITEM_MOD is 50 and ITEM_MOD_MASTERY_RATING applies it.
 RESISTANCES = {51: "fire_res", 52: "frost_res", 53: "holy_res", 54: "shadow_res", 55: "nature_res",
                56: "arcane_res"}
 # A DELETE + INSERT resets these AC-owned columns, so only run it for ids absent from item_template.
@@ -144,7 +143,7 @@ def convert(item_rows, sparse_rows, item_ids, tables=None):
                 row[RESISTANCES[stat_type]] += value
             elif stat_type == 50:  # extra armor
                 row["armor"] += value
-            elif stat_type != 49 and stat_type <= 56:
+            elif stat_type <= 56:  # AC's ItemModTypes, and 49 mastery (MaelstromCore applies it)
                 continue
             row[f"stat_type{i}"] = row[f"stat_value{i}"] = 0
         rows.append(row)
@@ -197,7 +196,7 @@ def self_test():
                       "ItemStatType2": 50, "ItemStatValue2": 7, "ItemStatType3": 49, "ItemStatValue3": 5})
     translated = convert(item, sparse, [1])[0]
     assert (translated["fire_res"], translated["arcane_res"], translated["armor"]) == (18, 18, 7)
-    assert [translated[f"stat_type{i}"] for i in range(1, 5)] == [0, 0, 0, 0]
+    assert [translated[f"stat_type{i}"] for i in range(1, 5)] == [0, 0, 0, 49]
     assert "DELETE" not in to_sql(rows, 15595, insert_only=True)
     assert sql.count("DELETE FROM") == 1 and "VALUES" in sql and sql.rstrip().endswith("COMMIT;")
     sparse[1]["Flags"] = -2147483648

@@ -5150,13 +5150,8 @@ void AuraEffect::HandleShieldBlockValuePercent(AuraApplication const* aurApp, ui
     if (!target)
         return;
 
-    if (apply)
-        target->ApplyBaseModPctValue(SHIELD_BLOCK_VALUE, float(GetAmount()));
-    else
-    {
-        float amount = target->GetTotalAuraMultiplier(SPELL_AURA_MOD_SHIELD_BLOCKVALUE_PCT);
-        target->SetBaseModPctValue(SHIELD_BLOCK_VALUE, amount);
-    }
+    // 4.x: percentage points on the share of a hit a block stops (Player::UpdateShieldBlockValue)
+    target->UpdateShieldBlockValue();
 }
 
 /********************************/
