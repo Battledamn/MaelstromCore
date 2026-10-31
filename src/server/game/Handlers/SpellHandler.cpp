@@ -15,6 +15,7 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Archaeology.h"
 #include "DBCStores.h"
 #include "GameObjectAI.h"
 #include "Log.h"
@@ -52,6 +53,31 @@ void WorldSession::HandleClientCastFlags(WorldPacket& recvPacket, uint8 castFlag
             recvPacket.SetOpcode(recvPacket.read<uint32>());
             HandleMovementOpcodes(recvPacket);
         }
+    }
+    else if (castFlags & 0x08)
+    {
+        // 4.x archaeology solve (CPP): the fragments (type 1, a currency) and keystones (type 2, an
+        // item) the player puts into the artifact
+        ArchaeologySolveData data;
+        uint32 count = recvPacket.read<uint32>();
+        for (uint32 i = 0; i < count; ++i)
+        {
+            uint8 type = recvPacket.read<uint8>();
+            uint32 id = recvPacket.read<uint32>();
+            uint32 quantity = recvPacket.read<uint32>();
+            if (type == 1)
+            {
+                data.CurrencyId = id;
+                data.CurrencyCount = quantity;
+            }
+            else if (type == 2)
+            {
+                data.KeystoneId = id;
+                data.KeystoneCount = quantity;
+            }
+        }
+
+        _player->GetArchaeology().SetSolveData(data);
     }
 }
 
@@ -458,7 +484,9 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
         // not have spell in spellbook or spell passive and not casted by client
         if (!(spellInfo->Targets & TARGET_FLAG_GAMEOBJECT_ITEM) && (!mover->ToPlayer()->HasActiveSpell(spellId) || spellInfo->IsPassive()))
         {
-            bool allow = false;
+            // 4.x archaeology: a solve is cast without being known, for the artifact in research (CPP)
+            bool allow = spellInfo->ResearchProjectId && !spellInfo->IsPassive() &&
+                mover->ToPlayer()->GetArchaeology().HasProject(uint16(spellInfo->ResearchProjectId));
 
             // allow casting of unknown spells for special lock cases
             if (GameObject* go = targets.GetGOTarget())

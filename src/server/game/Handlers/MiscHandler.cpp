@@ -16,6 +16,7 @@
  */
 
 #include "AccountMgr.h"
+#include "Archaeology.h"
 #include "BattlefieldMgr.h"
 #include "RBAC.h"
 #include "Battleground.h"
@@ -1793,4 +1794,10 @@ void WorldSession::HandleUpdateMissileTrajectory(WorldPacket& recvPacket)
         recvPacket.SetOpcode(opcode);
         HandleMovementOpcodes(recvPacket);
     }
+}
+
+void WorldSession::HandleRequestResearchHistory(WorldPacket& /*recvData*/)
+{
+    // 4.x archaeology: the solved artifacts for the Archaeology window
+    _player->GetArchaeology().SendResearchHistory();
 }

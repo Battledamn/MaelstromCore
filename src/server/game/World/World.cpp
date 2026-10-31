@@ -23,6 +23,7 @@
 #include "AccountMgr.h"
 #include "AchievementMgr.h"
 #include "AddonMgr.h"
+#include "ArchaeologyMgr.h"
 #include "ArenaSeasonMgr.h"
 #include "ArenaTeamMgr.h"
 #include "AuctionHouseMgr.h"
@@ -590,6 +591,9 @@ void World::SetInitialWorldSettings()
 
     LOG_INFO("server.loading", "Loading Gameobject Summon Data...");
     sObjectMgr->LoadGameObjectSummons();                         // must be after LoadCreatureTemplates() and LoadGameObjectTemplates()
+
+    LOG_INFO("server.loading", "Loading Archaeology Sites and Artifacts...");
+    sArchaeologyMgr->LoadData();                                 // 4.x, after the DBCs and LoadGameObjectTemplates()
 
     LOG_INFO("server.loading", "Loading Pet Levelup Spells...");
     sSpellMgr->LoadPetLevelupSpellMap();

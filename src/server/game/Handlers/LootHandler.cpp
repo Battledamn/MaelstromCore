@@ -571,3 +571,35 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recvData)
     loot->NotifyItemRemoved(slotid);
     --loot->unlootedCount;
 }
+
+void WorldSession::HandleLootCurrencyOpcode(WorldPacket& recvData)
+{
+    LOG_DEBUG("network", "WORLD: CMSG_LOOT_CURRENCY");
+
+    uint8 lootSlot = recvData.read<uint8>();
+
+    Player* player = GetPlayer();
+    ObjectGuid guid = player->GetLootGUID();
+    Loot* loot = nullptr;
+
+    // 4.x currency in a loot window (CPP HandleLootCurrencyOpcode)
+    switch (guid.GetHigh())
+    {
+        case HighGuid::GameObject:
+            if (GameObject* go = player->GetMap()->GetGameObject(guid))
+                if (go->GetOwnerGUID() == player->GetGUID() || go->IsWithinDistInMap(player, INTERACTION_DISTANCE))
+                    loot = &go->loot;
+            break;
+        case HighGuid::Unit:
+        case HighGuid::Vehicle:
+            if (Creature* creature = player->GetMap()->GetCreature(guid))
+                if (!creature->IsAlive() && creature->IsWithinDistInMap(player, INTERACTION_DISTANCE))
+                    loot = &creature->loot;
+            break;
+        default:
+            break;
+    }
+
+    if (loot)
+        loot->LootCurrencyInSlot(lootSlot, player);
+}

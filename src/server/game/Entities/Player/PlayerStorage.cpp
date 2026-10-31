@@ -17,6 +17,7 @@
 
 #include "AccountMgr.h"
 #include "AchievementMgr.h"
+#include "Archaeology.h"
 #include "ArenaTeam.h"
 #include "ArenaTeamMgr.h"
 #include "Battlefield.h"
@@ -5622,6 +5623,9 @@ bool Player::LoadFromDB(ObjectGuid playerGuid, CharacterDatabaseQueryHolder cons
             _currencyStorage[currencyFields[0].Get<uint16>()] = currencyFields[1].Get<uint32>();
         } while (currencyResult->NextRow());
     }
+
+    // dig sites and artifacts, after the skills and currencies they depend on
+    _archaeology->LoadFromDB();
 
     // has to be called after last Relocate() in Player::LoadFromDB
     SetFallInformation(GameTime::GetGameTime().count(), GetPositionZ());

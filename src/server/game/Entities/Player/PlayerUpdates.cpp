@@ -16,6 +16,7 @@
  */
 
 #include "AchievementMgr.h"
+#include "Archaeology.h"
 #include "BattlefieldMgr.h"
 #include "CellImpl.h"
 #include "Channel.h"
@@ -746,6 +747,9 @@ bool Player::UpdateSkill(uint32 skill_id, uint32 step)
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL,
                                   skill_id);
 
+        if (skill_id == SKILL_ARCHAEOLOGY)
+            _archaeology->OnSkillChange();
+
         sScriptMgr->OnPlayerUpdateSkill(this, skill_id, value, max, step, new_value);
         return true;
     }
@@ -803,6 +807,9 @@ bool Player::UpdateGatherSkill(uint32 SkillId, uint32 SkillValue,
     // 75-149 - 2 times, 225-299 - 8 times
     switch (SkillId)
     {
+    case SKILL_ARCHAEOLOGY:
+        // finds raise archaeology only below 50; after that solving artifacts does (CPP)
+        return UpdateSkillPro(SkillId, (SkillValue < 50 ? 1000 : 0) * Multiplicator, gathering_skill_gain);
     case SKILL_HERBALISM:
     case SKILL_LOCKPICKING:
     case SKILL_JEWELCRAFTING:
@@ -999,6 +1006,9 @@ bool Player::UpdateSkillPro(uint16 SkillId, int32 Chance, uint32 step)
         LOG_DEBUG("entities.player.skills",
                   "Player::UpdateSkillPro Chance={:3.1f}% taken",
                   Chance / 10.0f);
+
+        if (SkillId == SKILL_ARCHAEOLOGY)
+            _archaeology->OnSkillChange();
 
         sScriptMgr->OnPlayerUpdateSkill(this, SkillId, SkillValue, MaxValue, step, new_value);
         return true;

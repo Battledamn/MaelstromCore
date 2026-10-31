@@ -15,6 +15,7 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Archaeology.h"
 #include "Battleground.h"
 #include "BattlegroundIC.h"
 #include "BattlegroundMgr.h"
@@ -174,7 +175,7 @@ pEffect SpellEffects[TOTAL_SPELL_EFFECTS] =
     &Spell::EffectDismissPet,                               //102 SPELL_EFFECT_DISMISS_PET
     &Spell::EffectReputation,                               //103 SPELL_EFFECT_REPUTATION
     &Spell::EffectSummonObject,                             //104 SPELL_EFFECT_SUMMON_OBJECT_SLOT1
-    &Spell::EffectSummonObject,                             //105 SPELL_EFFECT_SUMMON_OBJECT_SLOT2
+    &Spell::EffectSurvey,                                   //105 SPELL_EFFECT_SUMMON_OBJECT_SLOT2, 4.x archaeology Survey (80451)
     &Spell::EffectSummonObject,                             //106 SPELL_EFFECT_SUMMON_OBJECT_SLOT3
     &Spell::EffectSummonObject,                             //107 SPELL_EFFECT_SUMMON_OBJECT_SLOT4
     &Spell::EffectDispelMechanic,                           //108 SPELL_EFFECT_DISPEL_MECHANIC
@@ -1859,6 +1860,11 @@ void Spell::DoCreateItem(uint8 /*effIndex*/, uint32 itemId)
 
     if (addNumber)
     {
+        // 4.x archaeology: the artifact a solve creates (CPP)
+        uint16 projectId = uint16(m_spellInfo->ResearchProjectId);
+        if (projectId && !player->GetArchaeology().CanSolve(projectId))
+            return;
+
         // create the new item and store it
         Item* pItem = player->StoreNewItem(dest, newitemid, true);
 
@@ -1868,6 +1874,9 @@ void Spell::DoCreateItem(uint8 /*effIndex*/, uint32 itemId)
             player->SendEquipError(EQUIP_ERR_ITEM_NOT_FOUND, nullptr, nullptr);
             return;
         }
+
+        if (projectId)
+            player->GetArchaeology().Solve(projectId);
 
         // set the "Crafted by ..." property of the item
         if (unitCaster && unitCaster->IsPlayer() && pItem->GetTemplate()->HasSignature())
@@ -2292,7 +2301,7 @@ void Spell::EffectOpenLock(SpellEffIndex effIndex)
     }
 
     if (gameObjTarget)
-        SendLoot(guid, LOOT_SKINNING);
+        SendLoot(guid, skillId == SKILL_ARCHAEOLOGY ? LOOT_ARCHAEOLOGY : LOOT_SKINNING);
     else if (itemTarget)
     {
         itemTarget->SetFlag(ITEM_FIELD_FLAGS, ITEM_FIELD_FLAG_UNLOCKED);
@@ -4852,6 +4861,24 @@ void Spell::EffectDismissPet(SpellEffIndex effIndex)
 
     ExecuteLogEffectUnsummonObject(effIndex, pet);
     pet->Remove(PET_SAVE_NOT_IN_SLOT);
+}
+
+void Spell::EffectSurvey(SpellEffIndex effIndex)
+{
+    // 4.x archaeology: Survey points at the nearest dig site's find (CPP); every other spell with this
+    // effect is a slot 2 summon
+    if (m_spellInfo->Id != SPELL_ARCHAEOLOGY_SURVEY)
+    {
+        EffectSummonObject(effIndex);
+        return;
+    }
+
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT || effIndex != EFFECT_0)
+        return;
+
+    if (Player* player = m_caster->ToPlayer())
+        if (player->HasSkill(SKILL_ARCHAEOLOGY))
+            player->GetArchaeology().Survey();
 }
 
 void Spell::EffectSummonObject(SpellEffIndex effIndex)

@@ -800,6 +800,7 @@ public:                                                 // opcodes handlers
     void HandleRepopRequestOpcode(WorldPacket& recvPacket);
     void HandleAutostoreLootItemOpcode(WorldPacket& recvPacket);
     void HandleLootMoneyOpcode(WorldPacket& recvPacket);
+    void HandleLootCurrencyOpcode(WorldPacket& recvPacket);
     void HandleLootOpcode(WorldPacket& recvPacket);
     void HandleLootReleaseOpcode(WorldPacket& recvPacket);
     void HandleLootMasterGiveOpcode(WorldPacket& recvPacket);
@@ -872,6 +873,7 @@ public:                                                 // opcodes handlers
     void HandleMoveTimeSkippedOpcode(WorldPacket& recvData);
 
     void HandleRequestRaidInfoOpcode(WorldPacket& recvData);
+    void HandleRequestResearchHistory(WorldPacket& recvData);
 
     void HandleBattlefieldStatusOpcode(WorldPacket& recvData);
 

@@ -17,6 +17,7 @@
 
 #include "Chat.h"
 #include "CommandScript.h"
+#include "DBCStores.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "Pet.h"
@@ -59,6 +60,7 @@ public:
             { "talentpoints",   HandleModifyTalentCommand,        rbac::RBAC_PERM_COMMAND_MODIFY_TALENTPOINTS,    Console::No },
             { "mount",          HandleModifyMountCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_MOUNT,           Console::No },
             { "honor",          HandleModifyHonorCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_HONOR,           Console::No },
+            { "currency",       HandleModifyCurrencyCommand,      rbac::RBAC_PERM_COMMAND_MODIFY_MONEY,           Console::No },
             { "reputation",     HandleModifyRepCommand,           rbac::RBAC_PERM_COMMAND_MODIFY_REPUTATION,      Console::No },
             { "arenapoints",    HandleModifyArenaCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_ARENAPOINTS,     Console::No },
             { "drunk",          HandleModifyDrunkCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_DRUNK,           Console::No },
@@ -710,6 +712,32 @@ public:
 
         handler->PSendSysMessage(LANG_COMMAND_MODIFY_HONOR, handler->GetNameLink(target), target->GetHonorPoints());
 
+        return true;
+    }
+
+    // 4.x currencies (e.g. archaeology fragments 384-401, Justice Points 395), in the amounts the
+    // client shows
+    static bool HandleModifyCurrencyCommand(ChatHandler* handler, uint32 currencyId, int32 amount)
+    {
+        Player* target = handler->getSelectedPlayer();
+        if (!target)
+        {
+            handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
+            return false;
+        }
+
+        if (handler->HasLowerSecurity(target))
+            return false;
+
+        CurrencyTypesEntry const* currency = sCurrencyTypesStore.LookupEntry(currencyId);
+        if (!currency)
+        {
+            handler->SendErrorMessage("Currency {} is not in CurrencyTypes.dbc.", currencyId);
+            return false;
+        }
+
+        target->ModifyCurrency(currencyId, currency->UsesPrecision() ? amount * int32(CURRENCY_PRECISION) : amount);
+        handler->PSendSysMessage("{} now has {} of currency {}.", handler->GetNameLink(target), target->GetCurrency(currencyId), currencyId);
         return true;
     }
 

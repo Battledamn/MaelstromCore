@@ -896,6 +896,7 @@ SpellInfo::SpellInfo(SpellEntry const* spellEntry, std::array<SpellEffectEntry c
     SpellIconID = spellEntry->SpellIconID;
     ActiveIconID = spellEntry->ActiveIconID;
     SchoolMask = spellEntry->SchoolMask;
+    ResearchProjectId = spellEntry->RequiredProjectID;
     RuneCostID = spellEntry->RuneCostID;
     SpellVisual = spellEntry->SpellVisualID;
     SpellName = spellEntry->Name;

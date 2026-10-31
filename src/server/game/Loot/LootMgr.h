@@ -85,6 +85,7 @@ enum LootType
     LOOT_SKINNING                       = 6,
     LOOT_PROSPECTING                    = 7,
     LOOT_MILLING                        = 8,
+    LOOT_ARCHAEOLOGY                    = 10,   // 4.x archaeology finds
 
     LOOT_FISHINGHOLE                    = 20,   // unsupported by client, sending LOOT_FISHING instead
     LOOT_INSIGNIA                       = 21,   // unsupported by client, sending LOOT_CORPSE instead
@@ -134,13 +135,14 @@ struct LootStoreItem
     uint8   groupid     : 7;
     uint8   mincount;                           // mincount for drop items
     uint8   maxcount;                           // max drop count for the item mincount or Ref multiplicator
+    bool    is_currency;                        // 4.x: itemid is a CurrencyTypes.dbc id (archaeology fragments)
     ConditionList conditions;                   // additional loot condition
 
     // Constructor
     // displayid is filled in IsValid() which must be called after
-    LootStoreItem(uint32 _itemid, int32 _reference, float _chance, bool _needs_quest, uint16 _lootmode, uint8 _groupid, int32 _mincount, uint8 _maxcount)
+    LootStoreItem(uint32 _itemid, int32 _reference, float _chance, bool _needs_quest, uint16 _lootmode, uint8 _groupid, int32 _mincount, uint8 _maxcount, bool _is_currency = false)
         : itemid(_itemid), reference(_reference), chance(_chance), needs_quest(_needs_quest),
-          lootmode(_lootmode), groupid(_groupid), mincount(_mincount), maxcount(_maxcount)
+          lootmode(_lootmode), groupid(_groupid), mincount(_mincount), maxcount(_maxcount), is_currency(_is_currency)
     {}
 
     bool Roll(bool rate, Player const* player, Loot& loot, LootStore const& store) const;   // Checks if the entry takes it's chance (at loot generation)
@@ -179,6 +181,15 @@ struct LootItem
     bool AllowedForPlayer(Player const* player, ObjectGuid source) const;
     void AddAllowedLooter(Player const* player);
     [[nodiscard]] AllowedLooterSet const& GetAllowedLooters() const { return allowedGUIDs; }
+};
+
+// 4.x currency in a loot window (CPP LootCurrency); kept apart from the items so no item, roll or
+// quest loop sees it
+struct LootCurrency
+{
+    uint32 currencyId{0};
+    uint32 count{0};
+    bool   is_looted{false};
 };
 
 struct QuestItem
@@ -319,6 +330,7 @@ struct Loot
 
     std::vector<LootItem> items;
     std::vector<LootItem> quest_items;
+    std::vector<LootCurrency> currencies;
     uint32 gold;
     uint8 unlootedCount{0};
     ObjectGuid roundRobinPlayer;        // GUID of the player having the Round-Robin ownership for the loot. If 0, round robin owner has released.
@@ -357,6 +369,7 @@ struct Loot
         PlayersLooting.clear();
         items.clear();
         quest_items.clear();
+        currencies.clear();
         gold = 0;
         unlootedCount = 0;
         roundRobinPlayer.Clear();
@@ -364,12 +377,13 @@ struct Loot
         loot_type = LOOT_NONE;
     }
 
-    [[nodiscard]] bool empty() const { return items.empty() && gold == 0; }
+    [[nodiscard]] bool empty() const { return items.empty() && currencies.empty() && gold == 0; }
     [[nodiscard]] bool isLooted() const { return gold == 0 && unlootedCount == 0; }
 
     void NotifyItemRemoved(uint8 lootIndex);
     void NotifyQuestItemRemoved(uint8 questIndex);
     void NotifyMoneyRemoved();
+    void NotifyCurrencyRemoved(uint8 lootSlot);
     void AddLooter(ObjectGuid GUID) { PlayersLooting.insert(GUID); }
     void RemoveLooter(ObjectGuid GUID) { PlayersLooting.erase(GUID); }
 
@@ -380,6 +394,9 @@ struct Loot
     void AddItem(LootStoreItem const& item);
 
     LootItem* LootItemInSlot(uint32 lootslot, Player* player, QuestItem** qitem = nullptr, QuestItem** ffaitem = nullptr, QuestItem** conditem = nullptr);
+    // currencies follow the item and quest item slots in the loot window
+    [[nodiscard]] uint8 GetCurrencySlot(std::size_t index) const { return uint8(items.size() + quest_items.size() + index); }
+    void LootCurrencyInSlot(uint8 lootSlot, Player* player);
     uint32 GetMaxSlotInLootFor(Player* player) const;
     [[nodiscard]] bool hasItemForAll() const;
     bool hasItemFor(Player* player) const;

@@ -52,6 +52,7 @@ struct TrainerSpell;
 struct VendorItem;
 
 class AchievementMgr;
+class Archaeology;
 class ReputationMgr;
 class Channel;
 class CharacterCreateInfo;
@@ -1405,6 +1406,7 @@ public:
     void TradeCancel(bool sendback, TradeStatus status = TRADE_STATUS_TRADE_CANCELED);
 
     CinematicMgr& GetCinematicMgr() { return _cinematicMgr; }
+    Archaeology& GetArchaeology() { return *_archaeology; }
     CinematicMgr const& GetCinematicMgr() const { return _cinematicMgr; }
 
     void UpdateEnchantTime(uint32 time);
@@ -2346,6 +2348,7 @@ public:
     void SendLootRelease(ObjectGuid guid);
     void SendNotifyLootItemRemoved(uint8 lootSlot);
     void SendNotifyLootMoneyRemoved();
+    void SendNotifyCurrencyLootRemoved(uint8 lootSlot);
 
     /*********************************************************/
     /***               BATTLEGROUND SYSTEM                 ***/
@@ -3129,6 +3132,7 @@ private:
     bool m_canKnockback;
 
     std::unique_ptr<PetStable> m_petStable;
+    std::unique_ptr<Archaeology> _archaeology;
 
     // Temporary removed pet cache
     uint32 m_temporaryUnsummonedPetNumber;

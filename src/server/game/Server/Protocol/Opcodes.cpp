@@ -529,6 +529,9 @@ void OpcodeTable::Initialize()
     /*0x6207*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_PROFICIENCY,                                    STATUS_NEVER);
     DEFINE_SERVER_OPCODE_HANDLER(SMSG_SETUP_CURRENCY,                                                STATUS_NEVER);
     /*0x59B0*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_CURRENCY,                                       STATUS_NEVER);
+    /*0x1DB4*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_CURRENCY_LOOT_REMOVED,                              STATUS_NEVER);
+    /*0x10B6*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SETUP_RESEARCH_HISTORY,                             STATUS_NEVER);
+    /*0x35A6*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_RESEARCH_COMPLETE,                                  STATUS_NEVER);
     /*0x6F06*/ DEFINE_HANDLER(CMSG_SET_ACTION_BUTTON,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleSetActionButtonOpcode              );
     /*0x38B5*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_UPDATE_ACTION_BUTTONS,                              STATUS_NEVER);
     /*0x0104*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SEND_KNOWN_SPELLS,                                  STATUS_NEVER);
@@ -586,6 +589,7 @@ void OpcodeTable::Initialize()
     /*0x6827*/ DEFINE_HANDLER(CMSG_RESURRECT_RESPONSE,                                               STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleResurrectResponseOpcode            );
     /*0x0127*/ DEFINE_HANDLER(CMSG_LOOT,                                                             STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleLootOpcode                         );
     /*0x6227*/ DEFINE_HANDLER(CMSG_LOOT_MONEY,                                                       STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleLootMoneyOpcode                    );
+    /*0x781C*/ DEFINE_HANDLER(CMSG_LOOT_CURRENCY,                                                    STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleLootCurrencyOpcode                 );
     /*0x2007*/ DEFINE_HANDLER(CMSG_LOOT_RELEASE,                                                     STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleLootReleaseOpcode                  );
     /*0x4C16*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_LOOT_RESPONSE,                                      STATUS_NEVER);
     /*0x6D25*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_LOOT_RELEASE_RESPONSE,                              STATUS_NEVER);
@@ -1004,6 +1008,7 @@ void OpcodeTable::Initialize()
     /*0x0124*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_INSTANCE_SAVE_CREATED,                              STATUS_NEVER);
     /*0x02CC*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_INSTANCE_INFO,                                 STATUS_NEVER);
     /*0x2F26*/ DEFINE_HANDLER(CMSG_REQUEST_RAID_INFO,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleRequestRaidInfoOpcode              );
+    /*0x3306*/ DEFINE_HANDLER(CMSG_REQUEST_RESEARCH_HISTORY,                                         STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleRequestResearchHistory             );
     /*0x7A0A*/ DEFINE_HANDLER(CMSG_MOVE_TIME_SKIPPED,                                                STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleMoveTimeSkippedOpcode              );
     /*0x3110*/ DEFINE_HANDLER(CMSG_MOVE_FEATHER_FALL_ACK,                                            STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleMoveFlagChangeOpcode               );
     /*0x3B00*/ DEFINE_HANDLER(CMSG_MOVE_WATER_WALK_ACK,                                              STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleMoveFlagChangeOpcode               );

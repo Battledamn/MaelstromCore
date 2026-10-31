@@ -17,6 +17,7 @@
 
 #include "LootMgr.h"
 #include "Containers.h"
+#include "DBCStores.h"
 #include "DisableMgr.h"
 #include "Group.h"
 #include "ItemEnchantmentMgr.h"
@@ -147,8 +148,8 @@ uint32 LootStore::LoadLootTable()
     // Clearing store (for reloading case)
     Clear();
 
-    //                                                  0     1            2               3         4         5             6
-    QueryResult result = WorldDatabase.Query("SELECT Entry, Item, Reference, Chance, QuestRequired, LootMode, GroupId, MinCount, MaxCount FROM {}", GetName());
+    //                                         0      1     2          3       4              5         6        7         8         9
+    QueryResult result = WorldDatabase.Query("SELECT Entry, Item, Reference, Chance, QuestRequired, LootMode, GroupId, MinCount, MaxCount, IsCurrency FROM {}", GetName());
 
     if (!result)
         return 0;
@@ -168,6 +169,7 @@ uint32 LootStore::LoadLootTable()
         uint8  groupid             = fields[6].Get<uint8>();
         int32  mincount            = fields[7].Get<uint8>();
         int32  maxcount            = fields[8].Get<uint8>();
+        bool   isCurrency          = fields[9].Get<bool>();
 
         if (maxcount > std::numeric_limits<uint8>::max())
         {
@@ -181,7 +183,7 @@ uint32 LootStore::LoadLootTable()
             lootmode = 1;
         }
 
-        LootStoreItem* storeitem = new LootStoreItem(item, reference, chance, needsquest, lootmode, groupid, mincount, maxcount);
+        LootStoreItem* storeitem = new LootStoreItem(item, reference, chance, needsquest, lootmode, groupid, mincount, maxcount, isCurrency);
 
         if (!storeitem->IsValid(*this, entry))            // Validity checks
         {
@@ -346,8 +348,15 @@ bool LootStoreItem::IsValid(LootStore const& store, uint32 entry) const
 
     if (!reference)                                  // item (quest or non-quest) entry, maybe grouped
     {
-        ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemid);
-        if (!proto)
+        if (is_currency)
+        {
+            if (!sCurrencyTypesStore.LookupEntry(itemid))
+            {
+                LOG_ERROR("sql.sql", "Table '{}' Entry {} Item {}: currency not listed in CurrencyTypes.dbc - skipped", store.GetName(), entry, itemid);
+                return false;
+            }
+        }
+        else if (!sObjectMgr->GetItemTemplate(itemid))
         {
             LOG_ERROR("sql.sql", "Table '{}' Entry {} Item {}: item entry not listed in `item_template` - skipped", store.GetName(), entry, itemid);
             return false;
@@ -480,6 +489,20 @@ void LootItem::AddAllowedLooter(Player const* player)
 // Inserts the item into the loot (called by LootTemplate processors)
 void Loot::AddItem(LootStoreItem const& item)
 {
+    // 4.x currency (CPP Loot::AddItem): one entry per drop, shown to the looter whatever the loot rules
+    if (item.is_currency)
+    {
+        if (!sCurrencyTypesStore.LookupEntry(item.itemid) || currencies.size() >= MAX_NR_LOOT_ITEMS)
+            return;
+
+        LootCurrency currency;
+        currency.currencyId = item.itemid;
+        currency.count = urand(item.mincount, item.maxcount);
+        currencies.push_back(currency);
+        ++unlootedCount;
+        return;
+    }
+
     ItemTemplate const* proto = sObjectMgr->GetItemTemplate(item.itemid);
     if (!proto)
         return;
@@ -771,6 +794,39 @@ void Loot::NotifyMoneyRemoved()
     }
 }
 
+void Loot::NotifyCurrencyRemoved(uint8 lootSlot)
+{
+    // notify all players that are looting this that the currency was removed
+    PlayersLootingSet::iterator i_next;
+    for (PlayersLootingSet::iterator i = PlayersLooting.begin(); i != PlayersLooting.end(); i = i_next)
+    {
+        i_next = i;
+        ++i_next;
+        if (Player* player = ObjectAccessor::FindPlayer(*i))
+            player->SendNotifyCurrencyLootRemoved(lootSlot);
+        else
+            PlayersLooting.erase(i);
+    }
+}
+
+void Loot::LootCurrencyInSlot(uint8 lootSlot, Player* player)
+{
+    uint8 const firstSlot = GetCurrencySlot(0);
+    if (lootSlot < firstSlot || lootSlot - firstSlot >= currencies.size())
+        return;
+
+    LootCurrency& currency = currencies[lootSlot - firstSlot];
+    if (currency.is_looted)
+        return;
+
+    currency.is_looted = true;
+    if (unlootedCount)
+        --unlootedCount;
+
+    NotifyCurrencyRemoved(lootSlot);
+    player->ModifyCurrency(currency.currencyId, int32(currency.count));
+}
+
 void Loot::NotifyQuestItemRemoved(uint8 questIndex)
 {
     // when a free for all questitem is looted
@@ -977,7 +1033,7 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
     {
         b << uint32(0);                                     //gold
         b << uint8(0);                                      // item count
-        b << uint8(0); // currency count
+        b << uint8(0);                                      // currency count
         return b;                                           // nothing output more
     }
 
@@ -989,7 +1045,8 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
 
     std::size_t count_pos = b.wpos();                            // pos of item count byte
     b << uint8(0);                                          // item count placeholder
-    b << uint8(0); // currency count
+    std::size_t currency_count_pos = b.wpos();
+    b << uint8(0);                                          // currency count placeholder
 
     switch (lv.permission)
     {
@@ -1228,6 +1285,20 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
 
     //update number of items shown
     b.put<uint8>(count_pos, itemsShown);
+
+    // 4.x currencies after the items (CPP LootResponse): slot, currency id, count
+    uint8 currenciesShown = 0;
+    for (std::size_t i = 0; i < l.currencies.size(); ++i)
+    {
+        if (l.currencies[i].is_looted)
+            continue;
+
+        b << uint8(l.GetCurrencySlot(i));
+        b << uint32(l.currencies[i].currencyId);
+        b << uint32(l.currencies[i].count);
+        ++currenciesShown;
+    }
+    b.put<uint8>(currency_count_pos, currenciesShown);
 
     return b;
 }

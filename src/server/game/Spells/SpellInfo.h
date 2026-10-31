@@ -420,6 +420,7 @@ public:
     uint32 PreventionType;
     int32  AreaGroupId;
     uint32 SchoolMask;
+    uint32 ResearchProjectId;                               // 4.x archaeology: the project this spell solves
     SpellScalingEntry const* ScalingEntry;
     float BonusCoefficientFromAP;
     float ConeAngle;

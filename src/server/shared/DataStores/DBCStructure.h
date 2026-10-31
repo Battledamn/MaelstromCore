@@ -1566,6 +1566,15 @@ struct QuestFactionRewEntry
     int32       QuestRewFactionValue[10];
 };
 
+// QuestPOIPoint.dbc (4.x): the perimeter points of a quest/dig-site area, grouped by blob
+struct QuestPOIPointEntry
+{
+    uint32  ID;                                             // 0
+    int32   X;                                              // 1
+    int32   Y;                                              // 2
+    uint32  QuestPOIBlobID;                                 // 3
+};
+
 struct RandomPropertiesPointsEntry
 {
     //uint32  Id;                                           // 0 hidden key
@@ -1573,6 +1582,41 @@ struct RandomPropertiesPointsEntry
     uint32    EpicPropertiesPoints[5];                      // 2-6
     uint32    RarePropertiesPoints[5];                      // 7-11
     uint32    UncommonPropertiesPoints[5];                  // 12-16
+};
+
+// ResearchBranch.dbc (4.x): an archaeology race, its fragment currency and keystone item
+struct ResearchBranchEntry
+{
+    uint32  ID;                                             // 0
+    //char* Name;                                           // 1
+    uint32  ResearchFieldID;                                // 2
+    uint32  CurrencyID;                                     // 3
+    //char* Texture;                                        // 4
+    uint32  ItemID;                                         // 5 keystone
+};
+
+// ResearchProject.dbc (4.x): an artifact to solve
+struct ResearchProjectEntry
+{
+    uint32  ID;                                             // 0
+    //char* Name;                                           // 1
+    //char* Description;                                    // 2
+    uint32  Rarity;                                         // 3
+    uint32  ResearchBranchID;                               // 4
+    uint32  SpellID;                                        // 5
+    uint32  NumSockets;                                     // 6 keystones
+    //char* Texture;                                        // 7
+    uint32  RequiredWeight;                                 // 8 fragments
+};
+
+// ResearchSite.dbc (4.x): a dig site on the map
+struct ResearchSiteEntry
+{
+    uint32  ID;                                             // 0
+    uint32  MapID;                                          // 1
+    uint32  QuestPOIBlobID;                                 // 2
+    //char* Name;                                           // 3
+    //char* AreaPOIIconEnum;                                // 4
 };
 
 struct ScalingStatDistributionEntry

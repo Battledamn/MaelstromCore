@@ -18,6 +18,7 @@
 #include "Player.h"
 #include "AccountMgr.h"
 #include "AchievementMgr.h"
+#include "Archaeology.h"
 #include "AreaDefines.h"
 #include "ArenaSpectator.h"
 #include "ArenaTeam.h"
@@ -355,6 +356,7 @@ Player::Player(WorldSession* session): Unit(), m_mover(this), _cinematicMgr(*thi
     m_creationTime = 0s;
 
     m_achievementMgr = new AchievementMgr(this);
+    _archaeology = std::make_unique<Archaeology>(this);
     m_reputationMgr = new ReputationMgr(this);
 
     m_NeedToSaveGlyphs = false;
@@ -4323,6 +4325,8 @@ void Player::DeleteFromDB(ObjectGuid::LowType lowGuid, uint32 accountId, bool up
                 stmt->SetData(0, lowGuid);
                 trans->Append(stmt);
 
+                Archaeology::DeleteFromDB(lowGuid, trans);
+
                 stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_SPELL);
                 stmt->SetData(0, lowGuid);
                 trans->Append(stmt);
@@ -5594,6 +5598,9 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                 UpdateSkillEnchantments(id, currVal, newVal);
             UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL, id);
             UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILL_LEVEL, id);
+
+            if (id == SKILL_ARCHAEOLOGY)
+                _archaeology->OnSkillChange();
         }
         else                                                //remove
         {
@@ -5624,6 +5631,9 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                 removeSpell(pAbility->Spell, SPEC_MASK_ALL, false);
                 RemoveAurasDueToSpell(pAbility->Spell);
             }
+
+            if (id == SKILL_ARCHAEOLOGY)
+                _archaeology->UnLearn();
         }
         sScriptMgr->OnPlayerSetSkill(this, id, currVal, maxVal, step, newVal);
     }
@@ -5693,6 +5703,10 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                 learnSkillRewardedSpells(id, newVal);
                 UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_REACH_SKILL_LEVEL, id);
                 UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SKILL_LEVEL, id);
+
+                if (id == SKILL_ARCHAEOLOGY)
+                    _archaeology->Learn();
+
                 sScriptMgr->OnPlayerSetSkill(this, id, currVal, maxVal, step, newVal);
                 return;
             }
@@ -8499,6 +8513,13 @@ void Player::SendNotifyLootMoneyRemoved()
     SendDirectMessage(&data);
 }
 
+void Player::SendNotifyCurrencyLootRemoved(uint8 lootSlot)
+{
+    WorldPacket data(SMSG_CURRENCY_LOOT_REMOVED, 1);
+    data << uint8(lootSlot);
+    SendDirectMessage(&data);
+}
+
 void Player::SendNotifyLootItemRemoved(uint8 lootSlot)
 {
     WorldPacket data(SMSG_LOOT_REMOVED, 1);
@@ -10489,6 +10510,10 @@ void Player::ModifyCurrency(uint32 currencyId, int32 amount, bool suppressChatLo
     packet.Quantity = int32(GetCurrency(currencyId));
     packet.SuppressChatLog = suppressChatLog;
     SendDirectMessage(packet.Write());
+
+    // a race's first fragments start its archaeology research (CPP)
+    if (!current)
+        _archaeology->OnCurrencyGained(currencyId);
 }
 
 void Player::SendBindPointUpdate() const
@@ -14911,10 +14936,11 @@ void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRa
     pet->SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
 }
 
-void Player::AddKnownCurrency(uint32 itemId)
+void Player::AddKnownCurrency(uint32 /*itemId*/)
 {
-    if (CurrencyTypesEntry const* ctEntry = sCurrencyTypesStore.LookupEntry(itemId))
-        AddKnownCurrencyFlag((1LL << (ctEntry->BitIndex - 1)));
+    // 4.3.4 has no known-currency bitmask and its currencies are not items: CurrencyTypes.dbc is keyed
+    // by currency id and field 3 is a string offset, so the 3.3.5a item lookup and bit shift (undefined
+    // above 63) must not run. Currencies are the currency storage (ModifyCurrency) now.
 }
 
 void Player::UnsummonPetTemporaryIfAny()

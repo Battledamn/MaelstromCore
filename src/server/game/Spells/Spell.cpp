@@ -16,6 +16,7 @@
  */
 
 #include "Spell.h"
+#include "Archaeology.h"
 #include "ArenaSpectator.h"
 #include "BattlefieldMgr.h"
 #include "Battleground.h"
@@ -5906,6 +5907,12 @@ SpellCastResult Spell::CheckCast(bool strict, uint32* /*param1*/, uint32* /*para
 
     if (res != SPELL_CAST_OK)
         return res;
+
+    // 4.x archaeology: a solve needs its artifact in research and the fragments and keystones the
+    // client offered with the cast
+    if (m_spellInfo->ResearchProjectId && unitCaster && unitCaster->IsPlayer() && !IsTriggered())
+        if (!unitCaster->ToPlayer()->GetArchaeology().CanSolve(uint16(m_spellInfo->ResearchProjectId)))
+            return SPELL_FAILED_REAGENTS;
 
     // check cooldowns to prevent cheating
     if (!m_spellInfo->HasAttribute(SPELL_ATTR0_PASSIVE))
