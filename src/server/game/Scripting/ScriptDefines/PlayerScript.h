@@ -240,6 +240,7 @@ enum PlayerHook
     PLAYERHOOK_ON_CURRENCY_CHANGE,
     PLAYERHOOK_ON_ARCHAEOLOGY_FIND,
     PLAYERHOOK_ON_ARCHAEOLOGY_SOLVE,
+    PLAYERHOOK_ON_SET_SPECIALIZATION,
     PLAYERHOOK_END
 };
 
@@ -1001,6 +1002,16 @@ public:
      * @param firstSolve True the first time this player solves it
      */
     virtual void OnPlayerArchaeologySolve(Player* /*player*/, uint16 /*projectId*/, bool /*firstSolve*/) {}
+
+    /**
+     * @brief This hook is called when a player chose the specialization (primary talent tree) of a
+     *        talent spec, after its bonus spells were added. A talent reset clears the choice again.
+     *
+     * @param player Contains information about the Player
+     * @param spec The talent spec (dual specialization slot) it was chosen for
+     * @param talentTabId The TalentTab.dbc id of the chosen tree
+     */
+    virtual void OnPlayerSetSpecialization(Player* /*player*/, uint8 /*spec*/, uint32 /*talentTabId*/) {}
 };
 
 #endif

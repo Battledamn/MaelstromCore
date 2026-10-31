@@ -78,6 +78,9 @@
 #include <cmath>
 #include <limits>
 
+// 4.x: triples the rage from damage taken (moves into spell_warrior.cpp with the class script port)
+constexpr uint32 SPELL_WARRIOR_BERSERKER_RAGE = 18499;
+
 // Speeds at Rate.MoveSpeed.NPC/Player = 1
 static constexpr std::array<float, MAX_MOVE_TYPE> DefaultMoveSpeed =
 {
@@ -15928,7 +15931,7 @@ void Unit::RewardRage(uint32 baseRage, bool attacker)
     float addRage = float(baseRage);
 
     // Berserker Rage effect
-    if (!attacker && HasAura(18499))
+    if (!attacker && HasAura(SPELL_WARRIOR_BERSERKER_RAGE))
         addRage *= 3.0f;
 
     addRage *= sWorld->getRate(RATE_POWER_RAGE_INCOME);

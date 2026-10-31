@@ -1019,6 +1019,11 @@ void ScriptMgr::OnPlayerArchaeologySolve(Player* player, uint16 projectId, bool 
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_ARCHAEOLOGY_SOLVE, script->OnPlayerArchaeologySolve(player, projectId, firstSolve));
 }
 
+void ScriptMgr::OnPlayerSetSpecialization(Player* player, uint8 spec, uint32 talentTabId)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_SET_SPECIALIZATION, script->OnPlayerSetSpecialization(player, spec, talentTabId));
+}
+
 PlayerScript::PlayerScript(char const* name, std::vector<uint16> enabledHooks)
     : ScriptObject(name, PLAYERHOOK_END)
 {

@@ -6272,6 +6272,10 @@ void Spell::EffectCreateTamedPet(SpellEffIndex effIndex)
     if (!pet)
         return;
 
+    // the starting pet of a new hunter (4.x, cast at character creation): defensive, like a tamed
+    // one; a new pet's charm info leaves it passive, and the owner has no pet bar to change it yet
+    pet->SetReactState(REACT_DEFENSIVE);
+
     // add to world
     pet->GetMap()->AddToMap(pet->ToCreature(), true);
 

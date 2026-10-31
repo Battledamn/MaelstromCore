@@ -488,6 +488,7 @@ public: /* PlayerScript */
     void OnPlayerCurrencyChange(Player* player, uint32 currencyId, uint32 oldAmount, uint32 newAmount);
     void OnPlayerArchaeologyFind(Player* player, uint16 siteId, GameObject* find);
     void OnPlayerArchaeologySolve(Player* player, uint16 projectId, bool firstSolve);
+    void OnPlayerSetSpecialization(Player* player, uint8 spec, uint32 talentTabId);
 
     // Anti cheat
     void AnticheatSetCanFlybyServer(Player* player, bool apply);

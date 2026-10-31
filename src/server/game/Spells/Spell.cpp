@@ -66,6 +66,15 @@
 
 extern pEffect SpellEffects[TOTAL_SPELL_EFFECTS];
 
+// 4.x death knight presences for Improved Frost Presence's runic power bonus (moves into
+// spell_dk.cpp with the class script port)
+enum DeathKnightPresenceSpells
+{
+    SPELL_DK_BLOOD_PRESENCE          = 48263,
+    SPELL_DK_UNHOLY_PRESENCE         = 48265,
+    SPELL_DK_IMPROVED_FROST_PRESENCE = 63621
+};
+
 SpellDestination::SpellDestination()
 {
     _position.Relocate(0, 0, 0, 0);
@@ -5742,7 +5751,8 @@ void Spell::TakeRunePower(bool didHit)
             for (AuraEffect const* aurEff : player->GetAuraEffectsByType(SPELL_AURA_MOD_RUNE_REGEN_SPEED))
             {
                 // Improved Frost Presence: only in Unholy or Blood Presence
-                if (aurEff->GetId() == 63621 && !player->HasAura(48265) && !player->HasAura(48263))
+                if (aurEff->GetId() == SPELL_DK_IMPROVED_FROST_PRESENCE && !player->HasAura(SPELL_DK_UNHOLY_PRESENCE) &&
+                    !player->HasAura(SPELL_DK_BLOOD_PRESENCE))
                     continue;
 
                 AddPct(rp, aurEff->GetAmount());

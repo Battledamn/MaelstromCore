@@ -60,7 +60,7 @@ public:
             { "talentpoints",   HandleModifyTalentCommand,        rbac::RBAC_PERM_COMMAND_MODIFY_TALENTPOINTS,    Console::No },
             { "mount",          HandleModifyMountCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_MOUNT,           Console::No },
             { "honor",          HandleModifyHonorCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_HONOR,           Console::No },
-            { "currency",       HandleModifyCurrencyCommand,      rbac::RBAC_PERM_COMMAND_MODIFY_MONEY,           Console::No },
+            { "currency",       HandleModifyCurrencyCommand,      rbac::RBAC_PERM_COMMAND_MODIFY_CURRENCY,        Console::No },
             { "reputation",     HandleModifyRepCommand,           rbac::RBAC_PERM_COMMAND_MODIFY_REPUTATION,      Console::No },
             { "arenapoints",    HandleModifyArenaCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_ARENAPOINTS,     Console::No },
             { "drunk",          HandleModifyDrunkCommand,         rbac::RBAC_PERM_COMMAND_MODIFY_DRUNK,           Console::No },

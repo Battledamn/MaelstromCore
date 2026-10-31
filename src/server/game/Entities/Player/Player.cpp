@@ -109,6 +109,14 @@
 
 static uint32 copseReclaimDelay[MAX_DEATH_COUNT] = { 30, 60, 120 };
 
+// 4.x: the passives that let a hunter or warlock command a pet (taught with Control Pet 79682 and
+// Control Demon 80388 through spell_learn_spell)
+enum PetControlSpells
+{
+    SPELL_CONTROL_PET_PASSIVE   = 93321,
+    SPELL_CONTROL_DEMON_PASSIVE = 93375
+};
+
 // we can disable this warning for this since it only
 // causes undefined behavior when passed to the base class constructor
 #ifdef _MSC_VER
@@ -3448,7 +3456,7 @@ void Player::learnSpell(uint32 spellId, bool temporary /*= false*/, bool learnFr
     uint8 const specMask = GetLearnSpellSpecMask(spellId);
 
     bool const added = addSpell(spellId, specMask, true, temporary, learnFromSkill);
-    if (added && (spellId == 93321 || spellId == 93375) && GetPet())
+    if (added && (spellId == SPELL_CONTROL_PET_PASSIVE || spellId == SPELL_CONTROL_DEMON_PASSIVE) && GetPet())
         PetSpellInitialize();                               // Control Pet / Control Demon: show the pet bar now
     if (added)
     {
@@ -9889,9 +9897,9 @@ bool Player::IsChatFiltered(std::string_view text)
 bool Player::CanControlPet() const
 {
     // Ported from The Cataclysm Preservation Project (Player::CanControlPet).
-    if (getClass() == CLASS_HUNTER && !HasAura(93321))     // Control Pet
+    if (getClass() == CLASS_HUNTER && !HasAura(SPELL_CONTROL_PET_PASSIVE))
         return false;
-    if (getClass() == CLASS_WARLOCK && !HasAura(93375))    // Control Demon
+    if (getClass() == CLASS_WARLOCK && !HasAura(SPELL_CONTROL_DEMON_PASSIVE))
         return false;
     return true;
 }
@@ -14800,6 +14808,7 @@ bool Player::LearnPrimaryTalentSpecialization(uint8 talentTabIndex)
 
     SetPrimaryTalentTree(GetActiveSpec(), talentTabId);
     _addPrimaryTalentTreeSpells();
+    sScriptMgr->OnPlayerSetSpecialization(this, GetActiveSpec(), talentTabId);
     return true;
 }
 
