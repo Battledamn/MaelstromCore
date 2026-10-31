@@ -246,6 +246,8 @@ bool Player::UpdateAllStats()
     UpdateShieldBlockValue();
     UpdateSpellDamageAndHealingBonus();
     UpdateManaRegen();
+    for (Powers power : { POWER_ENERGY, POWER_FOCUS, POWER_RAGE, POWER_RUNIC_POWER, POWER_HOLY_POWER })
+        UpdatePowerRegen(power);
     UpdateExpertise(BASE_ATTACK);
     UpdateExpertise(OFF_ATTACK);
     RecalculateRating(CR_ARMOR_PENETRATION);
@@ -912,18 +914,43 @@ void Player::UpdateManaRegen()
     SetStatFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index, power_regen_mp5 + power_regen);
 }
 
-void Player::UpdateEnergyRegen()
+float Player::GetBasePowerRegen(Powers power, bool inCombat)
 {
-    uint32 index = GetPowerIndex(POWER_ENERGY);
+    // 4.x base regeneration per second, which the client adds to the regen fields itself (CPP
+    // DBCManager::GetBasePowerRegen); rage and runic power are stored x10
+    switch (power)
+    {
+        case POWER_ENERGY:      return 10.0f;
+        case POWER_FOCUS:       return 5.0f;
+        case POWER_RAGE:        return inCombat ? 0.0f : -12.5f;
+        case POWER_RUNIC_POWER: return inCombat ? 0.0f : -12.5f;
+        case POWER_HOLY_POWER:  return inCombat ? 0.0f : -0.1f;
+        default:                return 0.0f;
+    }
+}
+
+void Player::UpdatePowerRegen(Powers power)
+{
+    uint32 index = GetPowerIndex(power);
     if (index >= MAX_UNIT_POWER_FIELDS)
         return;
 
-    float regenPerSecond = 10.f;   // +10 energy per second
-    regenPerSecond *= GetTotalAuraMultiplierByMiscValue(SPELL_AURA_MOD_POWER_REGEN_PERCENT, POWER_ENERGY);
-    regenPerSecond += static_cast<float>(GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, POWER_ENERGY)) / static_cast<float>((5 * IN_MILLISECONDS));
+    // The regen fields hold the offset from the base rate, with the percent and flat regen auras in
+    // it (CPP Unit::UpdatePowerRegeneration): the client predicts the bar from field + base, so an
+    // aura applied only on the server (the hunter's Focus passive, -20%) makes the bar jump back.
+    float const pct = GetTotalAuraMultiplierByMiscValue(SPELL_AURA_MOD_POWER_REGEN_PERCENT, power);
+    float const flat = float(GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, power)) / 5.0f;
+    float const peaceBase = GetBasePowerRegen(power, false);
+    float const combatBase = GetBasePowerRegen(power, true);
 
-    SetStatFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index, regenPerSecond - 10.f);
-    SetStatFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER + index, regenPerSecond - 10.f);
+    // Butchery and the like: flat runic power only in combat
+    float const peace = peaceBase * pct - peaceBase + (power == POWER_RUNIC_POWER ? 0.0f : flat);
+    float const combat = combatBase * pct - combatBase + flat;
+
+    // SetFloatValue, not SetStatFloatValue: an offset below the base rate (e.g. -20% focus) is negative,
+    // and SetStatFloatValue clamps negatives to 0
+    SetFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index, peace);
+    SetFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER + index, combat);
 }
 
 void Player::UpdateRuneRegen(RuneType rune)

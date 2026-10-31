@@ -20,6 +20,7 @@
 #include "ArenaSpectator.h"
 #include "CharmInfo.h"
 #include "Common.h"
+#include "DBCStores.h"
 #include "DatabaseEnv.h"
 #include "GameTime.h"
 #include "Group.h"
@@ -35,8 +36,10 @@
 #include "SpellMgr.h"
 #include "Unit.h"
 #include "Util.h"
+#include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include <cmath>
 
 Pet::Pet(Player* owner, PetType type) : Guardian(nullptr, owner ? owner->GetGUID() : ObjectGuid::Empty),
     m_usedTalentCount(0),
@@ -47,7 +50,7 @@ Pet::Pet(Player* owner, PetType type) : Guardian(nullptr, owner ? owner->GetGUID
     m_duration(0),
     m_auraRaidUpdateMask(0),
     m_loading(false),
-    m_petRegenTimer(PET_FOCUS_REGEN_INTERVAL),
+    m_petRegenTimer(0ms),
     m_tempspellTarget(),
     m_tempoldTarget(),
     m_tempspellIsPositive(false),
@@ -724,17 +727,7 @@ void Pet::Update(uint32 diff)
                     }
                 }
 
-                // xinef: m_regenTimer is decrased in Creature::Update()
-                // xinef: just check if we can update focus in current period
-                if (getPowerType() == POWER_FOCUS)
-                {
-                    m_petRegenTimer -= _diff;
-                    if (m_petRegenTimer <= 0ms)
-                    {
-                        m_petRegenTimer += PET_FOCUS_REGEN_INTERVAL;
-                        Regenerate(POWER_FOCUS);
-                    }
-                }
+                RegeneratePower(diff);
 
                 CastPendingSpell();
 
@@ -2586,4 +2579,108 @@ std::string Pet::GetDebugInfo() const
         << "PetType: " << std::to_string(getPetType()) << " "
         << "PetNumber: " << m_charmInfo->GetPetNumber();
     return sstr.str();
+}
+
+// 4.x base power regeneration per second, before the regen fields (CPP DBCManager::GetBasePowerRegen)
+static float PetBasePowerRegen(Powers power)
+{
+    switch (power)
+    {
+        case POWER_FOCUS:  return 5.0f;
+        case POWER_ENERGY: return 10.0f;
+        default:           return 0.0f;
+    }
+}
+
+void Pet::UpdatePowerRegenFields()
+{
+    Powers const power = getPowerType();
+    uint32 const index = GetPowerIndex(power);
+    if (index >= MAX_UNIT_POWER_FIELDS)
+        return;
+
+    float const flat = GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, power) / 5.0f;
+    float const pct = GetTotalAuraMultiplierByMiscValue(SPELL_AURA_MOD_POWER_REGEN_PERCENT, power);
+    float peace = 0.0f;
+    float combat = 0.0f;
+
+    if (power == POWER_MANA)
+    {
+        // 5% of the base mana per 5 seconds, plus Spirit regen out of combat (CPP UpdatePowerRegeneration)
+        float const base = GetCreateMana() / 100.0f * pct + flat;
+        float spirit = 0.0f;
+        uint8 const level = std::min<uint8>(GetLevel(), GT_MAX_LEVEL);
+        if (GtRegenMPPerSptEntry const* ratio = sGtRegenMPPerSptStore.LookupEntry((getClass() - 1) * GT_MAX_LEVEL + level - 1))
+            spirit = GetStat(STAT_SPIRIT) * ratio->ratio * std::sqrt(std::max(GetStat(STAT_INTELLECT), 0.0f)) * pct;
+
+        peace = base + spirit;
+        combat = base + CalculatePct(spirit, GetTotalAuraModifier(SPELL_AURA_MOD_MANA_REGEN_INTERRUPT));
+    }
+    else
+    {
+        // the fields hold the offset from the base rate
+        float const base = PetBasePowerRegen(power);
+        peace = combat = base * pct - base + flat;
+    }
+
+    // SetFloatValue, not SetStatFloatValue: an offset below the base rate (e.g. -20% focus) is negative,
+    // and SetStatFloatValue clamps negatives to 0
+    SetFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + index, peace);
+    SetFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER + index, combat);
+}
+
+void Pet::RegeneratePower(uint32 diff)
+{
+    Powers const power = getPowerType();
+    if (power != POWER_FOCUS && power != POWER_ENERGY && power != POWER_MANA)
+        return;
+
+    uint32 const index = GetPowerIndex(power);
+    if (index >= MAX_UNIT_POWER_FIELDS)
+        return;
+
+    // the regen fields follow stat and aura changes, and the power goes out, once a second (CPP creatures)
+    m_petRegenTimer -= Milliseconds(diff);
+    bool const sendUpdate = m_petRegenTimer <= 0ms;
+    if (sendUpdate)
+    {
+        m_petRegenTimer += 1s;
+        UpdatePowerRegenFields();
+    }
+
+    uint32 const maxValue = GetMaxPower(power);
+    uint32 curValue = GetPower(power);
+    if (!maxValue || HasAuraTypeWithMiscvalue(SPELL_AURA_PREVENT_REGENERATE_POWER, power + 1))
+        return;
+
+    uint32 const regenField = IsInCombat() ? UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER : UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER;
+    float const perSecond = GetFloatValue(regenField + index) + PetBasePowerRegen(power);
+
+    float rate = sWorld->getRate(RATE_POWER_MANA);
+    if (power == POWER_FOCUS)
+        rate = sWorld->getRate(RATE_POWER_FOCUS);
+    else if (power == POWER_ENERGY)
+        rate = sWorld->getRate(RATE_POWER_ENERGY);
+
+    float addValue = perSecond * 0.001f * diff * rate;
+    if ((addValue > 0.0f && curValue >= maxValue) || (addValue < 0.0f && !curValue) || addValue == 0.0f)
+        return;
+
+    // nearest whole point, as Player::Regenerate: the client shows its prediction rounded
+    float const total = float(curValue) + addValue + m_petPowerFraction;
+    if (total <= 0.0f || total >= float(maxValue))
+    {
+        curValue = total <= 0.0f ? 0 : maxValue;
+        m_petPowerFraction = 0.0f;
+    }
+    else
+    {
+        curValue = uint32(std::lround(total));
+        m_petPowerFraction = total - float(curValue);
+    }
+
+    if (sendUpdate || !curValue || curValue == maxValue)
+        SetPower(power, curValue);
+    else
+        UpdateUInt32Value(UNIT_FIELD_POWER1 + index, curValue);
 }

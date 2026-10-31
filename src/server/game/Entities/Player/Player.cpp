@@ -1925,20 +1925,19 @@ void Player::Regenerate(Powers power)
             if (HasInterruptRegenAura() && !inCombat && (power == POWER_RAGE || power == POWER_RUNIC_POWER))
                 break;
 
-            float baseRegen = 0.0f;
             float configRate = 1.0f;
             switch (power)
             {
-                case POWER_RAGE:        baseRegen = inCombat ? 0.0f : -12.5f; configRate = sWorld->getRate(RATE_POWER_RAGE_LOSS); break;
-                case POWER_RUNIC_POWER: baseRegen = inCombat ? 0.0f : -12.5f; configRate = sWorld->getRate(RATE_POWER_RUNICPOWER_LOSS); break;
-                case POWER_ENERGY:      baseRegen = 10.0f; configRate = sWorld->getRate(RATE_POWER_ENERGY); break;
-                case POWER_FOCUS:       baseRegen = 5.0f; configRate = sWorld->getRate(RATE_POWER_FOCUS); break;
-                case POWER_HOLY_POWER:  baseRegen = inCombat ? 0.0f : -0.1f; break;
+                case POWER_RAGE:        configRate = sWorld->getRate(RATE_POWER_RAGE_LOSS); break;
+                case POWER_RUNIC_POWER: configRate = sWorld->getRate(RATE_POWER_RUNICPOWER_LOSS); break;
+                case POWER_ENERGY:      configRate = sWorld->getRate(RATE_POWER_ENERGY); break;
+                case POWER_FOCUS:       configRate = sWorld->getRate(RATE_POWER_FOCUS); break;
                 default: break;
             }
 
+            // exactly the client's prediction: the regen field (auras included, UpdatePowerRegen) + base
             uint32 const regenField = inCombat ? UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER : UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER;
-            float perSecond = (power == POWER_HOLY_POWER ? 0.0f : GetFloatValue(regenField + index)) + baseRegen;
+            float perSecond = GetFloatValue(regenField + index) + GetBasePowerRegen(power, inCombat);
             if (power == POWER_ENERGY || power == POWER_FOCUS)
                 if (float const hasteRegen = GetFloatValue(PLAYER_FIELD_MOD_HASTE_REGEN); hasteRegen > 0.0f)
                     perSecond /= hasteRegen;
@@ -1958,15 +1957,7 @@ void Player::Regenerate(Powers power)
             break;
     }
 
-    // Mana regen calculated in Player::UpdateManaRegen(), energy regen calculated in Player::UpdateEnergyRegen()
-    if (power != POWER_MANA && power != POWER_ENERGY)
-    {
-        addvalue *= GetTotalAuraMultiplierByMiscValue(SPELL_AURA_MOD_POWER_REGEN_PERCENT, power);
-
-        // Butchery requires combat for this effect
-        if (power != POWER_RUNIC_POWER || IsInCombat())
-            addvalue += float(GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_POWER_REGEN, power) * m_regenTimer) / (5.0f * IN_MILLISECONDS);
-    }
+    // The regen auras are in the regen fields: UpdateManaRegen() for mana, UpdatePowerRegen() for the rest
 
     if (addvalue < 0.0f)
     {
@@ -1981,33 +1972,24 @@ void Player::Regenerate(Powers power)
     else
         return;
 
-    addvalue += m_powerFraction[power];
-    uint32 integerValue = uint32(std::fabs(addvalue));
-
-    if (addvalue < 0.0f)
+    // The client predicts the bar with decimals and shows it rounded: the stored value is the nearest
+    // whole point (the rest kept as a fraction of -0.5..0.5), so an update never shows one point less
+    // than the client already does.
+    float const total = float(curValue) + addvalue + m_powerFraction[power];
+    if (total <= 0.0f)
     {
-        if (curValue > integerValue)
-        {
-            curValue -= integerValue;
-            m_powerFraction[power] = addvalue + integerValue;
-        }
-        else
-        {
-            curValue = 0;
-            m_powerFraction[power] = 0;
-        }
+        curValue = 0;
+        m_powerFraction[power] = 0;
+    }
+    else if (total >= float(maxValue))
+    {
+        curValue = maxValue;
+        m_powerFraction[power] = 0;
     }
     else
     {
-        curValue += integerValue;
-
-        if (curValue >= maxValue)
-        {
-            curValue = maxValue;
-            m_powerFraction[power] = 0;
-        }
-        else
-            m_powerFraction[power] = addvalue - integerValue;
+        curValue = uint32(std::lround(total));
+        m_powerFraction[power] = total - float(curValue);
     }
 
     if (m_regenTimerCount >= 2000 || curValue == 0 || curValue == maxValue)

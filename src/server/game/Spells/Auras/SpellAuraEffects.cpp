@@ -4510,14 +4510,14 @@ void AuraEffect::HandleModPowerRegen(AuraApplication const* aurApp, uint8 mode, 
     if (!target->IsPlayer())
         return;
 
-    // Update manaregen value
+    // Update the regen fields the client predicts from
     if (GetMiscValue() == POWER_MANA)
         target->ToPlayer()->UpdateManaRegen();
-    else if (GetMiscValue() == POWER_ENERGY)
-        target->ToPlayer()->UpdateEnergyRegen();
     else if (GetMiscValue() == POWER_RUNE)
         target->ToPlayer()->UpdateRuneRegen(RuneType(GetMiscValueB()));
-    // other powers are not immediate effects - implemented in Player::Regenerate, Creature::Regenerate
+    else if (GetMiscValue() == POWER_ENERGY || GetMiscValue() == POWER_FOCUS || GetMiscValue() == POWER_RAGE ||
+             GetMiscValue() == POWER_RUNIC_POWER || GetMiscValue() == POWER_HOLY_POWER)
+        target->ToPlayer()->UpdatePowerRegen(Powers(GetMiscValue()));
 }
 
 void AuraEffect::HandleModPowerRegenPCT(AuraApplication const* aurApp, uint8 mode, bool apply) const

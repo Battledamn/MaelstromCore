@@ -2070,7 +2070,8 @@ public:
     void ApplyManaRegenBonus(int32 amount, bool apply);
     void ApplyHealthRegenBonus(int32 amount, bool apply);
     void UpdateManaRegen();
-    void UpdateEnergyRegen();
+    void UpdatePowerRegen(Powers power);              // energy, focus, rage, runic and holy power
+    static float GetBasePowerRegen(Powers power, bool inCombat);
     void UpdateRuneRegen(RuneType rune);
 
     [[nodiscard]] ObjectGuid GetLootGUID() const { return m_lootGuid; }

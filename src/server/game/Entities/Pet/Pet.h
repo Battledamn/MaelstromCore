@@ -156,7 +156,8 @@ protected:
     Milliseconds m_duration; // time until unsummon (used mostly for summoned guardians and not used for controlled pets)
     uint64  m_auraRaidUpdateMask;
     bool    m_loading;
-    Milliseconds m_petRegenTimer; // xinef: used for focus regeneration
+    Milliseconds m_petRegenTimer;                       // 4.x: power update and regen field interval
+    float m_petPowerFraction = 0.0f;                    // regenerated power below one point
 
     std::unique_ptr<DeclinedName> m_declinedname;
 
@@ -175,5 +176,9 @@ private:
         ABORT();
     }
     void CastPendingSpell();
+    // 4.x: power regenerates continuously from the regen fields plus a base rate, as the client
+    // predicts it for the pet frame (CPP Unit::Regenerate / Unit::UpdatePowerRegeneration)
+    void RegeneratePower(uint32 diff);
+    void UpdatePowerRegenFields();
 };
 #endif

@@ -928,10 +928,14 @@ void Creature::Update(uint32 diff)
                     }
                 }
 
-                if (getPowerType() == POWER_ENERGY)
-                    Regenerate(POWER_ENERGY);
-                else
-                    Regenerate(POWER_MANA);
+                // pets regenerate continuously in Pet::Update (4.x, as the client predicts it)
+                if (!IsPet())
+                {
+                    if (getPowerType() == POWER_ENERGY)
+                        Regenerate(POWER_ENERGY);
+                    else
+                        Regenerate(POWER_MANA);
+                }
 
                 m_regenTimer += CREATURE_REGEN_INTERVAL;
             }
