@@ -3527,15 +3527,9 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit* victim, SpellInfo const* spellInfo
 
 uint32 Unit::GetDefenseSkillValue(Unit const* target) const
 {
+    // 4.0.1 removed the Defense skill and defense rating: players defend at the skill of their level (CPP)
     if (IsPlayer())
-    {
-        // in PvP use full skill instead current skill value
-        uint32 value = (target && target->IsPlayer())
-                       ? ToPlayer()->GetMaxSkillValue(SKILL_DEFENSE)
-                       : ToPlayer()->GetSkillValue(SKILL_DEFENSE);
-        value += uint32(ToPlayer()->GetRatingBonusValue(CR_DEFENSE_SKILL));
-        return value;
-    }
+        return GetMaxSkillValueForLevel(target);
     else
         return GetUnitMeleeSkill(target);
 }
@@ -3711,34 +3705,9 @@ uint32 Unit::GetWeaponSkillValue (WeaponAttackType attType, Unit const* target) 
         if (attType != BASE_ATTACK && !item)
             return 0;
 
-        if (IsInFeralForm())
-            return GetMaxSkillValueForLevel();              // always maximized SKILL_FERAL_COMBAT in fact
-
-        // weapon skill or (unarmed for base attack)
-        uint32 skill = SKILL_UNARMED;
-        if (item)
-            skill = item->GetSkill();
-
-        // in PvP use full skill instead current skill value
-        value = (target && target->IsControlledByPlayer())
-                ? player->GetMaxSkillValue(skill)
-                : player->GetSkillValue(skill);
-        // Modify value from ratings
-        value += uint32(player->GetRatingBonusValue(CR_WEAPON_SKILL));
-        switch (attType)
-        {
-            case BASE_ATTACK:
-                value += uint32(player->GetRatingBonusValue(CR_WEAPON_SKILL_MAINHAND));
-                break;
-            case OFF_ATTACK:
-                value += uint32(player->GetRatingBonusValue(CR_WEAPON_SKILL_OFFHAND));
-                break;
-            case RANGED_ATTACK:
-                value += uint32(player->GetRatingBonusValue(CR_WEAPON_SKILL_RANGED));
-                break;
-            default:
-                break;
-        }
+        // 4.0.1 removed weapon skills and weapon skill ratings: players attack at the skill of their
+        // level, whatever the weapon (CPP)
+        value = GetMaxSkillValueForLevel(target);
     }
     else
         value = GetUnitMeleeSkill(target);
@@ -12640,21 +12609,7 @@ void Unit::ProcSkillsAndReactives(bool isVictim, Unit* target, uint32 procFlag, 
         if (!isVictim && GetShapeshiftForm() == FORM_GHOSTWOLF)
             return;
 
-        // Update skills here for players
-        // only when you are not fighting other players or their pets/totems (pvp)
-        if (IsPlayer() && !target->IsCharmedOwnedByPlayerOrPlayer())
-        {
-            // On melee based hit/miss/resist/parry/dodge need to update skill (for victim and attacker)
-            if (procExtra & (PROC_EX_NORMAL_HIT | PROC_EX_MISS | PROC_EX_RESIST | PROC_EX_PARRY | PROC_EX_DODGE))
-            {
-                ToPlayer()->UpdateCombatSkills(target, attType, isVictim, procSpell ? procSpell->m_weaponItem : nullptr);
-            }
-            // Update defence if player is victim and we block - TODO: confirm that blocked attacks only have a chance to increase defence skill
-            else if (isVictim && procExtra & (PROC_EX_BLOCK))
-            {
-                ToPlayer()->UpdateCombatSkills(target, attType, true);
-            }
-        }
+        // 4.0.1 removed weapon and defense skill-ups (CPP has none); combat uses the level-based skill
         // If exist crit/parry/dodge/block need update aura state (for victim and attacker)
         if (procExtra & (PROC_EX_CRITICAL_HIT | PROC_EX_PARRY | PROC_EX_DODGE | PROC_EX_BLOCK))
         {

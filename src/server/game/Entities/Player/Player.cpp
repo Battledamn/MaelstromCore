@@ -3101,9 +3101,9 @@ void Player::SendLearnPacket(uint32 spellId, bool learn)
 {
     if (learn)
     {
-        WorldPacket data(SMSG_LEARNED_SPELL, 6);
+        WorldPacket data(SMSG_LEARNED_SPELL, 8);
         data << uint32(spellId);
-        data << uint16(0);
+        data << uint32(0);                                  // 4.3.4 (CPP): uint32, was uint16 in 3.3.5a
         SendDirectMessage(&data);
     }
     else
@@ -3143,9 +3143,11 @@ bool Player::addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool
 
                     if (IsInWorld())
                     {
+                        // 4.3.4 order (CPP SupercededSpells): the new rank, then the rank it replaces;
+                        // 3.3.5a sent them the other way round, which left the old rank in the spellbook
                         WorldPacket data(SMSG_SUPERCEDED_SPELL, 4 + 4);
-                        data << uint32(nextSpellInfo->Id);
                         data << uint32(spellInfo->Id);
+                        data << uint32(nextSpellInfo->Id);
                         SendDirectMessage(&data);
                     }
                     return false;
@@ -5593,21 +5595,29 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
         {
             //remove enchantments needing this skill
             UpdateSkillEnchantments(id, currVal, 0);
-            // clear skill fields
-            SetSkillFieldValue(PLAYER_SKILL_INDEX(itr->second.pos), 0);
+            // clear skill fields; 4.3.4 keeps the skill line id in its slot (CPP): a client that sees the
+            // id vanish keeps showing the profession, with garbage values, until the next login
+            SetSkillFieldValue(PLAYER_SKILL_INDEX(itr->second.pos), MAKE_PAIR32(id, 0));
             SetSkillFieldValue(PLAYER_SKILL_VALUE_INDEX(itr->second.pos), 0);
             SetSkillFieldValue(PLAYER_SKILL_BONUS_INDEX(itr->second.pos), 0);
 
-            // mark as deleted or simply remove from map if not saved yet
-            if (itr->second.uState != SKILL_NEW)
-                itr->second.uState = SKILL_DELETED;
-            else
-                mSkillStatus.erase(itr);
+            // clear its primary profession slot (CPP)
+            if (GetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1) == id)
+                SetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1, 0);
+            else if (GetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1 + 1) == id)
+                SetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1 + 1, 0);
 
-            // remove all spells that related to this skill
+            // mark as deleted, also when not saved yet, so the entry keeps its slot until the next save
+            // (deleting a row that was never saved does nothing)
+            itr->second.uState = SKILL_DELETED;
+
+            // remove all spells that related to this skill: each one itself, not only through its first
+            // rank, since a rank chain with a gap (a top rank taught without the lower ones, e.g. by
+            // .learn) stops removing at the gap and leaves the profession in the client's spellbook
             for (SkillLineAbilityEntry const* pAbility : GetSkillLineAbilitiesBySkillLine(id))
             {
                 removeSpell(sSpellMgr->GetFirstSpellInChain(pAbility->Spell), SPEC_MASK_ALL, false);
+                removeSpell(pAbility->Spell, SPEC_MASK_ALL, false);
                 RemoveAurasDueToSpell(pAbility->Spell);
             }
         }
@@ -5616,8 +5626,18 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
     else if (newVal)                                        //add
     {
         currVal = 0;
-        for (int i = 0; i < PLAYER_MAX_SKILLS; ++i)
+        // a removed skill keeps its line id in its slot (see above), so relearning takes that slot
+        // back; otherwise the first empty slot
+        int32 slot = -1;
+        for (int i = 0; i < PLAYER_MAX_SKILLS && slot < 0; ++i)
+            if (PAIR32_LOPART(GetSkillFieldValue(PLAYER_SKILL_INDEX(i))) == id)
+                slot = i;
+        for (int i = 0; i < PLAYER_MAX_SKILLS && slot < 0; ++i)
             if (!GetSkillFieldValue(PLAYER_SKILL_INDEX(i)))
+                slot = i;
+
+        for (int i = 0; i < PLAYER_MAX_SKILLS; ++i)
+            if (i == slot)
             {
                 SkillLineEntry const* pSkill = sSkillLineStore.LookupEntry(id);
                 if (!pSkill)
@@ -5630,11 +5650,22 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                 SetSkillFieldValue(PLAYER_SKILL_VALUE_INDEX(i), MAKE_SKILL_VALUE(newVal, maxVal));
                 UpdateSkillEnchantments(id, currVal, newVal);
 
+                // 4.3.4: the client finds the primary professions through these two slots (CPP)
+                if (pSkill->categoryId == SKILL_CATEGORY_PROFESSION)
+                {
+                    if (!GetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1))
+                        SetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1, id);
+                    else if (!GetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1 + 1))
+                        SetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1 + 1, id);
+                }
+
                 // insert new entry or update if not deleted old entry yet
                 if (itr != mSkillStatus.end())
                 {
                     itr->second.pos = i;
-                    itr->second.uState = SKILL_CHANGED;
+                    // removed and relearned before a save: the row may or may not exist, and the
+                    // insert is an upsert
+                    itr->second.uState = SKILL_NEW;
                 }
                 else
                     mSkillStatus.insert(SkillStatusMap::value_type(id, SkillStatusData(i, SKILL_NEW)));
@@ -12451,6 +12482,10 @@ void Player::learnSkillRewardedSpells(uint32 skill_id, uint32 skill_value)
     uint32 raceMask  = getRaceMask();
     uint32 classMask = getClassMask();
 
+    SkillLineEntry const* skillLine = sSkillLineStore.LookupEntry(skill_id);
+    bool const isProfessionSkill = skillLine &&
+        (skillLine->categoryId == SKILL_CATEGORY_PROFESSION || skillLine->categoryId == SKILL_CATEGORY_SECONDARY);
+
     // Get all abilities for this skill and sort by MinSkillLineRank (lowest to highest)
     auto abilities = GetSkillLineAbilitiesBySkillLine(skill_id);
     std::vector<SkillLineAbilityEntry const*> sortedAbilities(abilities.begin(), abilities.end());
@@ -12487,7 +12522,9 @@ void Player::learnSkillRewardedSpells(uint32 skill_id, uint32 skill_value)
             continue;
         }
 
-        if (std::max(spellInfo->SpellLevel, spellInfo->BaseLevel) > GetLevel())
+        // 4.3.4 profession spells carry no character level there (Disenchant has 1000, recipes 300),
+        // so only other skill lines (class spells) are held back by level
+        if (!isProfessionSkill && std::max(spellInfo->SpellLevel, spellInfo->BaseLevel) > GetLevel())
             continue;
 
         // need unlearn spell
@@ -14216,6 +14253,7 @@ void Player::_LoadSkills(PreparedQueryResult result)
     // SetQuery(PLAYER_LOGIN_QUERY_LOADSKILLS,          "SELECT skill, value, max FROM character_skills WHERE guid = '{}'", m_guid.GetCounter());
 
     uint32 count = 0;
+    uint32 professionCount = 0;
     std::unordered_map<uint32, uint32> loadedSkillValues;
     if (result)
     {
@@ -14284,6 +14322,11 @@ void Player::_LoadSkills(PreparedQueryResult result)
 
             SetSkillFieldValue(PLAYER_SKILL_VALUE_INDEX(count), MAKE_SKILL_VALUE(value, max));
             SetSkillFieldValue(PLAYER_SKILL_BONUS_INDEX(count), 0);
+
+            // 4.3.4: the client finds the primary professions through these two slots (CPP)
+            if (SkillLineEntry const* skillLine = sSkillLineStore.LookupEntry(skill))
+                if (skillLine->categoryId == SKILL_CATEGORY_PROFESSION && professionCount < 2)
+                    SetUInt32Value(PLAYER_PROFESSION_SKILL_LINE_1 + professionCount++, skill);
 
             mSkillStatus.insert(SkillStatusMap::value_type(skill, SkillStatusData(count, SKILL_UNCHANGED)));
 

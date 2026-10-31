@@ -10175,8 +10175,9 @@ void ObjectMgr::LoadTrainers()
             }
 
             // TDB leaves ReqLevel 0 on some class spells (Bloodlust 2825 at 70); 0 must not mean
-            // "from level 1", so fall back to the spell's own level (recipes have none and stay 0).
-            if (!spell.ReqLevel)
+            // "from level 1", so fall back to the spell's own level. Not for spells that need a skill
+            // (recipes): 4.3.4 keeps a profession value there (base level 300), not a character level.
+            if (!spell.ReqLevel && !spell.ReqSkillLine)
                 spell.ReqLevel = uint8(std::min<uint32>(std::max(spellInfo->SpellLevel, spellInfo->BaseLevel), 255));
 
             if (GetTalentSpellCost(spell.SpellId))
