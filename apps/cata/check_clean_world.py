@@ -117,6 +117,35 @@ def main() -> int:
     if legacy_conditions:
         problems.append(f"{legacy_conditions} legacy phase-mask conditions remain")
 
+    # 59073 is the Gilneas phase-170 aura. Autocast is valid to disable for other
+    # spell_area rows, but this phase must be applied automatically in every area.
+    phase_autocast_mismatches = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM `spell_area` WHERE `spell`=59073 AND `autocast`<>1",
+    )
+    report["gilneas_phase_autocast_mismatches"] = phase_autocast_mismatches
+    if phase_autocast_mismatches:
+        problems.append(
+            f"{phase_autocast_mismatches} Gilneas phase 59073 rows are not autocast")
+
+    # A class trainer with several GOSSIP_OPTION_TRAINER rows shows duplicate
+    # training entries. Profession trainers legitimately have more than one.
+    duplicate_trainer_options = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM ("
+        "SELECT g.MenuID FROM gossip_menu_option g "
+        "JOIN creature_template c ON c.gossip_menu_id=g.MenuID "
+        "JOIN creature_default_trainer cdt ON cdt.CreatureId=c.entry "
+        "JOIN trainer t ON t.Id=cdt.TrainerId "
+        "WHERE g.OptionType=5 AND t.Type=0 "
+        "GROUP BY g.MenuID HAVING COUNT(DISTINCT g.OptionID)>1"
+        ") AS duplicates",
+    )
+    report["duplicate_class_trainer_options"] = duplicate_trainer_options
+    if duplicate_trainer_options:
+        problems.append(
+            f"{duplicate_trainer_options} class-trainer menus have duplicate training options")
+
     low_level_stats = scalar(args.container, args.user, args.password, args.clean,
                              "SELECT COUNT(*) FROM creature_classlevelstats "
                              "WHERE level<=5 AND (basehp0<=1 OR damage_base<=0)")
