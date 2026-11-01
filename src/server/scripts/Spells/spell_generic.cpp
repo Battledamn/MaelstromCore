@@ -6323,6 +6323,35 @@ class spell_gen_armor_specialization : public SpellScript
     }
 };
 
+// 67063 Throw Torch (Gilneas, Sacrifices)
+enum ThrowTorch
+{
+    CREDIT_ROUND_UP_WORGEN = 35582,
+    SPELL_THROW_TORCH      = 67063
+};
+
+class spell_gen_throw_torch : public SpellScript
+{
+    PrepareSpellScript(spell_gen_throw_torch);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_THROW_TORCH });
+    }
+
+    void HandleEffect(SpellMissInfo /*missInfo*/)
+    {
+        if (Player* player = GetCaster()->ToPlayer())
+            if (GetHitUnit() && !GetHitUnit()->HasAura(SPELL_THROW_TORCH))
+                player->KilledMonsterCredit(CREDIT_ROUND_UP_WORGEN);
+    }
+
+    void Register() override
+    {
+        BeforeHit += BeforeSpellHitFn(spell_gen_throw_torch::HandleEffect);
+    }
+};
+
 void AddSC_generic_spell_scripts()
 {
     RegisterSpellScript(spell_silithyst);
@@ -6521,4 +6550,5 @@ void AddSC_generic_spell_scripts()
     RegisterSpellScript(spell_gen_filter_party_level_80);
     RegisterSpellScript(spell_gen_submerge_visual);
     RegisterSpellScript(spell_gen_armor_specialization);
+    RegisterSpellScript(spell_gen_throw_torch);
 }
