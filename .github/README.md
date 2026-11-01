@@ -39,8 +39,19 @@ MaelstromCore builds like AzerothCore (CMake, C++20, MySQL); see AzerothCore's
 [installation guide](https://www.azerothcore.org/wiki/installation). It is developed and run on Windows
 with MSVC. It needs a Cataclysm 4.3.4 (build 15595) client and its extracted data.
 
-Agent instructions for this repository live in [AGENTS.md](../AGENTS.md), with task-scoped guides in
-[.agents/docs/](../.agents/docs/).
+## AI-assisted development
+
+MaelstromCore is developed with an AI coding agent, Anthropic's Claude (through Claude Code), working
+under the project owner's direction. The agent investigates against the 4.3.4 client data, packet logs
+and the reference projects, ports and writes the code, builds and deploys the server, and keeps the
+documentation; the owner decides what is built and tests every change in game. Nothing counts as working
+until it has been seen in game.
+
+The agent follows the same rules a human contributor would: AzerothCore's
+[AI agentic engineering guidelines](https://www.azerothcore.org/wiki/agentic-engineering), the agent
+instructions in [AGENTS.md](../AGENTS.md) with their task-scoped guides in
+[.agents/docs/](../.agents/docs/), and the project's own rules for 4.3.4 work. Commits it co-authors
+say so in their trailer.
 
 ## Credits
 
