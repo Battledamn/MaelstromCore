@@ -128,6 +128,64 @@ def main() -> int:
         problems.append(
             f"{phase_autocast_mismatches} Gilneas phase 59073 rows are not autocast")
 
+    gilneas_phase_areas = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM phase_area WHERE PhaseId IN (170,171) AND AreaId IN (4755,4756,4757)")
+    report["gilneas_phase_area_rows"] = gilneas_phase_areas
+    if gilneas_phase_areas != 6:
+        problems.append(f"expected 6 Gilneas phase-170/171 phase_area rows, found {gilneas_phase_areas}")
+
+    gilneas_phase_condition = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM conditions WHERE SourceTypeOrReferenceId=26 "
+        "AND SourceGroup IN (170,171) AND ConditionValue1 IN (14078,14159)")
+    report["gilneas_phase_condition"] = gilneas_phase_condition
+    if gilneas_phase_condition != 3:
+        problems.append(f"expected three Gilneas phase-170/171 quest conditions, found {gilneas_phase_condition}")
+
+    # A class trainer with several GOSSIP_OPTION_TRAINER rows shows duplicate
+    # training entries. Profession trainers legitimately have more than one.
+    duplicate_trainer_options = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM ("
+        "SELECT g.MenuID FROM gossip_menu_option g "
+        "JOIN creature_template c ON c.gossip_menu_id=g.MenuID "
+        "JOIN creature_default_trainer cdt ON cdt.CreatureId=c.entry "
+        "JOIN trainer t ON t.Id=cdt.TrainerId "
+        "WHERE g.OptionType=5 AND t.Type=0 "
+        "GROUP BY g.MenuID HAVING COUNT(DISTINCT g.OptionID)>1"
+        ") AS duplicates",
+    )
+    report["duplicate_class_trainer_options"] = duplicate_trainer_options
+    if duplicate_trainer_options:
+        problems.append(
+            f"{duplicate_trainer_options} class-trainer menus have duplicate training options")
+
+    graveyard_links = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM graveyard_zone")
+    report["graveyard_links"] = graveyard_links
+    if not graveyard_links:
+        problems.append("graveyard_zone is empty")
+
+    unresolved_graveyard_links = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM graveyard_zone gz "
+        "LEFT JOIN game_graveyard gg ON gg.ID=gz.ID WHERE gg.ID IS NULL")
+    report["unresolved_graveyard_links"] = unresolved_graveyard_links
+    if unresolved_graveyard_links:
+        problems.append(
+            f"{unresolved_graveyard_links} graveyard-zone links have no game_graveyard location")
+
+    gilneas_graveyard_links = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM graveyard_zone gz "
+        "JOIN game_graveyard gg ON gg.ID=gz.ID "
+        "WHERE gz.GhostZone=4755 AND gg.Map=654")
+    report["gilneas_graveyard_links"] = gilneas_graveyard_links
+    if not gilneas_graveyard_links:
+        problems.append("Gilneas has no linked map-654 graveyard")
+
     low_level_stats = scalar(args.container, args.user, args.password, args.clean,
                              "SELECT COUNT(*) FROM creature_classlevelstats "
                              "WHERE level<=5 AND (basehp0<=1 OR damage_base<=0)")
