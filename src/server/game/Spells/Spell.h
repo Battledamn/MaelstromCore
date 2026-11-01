@@ -343,7 +343,9 @@ public:
     void EffectQuestClear(SpellEffIndex effIndex);
     void EffectTeleUnitsFaceCaster(SpellEffIndex effIndex);
     void EffectLearnSkill(SpellEffIndex effIndex);
-    void EffectAddHonor(SpellEffIndex effIndex);
+    void EffectPlayMovie(SpellEffIndex effIndex);
+    void EffectUpdatePlayerPhase(SpellEffIndex effIndex);
+    void EffectUpdateZoneAurasAndPhases(SpellEffIndex effIndex);
     void EffectTradeSkill(SpellEffIndex effIndex);
     void EffectEnchantItemPerm(SpellEffIndex effIndex);
     void EffectEnchantItemTmp(SpellEffIndex effIndex);
@@ -436,7 +438,6 @@ public:
     // Cataclysm
     void EffectDamageFromMaxHealthPCT(SpellEffIndex effIndex);
     void EffectDestroyItem(SpellEffIndex effIndex);
-    void EffectUpdateZoneAurasAndPhases(SpellEffIndex effIndex);
 
     typedef std::set<Aura*> UsedSpellMods;
 
