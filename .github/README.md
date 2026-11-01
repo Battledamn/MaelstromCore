@@ -1,96 +1,69 @@
-# PLEASE NOTE: THIS CATACLYSM FORK IS A WORK IN PROGRESS AND IS NOT FULLY PLAYABLE YET
+# MaelstromCore
 
-# ![logo](https://raw.githubusercontent.com/azerothcore/azerothcore.github.io/master/images/logo-github.png) AzerothCore
+**MaelstromCore is [AzerothCore](https://www.azerothcore.org/) ported to World of Warcraft: Cataclysm
+4.3.4 (client build 15595).** It is AzerothCore itself, under a new name, not a separate core that
+borrows from it: the same code, structure, conventions, modules and tools, changed only where
+Cataclysm needs it.
 
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
-[![CodeFactor](https://www.codefactor.io/repository/github/azerothcore/azerothcore-wotlk/badge)](https://www.codefactor.io/repository/github/azerothcore/azerothcore-wotlk)
-[![Discord](https://img.shields.io/discord/217589275766685707?logo=discord&logoColor=white)](https://discord.gg/gkt4y2x "Our community hub on Discord")
+> **Work in progress.** MaelstromCore is not fully playable yet. Large parts of 4.3.4 already work in
+> game; classes, zones and dungeons are being brought to 4.3.4 step by step.
 
-## Build Status
+## Goal
 
-[![nopch-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core-build-nopch.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core-build-nopch.yml?query=branch%3Amaster)
-[![pch-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core-build-pch.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core-build-pch.yml?query=branch%3Amaster)
-[![core-modules-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core_modules_build.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core_modules_build.yml?query=branch%3Amaster)
-[![windows-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/windows_build.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/windows_build.yml?query=branch%3Amaster)
-[![macos-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/macos_build.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/macos_build.yml?query=branch%3Amaster)
-[![docker-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/docker_build.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/docker_build.yml?query=branch%3Amaster)
-[![tools-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/tools_build.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/tools_build.yml?query=branch%3Amaster)
-[![dashboard-ci](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/dashboard-ci.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/dashboard-ci.yml?query=branch%3Amaster)
+Version 1.0 covers every race and class from level 1 to 85, the Cataclysm 5-man dungeons and the
+Dungeon Finder. Raids and PvP come after 1.0.
 
-## Introduction
+What works today, among others: the 4.3.4 client connection and login, character creation, the
+Cataclysm stats, attack table and power regeneration, talents with specializations, mastery and
+dual spec, archaeology, currencies, achievements, professions and flights. The class spells are being
+brought to 4.3.4 one class at a time.
 
-AzerothCore is an open-source game server application and framework designed for hosting massively multiplayer online role-playing games (MMORPGs). It is based on the popular MMORPG World of Warcraft (WoW) and seeks to recreate the gameplay experience of the original game from patch 3.3.5a.
+## Principles
 
-The original code is based on MaNGOS, TrinityCore, and SunwellCore and has since then had extensive development to improve stability, in-game mechanics, and modularity to the game. AC has also grown into a community-driven project with a significant number of contributors and developers. It is written in C++ and provides a solid foundation for creating private servers that mimic the mechanics and behavior of the official WoW servers.
-
-## Philosophy
-
-Our main goal is to create a playable game server, offering a fully working in-game experience.
-
-Here are the main points we focus on:
-
-* Stability
-  * We make sure all changes pass the CIs before being merged into the master branch.
-
-* Blizzlike content
-  * We strive to make all in-game content to be blizzlike. Therefore we have a high standard for fixes being made.
-
-* Customization
-  * It is easy to customize your experience using [modules](#modules).
-
-* Community driven
-  * AzerothCore has an active community of developers, contributors, and users who collaborate, share knowledge, and provide support through forums, Discord channels, and other communication platforms. 
+- **The 4.3.4 client is the reference.** When sources disagree about a mechanic, what the client itself
+  shows and predicts decides.
+- **AzerothCore's way.** Code is written the way AzerothCore writes it, so it stays easy to read, edit
+  and extend, and upstream fixes keep fitting.
+- **Modular.** Anything that is not 4.3.4 behaviour lives in a module, never in the core.
+- **Credit where it is due.** Code or data taken from another project keeps its original author.
 
 ### Modules
 
-AzerothCore is designed to be highly modular, allowing developers to extend and customize the game to suit their preferences or create unique gameplay experiences. This flexibility enables the addition of custom features, content, and modifications.
+Like AzerothCore, MaelstromCore is built to be extended through modules (`modules/`), script hooks and
+configuration rather than changes to the core. Its own 4.3.4 hooks, functions and options for module
+authors are documented alongside the project.
 
-We have a lot of modules already made by the community, many of which can be found in the [Module Catalogue](https://www.azerothcore.org/catalogue.html#/).
+## Building
 
-## Installation
+MaelstromCore builds like AzerothCore (CMake, C++20, MySQL); see AzerothCore's
+[installation guide](https://www.azerothcore.org/wiki/installation). It is developed and run on Windows
+with MSVC. It needs a Cataclysm 4.3.4 (build 15595) client and its extracted data.
 
-Detailed installation instructions are available [here](http://www.azerothcore.org/wiki/installation).
+Agent instructions for this repository live in [AGENTS.md](../AGENTS.md), with task-scoped guides in
+[.agents/docs/](../.agents/docs/).
 
-## Contributing
+## Credits
 
-AzerothCore can also serve as a learning resource for aspiring developers who want to understand how WoW servers work, how MMORPGs are structured, how game server emulators are created, or to improve their C++ and SQL knowledge.
+MaelstromCore stands entirely on the work of others:
 
-If you want to contribute to the project, you will find a lot of resources that will guide you in our [wiki](https://www.azerothcore.org/wiki/contribute).
-
-We also recommend you read our [Contributor Covenant Code of Conduct](https://github.com/azerothcore/azerothcore-wotlk/blob/master/.github/CODE_OF_CONDUCT.md).
-
-Feel free to join our [Discord server](https://discord.gg/gkt4y2x).
-
-🤖 If you use any AI agent to work on AzerothCore, please read our [AI Agentic Engineering guidelines](https://www.azerothcore.org/wiki/agentic-engineering).
-Agent instructions for this repo live in [AGENTS.md](../AGENTS.md), with task-scoped guides in [.agents/docs/](../.agents/docs/); [.agents/README.md](../.agents/README.md) explains how to hook up your agent.
-
-Click on the "⭐ Star" button to help us gain more visibility on GitHub!
-
-## Authors & Contributors
-
-The project was born in 2016 based on SunwellCore. Unfortunately, SunwellCore was published without any git history, so on git there are no credits for all the contributors before 2016.
-
-You can check the [authors](https://github.com/azerothcore/azerothcore-wotlk/blob/master/AUTHORS) file for more details.
-
-## Important Links
-
-- [Doxygen documentation](https://www.azerothcore.org/pages/doxygen/index.html)
-- [Website](http://www.azerothcore.org/)
-- [AzerothCore catalogue](http://www.azerothcore.org/catalogue.html  "Modules, tools, and other stuff for AzerothCore") (modules, tools, etc...)
-- [Our Discord server](https://discord.gg/gkt4y2x)
-- [Our wiki](http://www.azerothcore.org/wiki "Easy to use and developed by AzerothCore founder")
-- [Our forum](https://github.com/azerothcore/azerothcore-wotlk/discussions/)
-- [Our Facebook page](https://www.facebook.com/AzerothCore/)
-- [Our LinkedIn page](https://www.linkedin.com/company/azerothcore/)
+- **[AzerothCore](https://github.com/azerothcore/azerothcore-wotlk)** and all of its contributors: the
+  core MaelstromCore is. AzerothCore was born in 2016 from SunwellCore and itself builds on
+  **[MaNGOS](https://www.getmangos.eu/)** and **[TrinityCore](https://www.trinitycore.org/)**. See the
+  [AUTHORS](../AUTHORS) file; contributors before 2016 have no git history of their own (SunwellCore was
+  published without it).
+- **[trolloks/azerothcore-cata](https://github.com/trolloks/azerothcore-cata)** and its contributors: the
+  AzerothCore Cataclysm fork MaelstromCore started from.
+- **[The Cataclysm Preservation Project](https://github.com/The-Cataclysm-Preservation-Project/TrinityCore)**
+  and **TrinityCore**: much of the 4.3.4 behaviour is ported from their code; each ported change carries
+  its original author.
+- **TrinityDB (TDB 434)**: the Cataclysm world data.
 
 ## License
 
-- The AzerothCore source code is released under the [GNU GPL v2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+- The MaelstromCore source code is released under the
+  [GNU GPL v2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html), like AzerothCore's
+  ([LICENSE](../LICENSE)).
 
-It's important to note that AzerothCore is not an official Blizzard Entertainment product, and it is not affiliated with or endorsed by World of Warcraft or Blizzard Entertainment. AzerothCore does not in any case sponsor nor support illegal public servers. If you use this project to run an illegal public server and not for testing and learning it is your own personal choice.
-
-## Special thanks
-
-[JetBrains](https://www.jetbrains.com/?from=AzerothCore) is providing free [open-source licenses](https://www.jetbrains.com/community/opensource/) to the AzerothCore developers.
-
-[![JetBrains logo.](https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg)](https://jb.gg/OpenSourceSupport)
+MaelstromCore is not an official Blizzard Entertainment product and is not affiliated with or endorsed
+by World of Warcraft or Blizzard Entertainment. It is a project for testing and learning; it does not
+sponsor or support illegal public servers.
