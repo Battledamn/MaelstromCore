@@ -128,6 +128,28 @@ def main() -> int:
         problems.append(
             f"{phase_autocast_mismatches} Gilneas phase 59073 rows are not autocast")
 
+    gilneas_phase_areas = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM phase_area WHERE PhaseId IN (170,171) AND AreaId IN (4755,4756,4757)")
+    report["gilneas_phase_area_rows"] = gilneas_phase_areas
+    if gilneas_phase_areas != 6:
+        problems.append(f"expected 6 Gilneas phase-170/171 phase_area rows, found {gilneas_phase_areas}")
+
+    gilneas_phase_172_rows = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM phase_area WHERE PhaseId=172 AND AreaId IN (4757,4758)")
+    report["gilneas_phase_172_rows"] = gilneas_phase_172_rows
+    if gilneas_phase_172_rows != 2:
+        problems.append(f"expected 2 Gilneas phase-172 rows, found {gilneas_phase_172_rows}")
+
+    gilneas_phase_condition = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM conditions WHERE SourceTypeOrReferenceId=26 "
+        "AND SourceGroup IN (170,171,172) AND ConditionValue1 IN (14078,14159,14294,14293)")
+    report["gilneas_phase_condition"] = gilneas_phase_condition
+    if gilneas_phase_condition != 5:
+        problems.append(f"expected five Gilneas phase 170/171/172 conditions, found {gilneas_phase_condition}")
+
     # A class trainer with several GOSSIP_OPTION_TRAINER rows shows duplicate
     # training entries. Profession trainers legitimately have more than one.
     duplicate_trainer_options = scalar(
@@ -145,6 +167,42 @@ def main() -> int:
     if duplicate_trainer_options:
         problems.append(
             f"{duplicate_trainer_options} class-trainer menus have duplicate training options")
+
+    # 19696 is Lorna's mastiff voice-over; only her mastiff line (38744) may use it.
+    # TDB applies it to Crowley, Liam, and Genn lines, which is audible during Sacrifices.
+    mastiff_sound_misuse = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM creature_text WHERE Sound=19696 AND BroadcastTextId<>38744")
+    report["mastiff_sound_misuse"] = mastiff_sound_misuse
+    if mastiff_sound_misuse:
+        problems.append(f"{mastiff_sound_misuse} non-Lorna rows use Lorna's mastiff sound")
+    # TDB 434 ships 685 spellclick, 422 vehicle-accessory and 15 seat-addon rows. The
+    # starter-zone import only reaches spawned creatures, so summoned vehicles such as
+    # Crowley's Horse lose their click/accessory rows unless the template phase copies them.
+    vehicle_tables = {
+        table: scalar(args.container, args.user, args.password, args.clean, f"SELECT COUNT(*) FROM `{table}`")
+        for table in ("npc_spellclick_spells", "vehicle_template_accessory", "vehicle_seat_addon")
+    }
+    report["vehicle_tables"] = vehicle_tables
+    if vehicle_tables["npc_spellclick_spells"] < 600:
+        problems.append(f"npc_spellclick_spells is incomplete: {vehicle_tables['npc_spellclick_spells']} rows")
+    if vehicle_tables["vehicle_template_accessory"] < 400:
+        problems.append(
+            f"vehicle_template_accessory is incomplete: {vehicle_tables['vehicle_template_accessory']} rows")
+    if not vehicle_tables["vehicle_seat_addon"]:
+        problems.append("vehicle_seat_addon is empty")
+    horse_spellclick = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM npc_spellclick_spells WHERE npc_entry IN (35231,44428) AND spell_id=46598")
+    horse_accessory = scalar(
+        args.container, args.user, args.password, args.clean,
+        "SELECT COUNT(*) FROM vehicle_template_accessory WHERE entry=35231 AND accessory_entry=35230")
+    report["crowley_horse_spellclick"] = horse_spellclick
+    report["crowley_horse_accessory"] = horse_accessory
+    if horse_spellclick != 2:
+        problems.append(f"expected 2 Crowley's Horse spellclick rows, found {horse_spellclick}")
+    if horse_accessory != 1:
+        problems.append(f"expected Crowley as Crowley's Horse accessory, found {horse_accessory}")
 
     graveyard_links = scalar(
         args.container, args.user, args.password, args.clean,
