@@ -18,10 +18,12 @@
 #include "GameTime.h"
 #include "Group.h"
 #include "Player.h"
+#include "Spell.h"
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
+#include "TemporarySummon.h"
 #include "UnitAI.h"
 /*
  * Scripts for spells with SPELLFAMILY_PALADIN and SPELLFAMILY_GENERIC spells used by paladin players.
@@ -48,7 +50,10 @@ enum PaladinSpells
     SPELL_PALADIN_DIVINE_STORM_DUMMY             = 54171,
     SPELL_PALADIN_DIVINE_STORM_HEAL              = 54172,
 
+    SPELL_PALADIN_EYE_FOR_AN_EYE_RANK_1          = 9799,
     SPELL_PALADIN_EYE_FOR_AN_EYE_DAMAGE          = 25997,
+    SPELL_PALADIN_GUARDED_BY_THE_LIGHT           = 88063,
+    SPELL_PALADIN_GUARDED_BY_THE_LIGHT_R2        = 85646,
 
     SPELL_PALADIN_FORBEARANCE                    = 25771,
     SPELL_PALADIN_AVENGING_WRATH_MARKER          = 61987,
@@ -161,186 +166,54 @@ enum PaladinProcSpells
     SPELL_PALADIN_T8_HOLY_4P_BONUS               = 64895
 };
 
-static bool HasJudgementsOfTheJust(Unit const* caster)
-{
-    return caster && caster->GetAuraEffect(
-        SPELL_AURA_ADD_FLAT_MODIFIER, SPELLFAMILY_PALADIN,
-        PALADIN_ICON_JUDGEMENTS_OF_THE_JUST, 0) != nullptr;
-}
-
-class spell_pal_seal_of_command_aura : public AuraScript
-{
-    PrepareAuraScript(spell_pal_seal_of_command_aura);
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        if (!eventInfo.GetActor() || !eventInfo.GetActionTarget())
-        {
-            return false;
-        }
-
-        if (SpellInfo const* procSpell = eventInfo.GetSpellInfo())
-        {
-            if (procSpell->SpellIconID == 3025) // Righteous Vengeance, should not proc SoC
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        // All melee procs should cleave except Hammer of the Righteous.
-        // Judgement cleave is handled separately via JotJ code path.
-        int32 targets = 3;
-        if (SpellInfo const* procSpell = eventInfo.GetSpellInfo())
-        {
-            // HotR: flag1 0x40000, DS: flag1 0x20000
-            if (procSpell->SpellFamilyName == SPELLFAMILY_PALADIN &&
-                (procSpell->SpellFamilyFlags[1] & 0x60000))
-                targets = 1;
-        }
-
-        Unit* target = eventInfo.GetActionTarget();
-        if (target->IsAlive())
-        {
-            eventInfo.GetActor()->CastCustomSpell(aurEff->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, SPELLVALUE_MAX_TARGETS, targets, target, false, nullptr, aurEff);
-        }
-    }
-
-    void Register() override
-    {
-        if (m_scriptSpellId == 20375)
-        {
-            DoCheckProc += AuraCheckProcFn(spell_pal_seal_of_command_aura::CheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_pal_seal_of_command_aura::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
-        }
-    }
-};
-
-class spell_pal_seal_of_command : public SpellScript
-{
-    PrepareSpellScript(spell_pal_seal_of_command);
-
-    void FilterTargets(std::list<WorldObject*>& targets)
-    {
-        if (SpellValue const* spellValue = GetSpellValue())
-            if (spellValue->MaxAffectedTargets == 1)
-                targets.clear();
-    }
-
-    void Register() override
-    {
-        if (m_scriptSpellId == 20424)
-            OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pal_seal_of_command::FilterTargets, EFFECT_0, TARGET_UNIT_TARGET_ENEMY);
-    }
-};
-
-class spell_pal_divine_intervention : public AuraScript
-{
-    PrepareAuraScript(spell_pal_divine_intervention);
-
-    void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        if (!GetTarget()->IsInCombat() && GetTarget()->IsPlayer())
-            GetTarget()->RemoveAurasDueToSpell(GetTarget()->ToPlayer()->GetTeamId() == TEAM_ALLIANCE ? 57723 : 57724);
-    }
-
-    void Register() override
-    {
-        OnEffectRemove += AuraEffectRemoveFn(spell_pal_divine_intervention::HandleRemove, EFFECT_0, SPELL_AURA_SCHOOL_IMMUNITY, AURA_EFFECT_HANDLE_REAL);
-    }
-};
-
-class spell_pal_seal_of_light : public AuraScript
-{
-    PrepareAuraScript(spell_pal_seal_of_light);
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        // xinef: skip divine storm self hit (dummy) and righteous vengeance (0x20000000=
-        return eventInfo.GetActor() != eventInfo.GetProcTarget() && (!eventInfo.GetSpellInfo() || !eventInfo.GetSpellInfo()->SpellFamilyFlags.HasFlag(0x20000000));
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_pal_seal_of_light::CheckProc);
-    }
-};
-
-// 58597 - Sacred Shield (absorb)
+// 85285 - Sacred Shield
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): in 4.3.4 a hit that
+// leaves the paladin below 30% health triggers the absorb (twice its base plus 280% attack power).
 class spell_pal_sacred_shield : public AuraScript
 {
     PrepareAuraScript(spell_pal_sacred_shield);
 
-    void CalculateAmount(AuraEffect const* aurEff, int32& amount, bool& /*canBeRecalculated*/)
+    bool CheckProc(ProcEventInfo& eventInfo)
     {
-        if (Unit* caster = GetCaster())
-        {
-            // +75.00% from sp bonus
-            float bonus = CalculatePct(caster->SpellBaseHealingBonusDone(GetSpellInfo()->GetSchoolMask()), 75.0f);
+        if (DamageInfo* damage = eventInfo.GetDamageInfo())
+            return GetTarget()->HealthBelowPctDamaged(30, damage->GetDamage());
 
-            // Divine Guardian is only applied at the spell healing bonus because it was already applied to the base value in CalculateSpellDamage
-            bonus = caster->ApplyEffectModifiers(GetSpellInfo(), aurEff->GetEffIndex(), bonus);
-            bonus *= caster->CalculateLevelPenalty(GetSpellInfo());
+        return false;
+    }
 
-            amount += int32(bonus);
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
 
-            // Arena - Dampening
-            if (AuraEffect const* auraEffArenaDampening = caster->GetAuraEffect(SPELL_GENERIC_ARENA_DAMPENING, EFFECT_0))
-                AddPct(amount, auraEffArenaDampening->GetAmount());
-            // Battleground - Dampening
-            else if (AuraEffect const* auraEffBattlegroundDampening = caster->GetAuraEffect(SPELL_GENERIC_BATTLEGROUND_DAMPENING, EFFECT_0))
-                AddPct(amount, auraEffBattlegroundDampening->GetAmount());
-
-            // ICC buff
-            if (AuraEffect const* auraStrengthOfWrynn = caster->GetAuraEffect(SPELL_AURA_MOD_HEALING_DONE_PERCENT, SPELLFAMILY_GENERIC, SPELL_ICON_ID_STRENGTH_OF_WRYNN, EFFECT_2))
-                AddPct(amount, auraStrengthOfWrynn->GetAmount());
-            else if (AuraEffect const* auraHellscreamsWarsong = caster->GetAuraEffect(SPELL_AURA_MOD_HEALING_DONE_PERCENT, SPELLFAMILY_GENERIC, SPELL_ICON_ID_HELLSCREAM_WARSONG, EFFECT_2))
-                AddPct(amount, auraHellscreamsWarsong->GetAmount());
-        }
+        Unit* target = GetTarget();
+        SpellInfo const* spell = sSpellMgr->AssertSpellInfo(GetSpellInfo()->Effects[aurEff->GetEffIndex()].TriggerSpell);
+        int32 absorb = int32(spell->Effects[EFFECT_0].CalcValue() * 2 + target->GetTotalAttackPowerValue(BASE_ATTACK) * 2.8f);
+        target->CastCustomSpell(spell->Id, SPELLVALUE_BASE_POINT0, absorb, target, true, nullptr, aurEff);
     }
 
     void Register() override
     {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pal_sacred_shield::CalculateAmount, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB);
+        DoCheckProc += AuraCheckProcFn(spell_pal_sacred_shield::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_sacred_shield::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
     }
 };
 
 // 31850 - Ardent Defender
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): in 4.3.4 it is a
+// cooldown whose own aura reduces the damage taken; a blow that would kill is absorbed instead and
+// heals for 15% of maximum health, which ends the aura.
 class spell_pal_ardent_defender : public AuraScript
 {
     PrepareAuraScript(spell_pal_ardent_defender);
 
-public:
-    spell_pal_ardent_defender()
-    {
-        absorbPct = 0;
-        healPct = 0;
-    }
-
-private:
-    uint32 absorbPct, healPct;
-
     enum Spell
     {
-        PAL_SPELL_ARDENT_DEFENDER_DEBUFF = 66233,
         PAL_SPELL_ARDENT_DEFENDER_HEAL   = 66235
     };
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo({ PAL_SPELL_ARDENT_DEFENDER_HEAL });
-    }
-
-    bool Load() override
-    {
-        healPct = GetSpellInfo()->Effects[EFFECT_1].CalcValue();
-        absorbPct = GetSpellInfo()->Effects[EFFECT_0].CalcValue();
-        return GetUnitOwner()->IsPlayer();
     }
 
     void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
@@ -351,34 +224,15 @@ private:
 
     void Absorb(AuraEffect* aurEff, DamageInfo& dmgInfo, uint32& absorbAmount)
     {
-        Unit* victim = GetTarget();
-        int32 remainingHealth = victim->GetHealth() - dmgInfo.GetDamage();
-        uint32 allowedHealth = victim->CountPctFromMaxHealth(35);
-        // If damage kills us
-        if (remainingHealth <= 0 && !victim->ToPlayer()->HasAura(PAL_SPELL_ARDENT_DEFENDER_DEBUFF))
-        {
-            // Cast healing spell, completely avoid damage
-            absorbAmount = dmgInfo.GetDamage();
+        absorbAmount = 0;
+        Unit* target = GetTarget();
+        if (dmgInfo.GetDamage() < target->GetHealth())
+            return;
 
-            uint32 defenseSkillValue = victim->GetDefenseSkillValue();
-            // Max heal when defense skill denies critical hits from raid bosses
-            // Formula: max defense at level + 140 (raiting from gear)
-            uint32 reqDefForMaxHeal = victim->GetLevel() * 5 + 140;
-            float pctFromDefense = (defenseSkillValue >= reqDefForMaxHeal)
-                                    ? 1.0f
-                                    : float(defenseSkillValue) / float(reqDefForMaxHeal);
-
-            int32 healAmount = int32(victim->CountPctFromMaxHealth(uint32(healPct * pctFromDefense)));
-            victim->CastCustomSpell(PAL_SPELL_ARDENT_DEFENDER_HEAL, SPELLVALUE_BASE_POINT0, healAmount, victim, true, nullptr, aurEff);
-        }
-        else if (remainingHealth < int32(allowedHealth))
-        {
-            // Reduce damage that brings us under 35% (or full damage if we are already under 35%) by x%
-            uint32 damageToReduce = (victim->GetHealth() < allowedHealth)
-                                    ? dmgInfo.GetDamage()
-                                    : allowedHealth - remainingHealth;
-            absorbAmount = CalculatePct(damageToReduce, absorbPct);
-        }
+        absorbAmount = dmgInfo.GetDamage();
+        int32 health = int32(target->CountPctFromMaxHealth(15));
+        target->CastCustomSpell(PAL_SPELL_ARDENT_DEFENDER_HEAL, SPELLVALUE_BASE_POINT0, health, target, true, nullptr, aurEff);
+        Remove();
     }
 
     void Register() override
@@ -450,7 +304,8 @@ class spell_pal_beacon_of_light : public AuraScript
     {
         PreventDefaultAction();
 
-        // area aura owner casts the spell
+        // the beacon target casts Light's Beacon on its party and raid members, as TrinityCore's periodic
+        // trigger does (the caster is the beacon target, which spell_pal_lights_beacon relies on)
         Unit* owner = GetAura()->GetUnitOwner();
         uint32 triggerSpell = GetSpellInfo()->Effects[aurEff->GetEffIndex()].TriggerSpell;
         owner->CastSpell(GetTarget(), triggerSpell, true, nullptr, aurEff, owner->GetGUID());
@@ -469,24 +324,15 @@ class spell_pal_avenging_wrath : public AuraScript
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo(
-        {
-            SPELL_PALADIN_SANCTIFIED_WRATH,
-            SPELL_PALADIN_SANCTIFIED_WRATH_TALENT_R1,
-            SPELL_PALADIN_AVENGING_WRATH_MARKER,
-            SPELL_PALADIN_IMMUNE_SHIELD_MARKER
-        });
+        return ValidateSpellInfo({ SPELL_PALADIN_SANCTIFIED_WRATH, SPELL_PALADIN_SANCTIFIED_WRATH_TALENT_R1 });
     }
 
-    void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    // 4.3.4 (CPP): any rank of the Sanctified Wrath talent brings its aura while Avenging Wrath lasts
+    void HandleApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
     {
         Unit* target = GetTarget();
-
-        if (AuraEffect const* sanctifiedWrathAurEff = target->GetAuraEffectOfRankedSpell(SPELL_PALADIN_SANCTIFIED_WRATH_TALENT_R1, EFFECT_2))
-        {
-            int32 basepoints = sanctifiedWrathAurEff->GetAmount();
-            target->CastCustomSpell(target, SPELL_PALADIN_SANCTIFIED_WRATH, &basepoints, &basepoints, nullptr, true, nullptr, sanctifiedWrathAurEff);
-        }
+        if (target->GetAuraOfRankedSpell(SPELL_PALADIN_SANCTIFIED_WRATH_TALENT_R1))
+            target->CastSpell(target, SPELL_PALADIN_SANCTIFIED_WRATH, true, nullptr, aurEff);
     }
 
     void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
@@ -550,50 +396,6 @@ class spell_pal_blessing_of_faith : public SpellScript
     }
 };
 
-// 20911 - Blessing of Sanctuary
-// 25899 - Greater Blessing of Sanctuary
-class spell_pal_blessing_of_sanctuary : public AuraScript
-{
-    PrepareAuraScript(spell_pal_blessing_of_sanctuary);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_BLESSING_OF_SANCTUARY_BUFF, SPELL_PALADIN_BLESSING_OF_SANCTUARY_ENERGIZE });
-    }
-
-    void HandleEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        Unit* target = GetTarget();
-        if (Unit* caster = GetCaster())
-            caster->CastSpell(target, SPELL_PALADIN_BLESSING_OF_SANCTUARY_BUFF, true);
-    }
-
-    void HandleEffectRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        Unit* target = GetTarget();
-        target->RemoveAura(SPELL_PALADIN_BLESSING_OF_SANCTUARY_BUFF, GetCasterGUID());
-    }
-
-    bool CheckProc(ProcEventInfo& /*eventInfo*/)
-    {
-        return GetTarget()->HasActivePowerType(POWER_MANA);
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
-    {
-        PreventDefaultAction();
-        GetTarget()->CastSpell(GetTarget(), SPELL_PALADIN_BLESSING_OF_SANCTUARY_ENERGIZE, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        AfterEffectApply += AuraEffectApplyFn(spell_pal_blessing_of_sanctuary::HandleEffectApply, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
-        AfterEffectRemove += AuraEffectRemoveFn(spell_pal_blessing_of_sanctuary::HandleEffectRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
-        DoCheckProc += AuraCheckProcFn(spell_pal_blessing_of_sanctuary::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_blessing_of_sanctuary::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
 // 64205 - Divine Sacrifice
 class spell_pal_divine_sacrifice : public AuraScript
 {
@@ -639,34 +441,50 @@ class spell_pal_divine_sacrifice : public AuraScript
 };
 
 // 53385 - Divine Storm
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): in 4.3.4 it grants a
+// holy power charge (effect 0) only when it hits at least four enemies, and the heal goes to up to
+// three party members.
 class spell_pal_divine_storm : public SpellScript
 {
     PrepareSpellScript(spell_pal_divine_storm);
-
-    uint32 healPct;
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo({ SPELL_PALADIN_DIVINE_STORM_DUMMY });
     }
 
-    bool Load() override
-    {
-        healPct = GetSpellInfo()->Effects[EFFECT_1].CalcValue(GetCaster());
-        return true;
-    }
-
     void TriggerHeal()
     {
         Unit* caster = GetCaster();
-        if (GetHitUnit() != caster)
-            caster->CastCustomSpell(SPELL_PALADIN_DIVINE_STORM_DUMMY, SPELLVALUE_BASE_POINT0, (GetHitDamage() * healPct) / 100, caster, true);
+        if (GetHitUnit() == caster)
+            return;
+
+        CustomSpellValues values;
+        values.AddSpellMod(SPELLVALUE_BASE_POINT0, CalculatePct(GetHitDamage(), GetSpellInfo()->Effects[EFFECT_1].CalcValue(caster)));
+        values.AddSpellMod(SPELLVALUE_MAX_TARGETS, 3);
+        caster->CastCustomSpell(SPELL_PALADIN_DIVINE_STORM_DUMMY, values, caster, TRIGGERED_FULL_MASK);
+    }
+
+    void CountTargets(std::list<WorldObject*>& targets)
+    {
+        _targetCount = uint8(targets.size());
+    }
+
+    void HandleEnergize(SpellEffIndex effIndex)
+    {
+        if (_targetCount < 4)
+            PreventHitDefaultEffect(effIndex);
     }
 
     void Register() override
     {
         AfterHit += SpellHitFn(spell_pal_divine_storm::TriggerHeal);
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pal_divine_storm::CountTargets, EFFECT_2, TARGET_UNIT_SRC_AREA_ENEMY);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_divine_storm::HandleEnergize, EFFECT_0, SPELL_EFFECT_ENERGIZE);
     }
+
+private:
+    uint8 _targetCount = 0;
 };
 
 // 54171 - Divine Storm (Dummy)
@@ -756,7 +574,9 @@ class spell_pal_eye_for_an_eye : public AuraScript
 
     void Register() override
     {
-        OnEffectProc += AuraEffectProcFn(spell_pal_eye_for_an_eye::OnProc, EFFECT_0, SPELL_AURA_DUMMY);
+        // 4.3.4: rank 1's effect is a dummy, rank 2's a proc trigger (CPP)
+        OnEffectProc += AuraEffectProcFn(spell_pal_eye_for_an_eye::OnProc, EFFECT_0,
+            m_scriptSpellId == SPELL_PALADIN_EYE_FOR_AN_EYE_RANK_1 ? SPELL_AURA_DUMMY : SPELL_AURA_PROC_TRIGGER_SPELL);
     }
 };
 
@@ -783,26 +603,34 @@ class spell_pal_glyph_of_holy_light : public SpellScript
     }
 };
 
-// 63521 - Guarded by The Light
-class spell_pal_guarded_by_the_light : public SpellScript
+// -85639 - Guarded by the Light
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): rank 2 turns the
+// overhealing of the paladin's heals on themselves into an absorb (88063).
+class spell_pal_guarded_by_the_light : public AuraScript
 {
-    PrepareSpellScript(spell_pal_guarded_by_the_light);
+    PrepareAuraScript(spell_pal_guarded_by_the_light);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_PALADIN_DIVINE_PLEA });
+        return ValidateSpellInfo({ SPELL_PALADIN_GUARDED_BY_THE_LIGHT, SPELL_PALADIN_GUARDED_BY_THE_LIGHT_R2 });
     }
 
-    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
+    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
     {
-        // Divine Plea
-        if (Aura* aura = GetCaster()->GetAura(SPELL_PALADIN_DIVINE_PLEA))
-            aura->RefreshDuration();
+        PreventDefaultAction();
+        HealInfo* heal = eventInfo.GetHealInfo();
+        if (!heal)
+            return;
+
+        int32 overheal = int32(heal->GetHeal()) - int32(heal->GetEffectiveHeal());
+        if (overheal > 0)
+            GetTarget()->CastCustomSpell(SPELL_PALADIN_GUARDED_BY_THE_LIGHT, SPELLVALUE_BASE_POINT0, overheal, GetTarget(), true);
     }
 
     void Register() override
     {
-        OnEffectHitTarget += SpellEffectFn(spell_pal_guarded_by_the_light::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+        if (m_scriptSpellId == SPELL_PALADIN_GUARDED_BY_THE_LIGHT_R2) // only rank 2 has this effect
+            OnEffectProc += AuraEffectProcFn(spell_pal_guarded_by_the_light::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -858,48 +686,15 @@ class spell_pal_hand_of_sacrifice : public SpellScript
     }
 };
 
-// 1038 - Hand of Salvation
-class spell_pal_hand_of_salvation : public AuraScript
-{
-    PrepareAuraScript(spell_pal_hand_of_salvation);
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        if (Unit* caster = GetCaster())
-        {
-            // Glyph of Salvation
-            if (caster->GetGUID() == GetUnitOwner()->GetGUID())
-                if (AuraEffect const* aurEff = caster->GetAuraEffect(SPELL_PALADIN_GLYPH_OF_SALVATION, EFFECT_0))
-                    amount -= aurEff->GetAmount();
-        }
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pal_hand_of_salvation::CalculateAmount, EFFECT_1, SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN);
-    }
-};
-
-// -20473 - Holy Shock
+// 20473 - Holy Shock
+// 4.3.4 has one rank: the dummy casts the heal on a friend or the damage on an enemy (CPP).
 class spell_pal_holy_shock : public SpellScript
 {
     PrepareSpellScript(spell_pal_holy_shock);
 
-    bool Validate(SpellInfo const* spellInfo) override
+    bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        SpellInfo const* firstRankSpellInfo = sSpellMgr->GetSpellInfo(SPELL_PALADIN_HOLY_SHOCK_R1);
-        if (!firstRankSpellInfo)
-            return false;
-
-        // can't use other spell than holy shock due to spell_ranks dependency
-        if (!spellInfo->IsRankOf(firstRankSpellInfo))
-            return false;
-
-        uint8 rank = spellInfo->GetRank();
-        if (!sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HOLY_SHOCK_R1_DAMAGE, rank, true) || !sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HOLY_SHOCK_R1_HEALING, rank, true))
-            return false;
-
-        return true;
+        return ValidateSpellInfo({ SPELL_PALADIN_HOLY_SHOCK_R1_DAMAGE, SPELL_PALADIN_HOLY_SHOCK_R1_HEALING });
     }
 
     void HandleDummy(SpellEffIndex /*effIndex*/)
@@ -907,11 +702,10 @@ class spell_pal_holy_shock : public SpellScript
         Unit* caster = GetCaster();
         if (Unit* unitTarget = GetHitUnit())
         {
-            uint8 rank = GetSpellInfo()->GetRank();
             if (caster->IsFriendlyTo(unitTarget))
-                caster->CastSpell(unitTarget, sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HOLY_SHOCK_R1_HEALING, rank), true);
+                caster->CastSpell(unitTarget, SPELL_PALADIN_HOLY_SHOCK_R1_HEALING, true);
             else
-                caster->CastSpell(unitTarget, sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HOLY_SHOCK_R1_DAMAGE, rank), true);
+                caster->CastSpell(unitTarget, SPELL_PALADIN_HOLY_SHOCK_R1_DAMAGE, true);
         }
     }
 
@@ -953,6 +747,7 @@ enum PaladinCataSpells
     SPELL_PALADIN_LONG_ARM_OF_THE_LAW                   = 87173,
     SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE          = 25742,
     SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS_DAMAGE_AOE      = 101423,
+    SPELL_PALADIN_SEAL_OF_JUSTICE_EFFECT                = 20170,
     SPELL_PALADIN_TWO_HANDED_WEAPON_SPECIALIZATION      = 20113
 };
 
@@ -963,7 +758,9 @@ enum PaladinCataSpellIcons
     PALADIN_ICON_ID_GUARDED_BY_THE_LIGHT                = 3026,
     PALADIN_ICON_ID_LONG_ARM_OF_THE_LAW                 = 3013,
     PALADIN_ICON_ID_SEALS_OF_COMMAND                    = 561,
-    PALADIN_ICON_ID_SELFLESS_HEALER                     = 3924
+    PALADIN_ICON_ID_SELFLESS_HEALER                     = 3924,
+    PALADIN_ICON_ID_GLYPH_OF_DIVINITY                   = 79,
+    PALADIN_ICON_ID_GLYPH_OF_LIGHT_OF_DAWN              = 5154
 };
 
 // 20271 - Judgement
@@ -1043,25 +840,9 @@ class spell_pal_judgement : public SpellScript
     }
 };
 
-// 20425 - Judgement of Command
-class spell_pal_judgement_of_command : public SpellScript
-{
-    PrepareSpellScript(spell_pal_judgement_of_command);
-
-    void HandleDummy(SpellEffIndex /*effIndex*/)
-    {
-        if (Unit* unitTarget = GetHitUnit())
-            if (SpellInfo const* spell_proto = sSpellMgr->GetSpellInfo(GetEffectValue()))
-                GetCaster()->CastSpell(unitTarget, spell_proto, true, nullptr);
-    }
-
-    void Register() override
-    {
-        OnEffectHitTarget += SpellEffectFn(spell_pal_judgement_of_command::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
-    }
-};
-
-// -633 - Lay on Hands
+// 633 - Lay on Hands
+// 4.3.4 (CPP): on yourself it brings Forbearance and the immune marker (no Avenging Wrath marker any
+// more); the Glyph of Divinity gives mana on every use (54986).
 class spell_pal_lay_on_hands : public SpellScript
 {
     PrepareSpellScript(spell_pal_lay_on_hands);
@@ -1071,15 +852,9 @@ class spell_pal_lay_on_hands : public SpellScript
         return ValidateSpellInfo(
             {
                 SPELL_PALADIN_FORBEARANCE,
-                SPELL_PALADIN_AVENGING_WRATH_MARKER,
-                SPELL_PALADIN_IMMUNE_SHIELD_MARKER
+                SPELL_PALADIN_IMMUNE_SHIELD_MARKER,
+                SPELL_PALADIN_GLYPH_OF_DIVINITY_PROC
             });
-    }
-
-    bool Load() override
-    {
-        _manaAmount = 0;
-        return true;
     }
 
     void HandleMaxHealthHeal(SpellEffIndex /*effIndex*/)
@@ -1105,13 +880,8 @@ class spell_pal_lay_on_hands : public SpellScript
         Unit* caster = GetCaster();
         if (Unit* target = GetExplTargetUnit())
             if (caster == target)
-                if (target->HasAnyAuras(SPELL_PALADIN_FORBEARANCE, SPELL_PALADIN_AVENGING_WRATH_MARKER, SPELL_PALADIN_IMMUNE_SHIELD_MARKER))
+                if (target->HasAnyAuras(SPELL_PALADIN_FORBEARANCE, SPELL_PALADIN_IMMUNE_SHIELD_MARKER))
                     return SPELL_FAILED_TARGET_AURASTATE;
-
-        // Xinef: Glyph of Divinity
-        if (Unit* target = GetExplTargetUnit())
-            if (target->HasActivePowerType(POWER_MANA))
-                _manaAmount = target->GetPower(POWER_MANA);
 
         return SPELL_CAST_OK;
     }
@@ -1119,21 +889,14 @@ class spell_pal_lay_on_hands : public SpellScript
     void HandleScript()
     {
         Unit* caster = GetCaster();
-        Unit* target = GetHitUnit();
-        if (caster == target)
+        if (caster == GetHitUnit())
         {
             caster->CastSpell(caster, SPELL_PALADIN_FORBEARANCE, true);
-            caster->CastSpell(caster, SPELL_PALADIN_AVENGING_WRATH_MARKER, true);
             caster->CastSpell(caster, SPELL_PALADIN_IMMUNE_SHIELD_MARKER, true);
         }
-        // Xinef: Glyph of Divinity
-        else if (target && caster->HasAura(SPELL_PALADIN_GLYPH_OF_DIVINITY) &&
-            GetSpellInfo()->Id != SPELL_PALADIN_LAY_ON_HANDS_R1 && _manaAmount > 0) // excluding first rank
-        {
-            _manaAmount = target->GetPower(POWER_MANA) - _manaAmount;
-            if (_manaAmount > 0)
-                caster->CastCustomSpell(54986 /*Energize*/, SPELLVALUE_BASE_POINT1, _manaAmount, caster, true);
-        }
+
+        if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_GLYPH_OF_DIVINITY, EFFECT_0))
+            caster->CastSpell(caster, SPELL_PALADIN_GLYPH_OF_DIVINITY_PROC, true, nullptr, aurEff);
     }
 
     void Register() override
@@ -1142,8 +905,6 @@ class spell_pal_lay_on_hands : public SpellScript
         AfterHit += SpellHitFn(spell_pal_lay_on_hands::HandleScript);
         OnEffectHitTarget += SpellEffectFn(spell_pal_lay_on_hands::HandleMaxHealthHeal, EFFECT_0, SPELL_EFFECT_HEAL_MAX_HEALTH);
     }
-
-    int32 _manaAmount;
 };
 
 // 31789 - Righteous Defense
@@ -1237,212 +998,37 @@ class spell_pal_seal_of_righteousness : public AuraScript
     }
 };
 
-// -31876 - Judgements of the Wise
-class spell_pal_judgements_of_the_wise : public AuraScript
+// 20164 - Seal of Justice - single-target melee hits snare the target and deal
+// ${$MWS*(0.005*$AP+0.01*$SPH)} Holy damage (20170's effect 1 is a placeholder of 1)
+class spell_pal_seal_of_justice : public AuraScript
 {
-    PrepareAuraScript(spell_pal_judgements_of_the_wise);
+    PrepareAuraScript(spell_pal_seal_of_justice);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_MANA, SPELL_PALADIN_REPLENISHMENT });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
-    {
-        PreventDefaultAction();
-        Unit* caster = GetTarget();
-        caster->CastSpell(caster, SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_MANA, true, nullptr, aurEff);
-        caster->CastSpell(caster, SPELL_PALADIN_REPLENISHMENT, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_judgements_of_the_wise::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// -53380 - Righteous Vengeance
-class spell_pal_righteous_vengeance : public AuraScript
-{
-    PrepareAuraScript(spell_pal_righteous_vengeance);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_RIGHTEOUS_VENGEANCE_DOT });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        Unit* target = eventInfo.GetActionTarget();
-        if (!target)
-            return;
-
-        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
-        if (!damageInfo || !damageInfo->GetDamage())
-            return;
-
-        // Calculate total DoT damage (percentage of crit damage), divided by 4 ticks
-        int32 amount = CalculatePct(static_cast<int32>(damageInfo->GetDamage()), aurEff->GetAmount()) / 4;
-        target->CastDelayedSpellWithPeriodicAmount(GetTarget(), SPELL_PALADIN_RIGHTEOUS_VENGEANCE_DOT, SPELL_AURA_PERIODIC_DAMAGE, amount);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_righteous_vengeance::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// -53501 - Sheath of Light
-class spell_pal_sheath_of_light : public AuraScript
-{
-    PrepareAuraScript(spell_pal_sheath_of_light);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_SHEATH_OF_LIGHT_HOT });
+        return ValidateSpellInfo({ SPELL_PALADIN_SEAL_OF_JUSTICE_EFFECT });
     }
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
-        HealInfo* healInfo = eventInfo.GetHealInfo();
-        return healInfo && healInfo->GetHeal();
+        return eventInfo.GetProcTarget() && (!eventInfo.GetSpellInfo() || !eventInfo.GetSpellInfo()->IsAffectingArea());
     }
 
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
     {
         PreventDefaultAction();
+        Unit* target = GetTarget();
 
-        Unit* caster = eventInfo.GetActor();
-        Unit* target = eventInfo.GetActionTarget();
-
-        SpellInfo const* spellInfo = sSpellMgr->AssertSpellInfo(SPELL_PALADIN_SHEATH_OF_LIGHT_HOT);
-        int32 amount = CalculatePct(static_cast<int32>(eventInfo.GetHealInfo()->GetHeal()), aurEff->GetAmount());
-
-        ASSERT(spellInfo->GetMaxTicks() > 0);
-        amount /= spellInfo->GetMaxTicks();
-
-        caster->CastCustomSpell(SPELL_PALADIN_SHEATH_OF_LIGHT_HOT, SPELLVALUE_BASE_POINT0, amount, target, true, nullptr, aurEff);
+        float ap = target->GetTotalAttackPowerValue(BASE_ATTACK);
+        int32 holy = target->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY);
+        int32 bp1 = int32((ap * 0.005f + 0.01f * holy) * target->GetAttackTime(BASE_ATTACK) / 1000);
+        target->CastCustomSpell(eventInfo.GetProcTarget(), SPELL_PALADIN_SEAL_OF_JUSTICE_EFFECT, nullptr, &bp1, nullptr, true, nullptr, aurEff);
     }
 
     void Register() override
     {
-        DoCheckProc += AuraCheckProcFn(spell_pal_sheath_of_light::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_sheath_of_light::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
-    }
-};
-
-// 20185 - Judgement of Light (debuff on target)
-class spell_pal_judgement_of_light_heal : public AuraScript
-{
-    PrepareAuraScript(spell_pal_judgement_of_light_heal);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_JUDGEMENT_OF_LIGHT_HEAL });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        Unit* attacker = eventInfo.GetActor();
-        if (!attacker)
-            return;
-
-        int32 bp = int32(attacker->CountPctFromMaxHealth(aurEff->GetAmount()));
-        attacker->CastCustomSpell(attacker, SPELL_PALADIN_JUDGEMENT_OF_LIGHT_HEAL, &bp, nullptr, nullptr, true, nullptr, aurEff, GetCasterGUID());
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_judgement_of_light_heal::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// 20186 - Judgement of Wisdom (debuff on target)
-class spell_pal_judgement_of_wisdom_mana : public AuraScript
-{
-    PrepareAuraScript(spell_pal_judgement_of_wisdom_mana);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_JUDGEMENT_OF_WISDOM_MANA });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        return eventInfo.GetActor()->getPowerType() == POWER_MANA;
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        Unit* attacker = eventInfo.GetActor();
-        if (!attacker)
-            return;
-
-        SpellInfo const* spellInfo = sSpellMgr->AssertSpellInfo(SPELL_PALADIN_JUDGEMENT_OF_WISDOM_MANA);
-        int32 bp = int32(CalculatePct(attacker->GetCreateMana(), spellInfo->Effects[EFFECT_0].CalcValue()));
-        attacker->CastCustomSpell(attacker, SPELL_PALADIN_JUDGEMENT_OF_WISDOM_MANA, &bp, nullptr, nullptr, true, nullptr, aurEff, GetCasterGUID());
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_pal_judgement_of_wisdom_mana::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_judgement_of_wisdom_mana::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// 31785, 33776 - Spiritual Attunement
-class spell_pal_spiritual_attunement : public AuraScript
-{
-    PrepareAuraScript(spell_pal_spiritual_attunement);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_SPIRITUAL_ATTUNEMENT_MANA });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        // If healed by another unit (not self)
-        if (GetTarget() == eventInfo.GetActor())
-            return false;
-
-        // Don't allow non-positive spells to proc
-        SpellInfo const* procSpell = eventInfo.GetSpellInfo();
-        if (!procSpell || !procSpell->IsPositive())
-            return false;
-
-        HealInfo const* healInfo = eventInfo.GetHealInfo();
-        if (!healInfo || !healInfo->GetEffectiveHeal())
-            return false;
-
-        return true;
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        HealInfo const* healInfo = eventInfo.GetHealInfo();
-        if (!healInfo)
-            return;
-
-        uint32 effectiveHeal = healInfo->GetEffectiveHeal();
-        if (!effectiveHeal)
-            return;
-
-        int32 bp = int32(CalculatePct(effectiveHeal, aurEff->GetAmount()));
-        if (bp)
-            GetTarget()->CastCustomSpell(SPELL_PALADIN_SPIRITUAL_ATTUNEMENT_MANA, SPELLVALUE_BASE_POINT0, bp, GetTarget(), true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_pal_spiritual_attunement::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_spiritual_attunement::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        DoCheckProc += AuraCheckProcFn(spell_pal_seal_of_justice::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_seal_of_justice::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -1470,96 +1056,56 @@ class spell_pal_hand_of_protection : public SpellScript
         return SPELL_CAST_OK;
     }
 
+    // 4.3.4 (CPP): Forbearance and the server-side immune marker on the target
+    void HandleForbearance(SpellEffIndex /*effIndex*/)
+    {
+        Unit* target = GetHitUnit();
+        target->AddAura(SPELL_PALADIN_IMMUNE_SHIELD_MARKER, target);
+        GetCaster()->CastSpell(target, SPELL_PALADIN_FORBEARANCE, true);
+    }
+
     void Register() override
     {
         OnCheckCast += SpellCheckCastFn(spell_pal_hand_of_protection::CheckCast);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_protection::HandleForbearance, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
     }
 };
 
-// -31871 - Divine Purpose
+// -85117 - Divine Purpose
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): in 4.3.4 the talent
+// gives a chance on holy power abilities to make the next one free (90174); the free cast itself does
+// not roll again.
 class spell_pal_divine_purpose : public AuraScript
 {
     PrepareAuraScript(spell_pal_divine_purpose);
 
-    bool CheckProc(ProcEventInfo& /*eventInfo*/)
+    bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        // Get the EFFECT_2 aura effect for the proc chance
-        if (AuraEffect const* aurEff = GetEffect(EFFECT_2))
+        return ValidateSpellInfo({ SPELL_PALADIN_DIVINE_PURPOSE_PROC });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        if (AuraEffect const* divineEff = GetTarget()->GetAuraEffect(SPELL_PALADIN_DIVINE_PURPOSE_PROC, EFFECT_0))
+            if (divineEff->IsAffectedOnSpell(eventInfo.GetSpellInfo()))
+                return false;
+
+        if (AuraEffect const* aurEff = GetEffect(EFFECT_0))
             return roll_chance_i(aurEff->GetAmount());
+
         return false;
     }
 
-    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
     {
         PreventDefaultAction();
-        if (Unit* target = eventInfo.GetActionTarget())
-            target->RemoveAurasWithMechanic(1ULL << MECHANIC_STUN, AURA_REMOVE_BY_ENEMY_SPELL);
+        GetTarget()->CastSpell(GetTarget(), SPELL_PALADIN_DIVINE_PURPOSE_PROC, true, nullptr, aurEff);
     }
 
     void Register() override
     {
         DoCheckProc += AuraCheckProcFn(spell_pal_divine_purpose::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_divine_purpose::HandleProc, EFFECT_2, SPELL_AURA_DUMMY);
-    }
-};
-
-// -53569 - Infusion of Light
-class spell_pal_infusion_of_light : public AuraScript
-{
-    PrepareAuraScript(spell_pal_infusion_of_light);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-            {
-                SPELL_PALADIN_SACRED_SHIELD,
-                SPELL_PALADIN_T9_HOLY_4P_BONUS,
-                SPELL_PALADIN_FLASH_OF_LIGHT_PROC
-            });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        if (!spellInfo)
-            return;
-
-        // Flash of Light HoT on Flash of Light when Sacred Shield active
-        if (spellInfo->SpellFamilyFlags[0] & 0x40000000 && spellInfo->SpellIconID == 242)
-        {
-            PreventDefaultAction();
-
-            HealInfo* healInfo = eventInfo.GetHealInfo();
-            if (!healInfo || !healInfo->GetHeal())
-                return;
-
-            Unit* procTarget = eventInfo.GetActionTarget();
-            if (procTarget && procTarget->HasAura(SPELL_PALADIN_SACRED_SHIELD))
-            {
-                Unit* target = GetTarget();
-                SpellInfo const* flashProcInfo = sSpellMgr->AssertSpellInfo(SPELL_PALADIN_FLASH_OF_LIGHT_PROC);
-                int32 duration = flashProcInfo->GetMaxDuration() / 1000;
-                int32 pct = GetSpellInfo()->Effects[EFFECT_2].CalcValue();
-                if (duration <= 0)
-                    return;
-
-                int32 bp0 = CalculatePct(healInfo->GetHeal() / duration, pct);
-
-                // Item - Paladin T9 Holy 4P Bonus
-                if (AuraEffect const* bonus = target->GetAuraEffect(SPELL_PALADIN_T9_HOLY_4P_BONUS, EFFECT_0))
-                    AddPct(bp0, bonus->GetAmount());
-
-                target->CastCustomSpell(SPELL_PALADIN_FLASH_OF_LIGHT_PROC, SPELLVALUE_BASE_POINT0, bp0, procTarget, true, nullptr, aurEff);
-            }
-        }
-        // but should not proc on non-critical Holy Shocks
-        else if ((spellInfo->SpellFamilyFlags[0] & 0x200000 || spellInfo->SpellFamilyFlags[1] & 0x10000) && !(eventInfo.GetHitMask() & PROC_EX_CRITICAL_HIT))
-            PreventDefaultAction();
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_infusion_of_light::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+        OnEffectProc += AuraEffectProcFn(spell_pal_divine_purpose::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -1722,123 +1268,6 @@ class spell_pal_t8_2p_bonus : public AuraScript
     }
 };
 
-// -54939 - Glyph of Divinity
-class spell_pal_glyph_of_divinity : public AuraScript
-{
-    PrepareAuraScript(spell_pal_glyph_of_divinity);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_GLYPH_OF_DIVINITY_PROC });
-    }
-
-    void OnProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        if (!spellInfo || !spellInfo->HasEffect(SPELL_EFFECT_ENERGIZE))
-            return;
-
-        Unit* caster = eventInfo.GetActor();
-        if (caster == eventInfo.GetActionTarget())
-            return;
-
-        int32 amount = GetSpellInfo()->Effects[EFFECT_1].CalcValue() * 2;
-        caster->CastCustomSpell(SPELL_PALADIN_GLYPH_OF_DIVINITY_PROC, SPELLVALUE_BASE_POINT1, amount, nullptr, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_glyph_of_divinity::OnProc, EFFECT_0, SPELL_AURA_ADD_PCT_MODIFIER);
-    }
-};
-
-// -54936 - Glyph of Holy Light (dummy aura)
-class spell_pal_glyph_of_holy_light_dummy : public AuraScript
-{
-    PrepareAuraScript(spell_pal_glyph_of_holy_light_dummy);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_GLYPH_OF_HOLY_LIGHT_HEAL });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        HealInfo* healInfo = eventInfo.GetHealInfo();
-        return healInfo && healInfo->GetHeal();
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        HealInfo* healInfo = eventInfo.GetHealInfo();
-
-        uint32 basePoints = healInfo->GetSpellInfo()->Effects[EFFECT_0].BasePoints + healInfo->GetSpellInfo()->Effects[EFFECT_0].DieSides;
-        uint32 healAmount;
-        if (healInfo->GetEffectiveHeal() >= basePoints)
-            healAmount = healInfo->GetEffectiveHeal();
-        else
-            healAmount = healInfo->GetHeal();
-
-        int32 bp0 = CalculatePct(static_cast<int32>(healAmount), aurEff->GetAmount());
-        eventInfo.GetActor()->CastCustomSpell(SPELL_PALADIN_GLYPH_OF_HOLY_LIGHT_HEAL, SPELLVALUE_BASE_POINT0, bp0, eventInfo.GetActionTarget(), true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_pal_glyph_of_holy_light_dummy::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_glyph_of_holy_light_dummy::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// -20335 - Heart of the Crusader
-class spell_pal_heart_of_the_crusader : public AuraScript
-{
-    PrepareAuraScript(spell_pal_heart_of_the_crusader);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PALADIN_HEART_OF_THE_CRUSADER_EFF_R1 });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        uint32 spellId = sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HEART_OF_THE_CRUSADER_EFF_R1, GetSpellInfo()->GetRank());
-        eventInfo.GetActor()->CastSpell(eventInfo.GetActionTarget(), spellId, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_heart_of_the_crusader::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// -20234 - Improved Lay on Hands
-class spell_pal_improved_lay_of_hands : public AuraScript
-{
-    PrepareAuraScript(spell_pal_improved_lay_of_hands);
-
-    bool Validate(SpellInfo const* spellInfo) override
-    {
-        return ValidateSpellInfo({ spellInfo->Effects[EFFECT_0].TriggerSpell });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        uint32 triggeredSpell = GetSpellInfo()->Effects[EFFECT_0].TriggerSpell;
-        eventInfo.GetActionTarget()->CastSpell(eventInfo.GetActionTarget(), triggeredSpell, true, nullptr, aurEff, GetTarget()->GetGUID());
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_improved_lay_of_hands::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
-    }
-};
-
 // -53695 - Judgements of the Just
 class spell_pal_judgements_of_the_just : public AuraScript
 {
@@ -1859,285 +1288,6 @@ class spell_pal_judgements_of_the_just : public AuraScript
     {
         OnEffectProc += AuraEffectProcFn(spell_pal_judgements_of_the_just::OnProc, EFFECT_0, SPELL_AURA_ADD_FLAT_MODIFIER);
     }
-};
-
-// 58597 - Sacred Shield (dummy on target)
-class spell_pal_sacred_shield_dummy : public AuraScript
-{
-    PrepareAuraScript(spell_pal_sacred_shield_dummy);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-        {
-            SPELL_PALADIN_SACRED_SHIELD_TRIGGER,
-            SPELL_PALADIN_T8_HOLY_4P_BONUS
-        });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
-    {
-        PreventDefaultAction();
-
-        Unit* caster = GetCaster();
-        if (!caster)
-            return;
-
-        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-        if (_cooldownEnd > now)
-            return;
-
-        std::chrono::seconds cooldown(aurEff->GetAmount());
-        if (AuraEffect const* bonus = caster->GetAuraEffect(SPELL_PALADIN_T8_HOLY_4P_BONUS, EFFECT_0, caster->GetGUID()))
-            cooldown = std::chrono::seconds(bonus->GetAmount());
-
-        _cooldownEnd = now + cooldown;
-        caster->CastSpell(GetTarget(), SPELL_PALADIN_SACRED_SHIELD_TRIGGER, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_sacred_shield_dummy::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-
-    std::chrono::steady_clock::time_point _cooldownEnd = std::chrono::steady_clock::time_point::min();
-};
-
-// 31801, 53736 - Seal of Vengeance/Corruption (aura proc handler)
-class spell_pal_seal_of_vengeance_aura : public AuraScript
-{
-    PrepareAuraScript(spell_pal_seal_of_vengeance_aura);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-        {
-            SPELL_PALADIN_HOLY_VENGEANCE,
-            SPELL_PALADIN_BLOOD_CORRUPTION,
-            SPELL_PALADIN_SEAL_OF_VENGEANCE_EFFECT,
-            SPELL_PALADIN_SEAL_OF_CORRUPTION_EFFECT
-        });
-    }
-
-    bool Load() override
-    {
-        // Seal of Vengeance = 31801, Seal of Corruption = 53736
-        _isVengeance = GetSpellInfo()->Id == 31801;
-        return true;
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        SpellInfo const* procSpell = eventInfo.GetSpellInfo();
-        if (procSpell &&
-            procSpell->SpellFamilyName == SPELLFAMILY_PALADIN)
-        {
-            // Block re-proc from seal damage effects
-            if ((procSpell->SpellFamilyFlags[1] & 0x800) &&
-                !(procSpell->SpellFamilyFlags[0] & 0x800000))
-                return false;
-
-            // Judgements only trigger seal procs with JotJ
-            if (procSpell->SpellFamilyFlags[0] & 0x800000)
-                return HasJudgementsOfTheJust(eventInfo.GetActor());
-        }
-
-        return true;
-    }
-
-    void HandleApplyDoT(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        if (!(eventInfo.GetTypeMask() & PROC_FLAG_DONE_MELEE_AUTO_ATTACK))
-        {
-            SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-            if (!spellInfo || spellInfo->SpellIconID != PALADIN_ICON_HAMMER_OF_THE_RIGHTEOUS)
-                return;
-        }
-
-        uint32 dotSpell = _isVengeance ? SPELL_PALADIN_HOLY_VENGEANCE : SPELL_PALADIN_BLOOD_CORRUPTION;
-        eventInfo.GetActor()->CastSpell(eventInfo.GetActionTarget(), dotSpell, true, nullptr, aurEff);
-    }
-
-    void HandleSeal(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        Unit* caster = eventInfo.GetActor();
-        Unit* target = eventInfo.GetActionTarget();
-
-        AuraEffect const* sealDot = target->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_PALADIN, 0x00000000, 0x00000800, 0x00000000, caster->GetGUID());
-        if (!sealDot)
-            return;
-
-        uint8 stacks = sealDot->GetBase()->GetStackAmount();
-        uint8 maxStacks = sealDot->GetSpellInfo()->StackAmount;
-
-        uint32 damageSpell = _isVengeance ? SPELL_PALADIN_SEAL_OF_VENGEANCE_EFFECT : SPELL_PALADIN_SEAL_OF_CORRUPTION_EFFECT;
-
-        // Scale weapon damage % by stacks (6.6% per stack, up to 33% at 5 stacks)
-        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(damageSpell);
-        int32 amount = spellInfo->Effects[EFFECT_0].CalcValue();
-        amount = (amount * stacks) / maxStacks;
-
-        caster->CastCustomSpell(damageSpell, SPELLVALUE_BASE_POINT0, amount, target, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_pal_seal_of_vengeance_aura::CheckProc);
-        // HandleSeal reads stacks BEFORE HandleApplyDoT increments them,
-        // so the attacking hit does not benefit from its own stack application.
-        OnEffectProc += AuraEffectProcFn(spell_pal_seal_of_vengeance_aura::HandleSeal, EFFECT_0, SPELL_AURA_DUMMY);
-        OnEffectProc += AuraEffectProcFn(spell_pal_seal_of_vengeance_aura::HandleApplyDoT, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-
-private:
-    bool _isVengeance = true;
-};
-
-// -20210 - Illumination
-class spell_pal_illumination : public AuraScript
-{
-    PrepareAuraScript(spell_pal_illumination);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({
-            SPELL_PALADIN_HOLY_SHOCK_R1_HEALING,
-            SPELL_PALADIN_ILLUMINATION_ENERGIZE,
-            SPELL_PALADIN_HOLY_SHOCK_R1
-        });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        // this script is valid only for the Holy Shock procs of illumination
-        if (eventInfo.GetHealInfo() && eventInfo.GetHealInfo()->GetSpellInfo())
-        {
-            SpellInfo const* originalSpell = nullptr;
-
-            // if proc comes from the Holy Shock heal, need to get mana cost of original spell - else it's the original heal itself
-            if (eventInfo.GetHealInfo()->GetSpellInfo()->SpellFamilyFlags[1] & 0x00010000)
-                originalSpell = sSpellMgr->GetSpellInfo(sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HOLY_SHOCK_R1, eventInfo.GetHealInfo()->GetSpellInfo()->GetRank()));
-            else
-                originalSpell = eventInfo.GetHealInfo()->GetSpellInfo();
-
-            if (originalSpell && aurEff->GetSpellInfo())
-            {
-                Unit* target = eventInfo.GetActor(); // Paladin is the target of the energize
-                int32 baseCost = originalSpell->ManaCost + int32(CalculatePct(target->GetCreateMana(), originalSpell->ManaCostPercentage));
-                int32 bp = CalculatePct(baseCost, aurEff->GetSpellInfo()->Effects[EFFECT_1].CalcValue());
-                target->CastCustomSpell(target, SPELL_PALADIN_ILLUMINATION_ENERGIZE, &bp, nullptr, nullptr, true, nullptr, aurEff);
-            }
-        }
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_pal_illumination::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
-    }
-};
-
-// 498, 642, 1022 - Divine Protection, Divine Shield, Hand of Protection
-class spell_pal_immunities : public SpellScript
-{
-    PrepareSpellScript(spell_pal_immunities);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-        {
-            SPELL_PALADIN_FORBEARANCE,
-            SPELL_PALADIN_AVENGING_WRATH_MARKER,
-            SPELL_PALADIN_IMMUNE_SHIELD_MARKER
-        });
-    }
-
-    SpellCastResult CheckCast()
-    {
-        Unit* caster = GetCaster();
-
-        // for HoP
-        Unit* target = GetExplTargetUnit();
-        if (!target)
-            target = caster;
-
-        // "Cannot be used within $61987d. of using Avenging Wrath."
-        if (target->HasAura(SPELL_PALADIN_FORBEARANCE) || target->HasAura(SPELL_PALADIN_AVENGING_WRATH_MARKER))
-            return SPELL_FAILED_TARGET_AURASTATE;
-
-        return SPELL_CAST_OK;
-    }
-
-    void TriggerDebuffs()
-    {
-        if (Unit* target = GetHitUnit())
-        {
-            // Blizz seems to just apply aura without bothering to cast
-            GetCaster()->AddAura(SPELL_PALADIN_FORBEARANCE, target);
-            GetCaster()->AddAura(SPELL_PALADIN_AVENGING_WRATH_MARKER, target);
-            GetCaster()->AddAura(SPELL_PALADIN_IMMUNE_SHIELD_MARKER, target);
-        }
-    }
-
-    void Register() override
-    {
-        OnCheckCast += SpellCheckCastFn(spell_pal_immunities::CheckCast);
-        AfterHit += SpellHitFn(spell_pal_immunities::TriggerDebuffs);
-    }
-};
-
-// -20254 - Improved Concentration Aura
-// -20138 - Improved Devotion Aura
-//  31869 - Sanctified Retribution
-// -53379 - Swift Retribution
-class spell_pal_improved_aura : public AuraScript
-{
-    PrepareAuraScript(spell_pal_improved_aura);
-
-public:
-    spell_pal_improved_aura(uint32 spellId) : AuraScript(), _spellId(spellId) { }
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-        {
-            _spellId,
-            SPELL_PALADIN_SANCTIFIED_RETRIBUTION_R1,
-            SPELL_PALADIN_SWIFT_RETRIBUTION_R1
-        });
-    }
-
-    void HandleEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        Unit* target = GetTarget();
-        target->RemoveOwnedAura(_spellId, GetCasterGUID()); // need to remove to reapply spellmods
-        target->CastSpell(target, _spellId, true);
-    }
-
-    void HandleEffectRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        uint32 spellId = GetSpellInfo()->GetFirstRankSpell()->Id;
-
-        if ((spellId == SPELL_PALADIN_SANCTIFIED_RETRIBUTION_R1 && GetTarget()->GetAuraOfRankedSpell(SPELL_PALADIN_SWIFT_RETRIBUTION_R1))
-            || (spellId == SPELL_PALADIN_SWIFT_RETRIBUTION_R1 && GetTarget()->GetAuraOfRankedSpell(SPELL_PALADIN_SANCTIFIED_RETRIBUTION_R1)))
-            return;
-
-        GetTarget()->RemoveOwnedAura(_spellId, GetCasterGUID());
-    }
-
-    void Register() override
-    {
-        AfterEffectApply += AuraEffectApplyFn(spell_pal_improved_aura::HandleEffectApply, EFFECT_FIRST_FOUND, SPELL_AURA_ADD_FLAT_MODIFIER, AURA_EFFECT_HANDLE_REAL);
-        AfterEffectRemove += AuraEffectRemoveFn(spell_pal_improved_aura::HandleEffectRemove, EFFECT_FIRST_FOUND, SPELL_AURA_ADD_FLAT_MODIFIER, AURA_EFFECT_HANDLE_REAL);
-    }
-
-private:
-    uint32 _spellId;
 };
 
 // 63510 - Improved Concentration Aura (requires Concentration Aura on the target)
@@ -2174,6 +1324,7 @@ class spell_pal_sanctified_retribution_effect : public AuraScript
 {
     PrepareAuraScript(spell_pal_sanctified_retribution_effect);
 
+    // 4.x merged the shadow, frost and fire resistance auras into Resistance Aura (19891)
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo(
@@ -2181,8 +1332,6 @@ class spell_pal_sanctified_retribution_effect : public AuraScript
             SPELL_PALADIN_DEVOTION_AURA_R1,
             SPELL_PALADIN_RETRIBUTION_AURA_R1,
             SPELL_PALADIN_CONCENTRACTION_AURA,
-            SPELL_PALADIN_SHADOW_RESISTANCE_AURA_R1,
-            SPELL_PALADIN_FROST_RESISTANCE_AURA_R1,
             SPELL_PALADIN_FIRE_RESISTANCE_AURA_R1,
             SPELL_PALADIN_CRUSADER_AURA
         });
@@ -2191,7 +1340,7 @@ class spell_pal_sanctified_retribution_effect : public AuraScript
     bool CheckAreaTarget(Unit* target)
     {
         for (uint32 auraSpellId : { SPELL_PALADIN_DEVOTION_AURA_R1, SPELL_PALADIN_RETRIBUTION_AURA_R1, SPELL_PALADIN_CONCENTRACTION_AURA,
-            SPELL_PALADIN_SHADOW_RESISTANCE_AURA_R1, SPELL_PALADIN_FROST_RESISTANCE_AURA_R1, SPELL_PALADIN_FIRE_RESISTANCE_AURA_R1, SPELL_PALADIN_CRUSADER_AURA })
+            SPELL_PALADIN_FIRE_RESISTANCE_AURA_R1, SPELL_PALADIN_CRUSADER_AURA })
             if (target->GetAuraOfRankedSpell(auraSpellId, GetCasterGUID()))
                 return true;
 
@@ -2204,72 +1353,50 @@ class spell_pal_sanctified_retribution_effect : public AuraScript
     }
 };
 
-// 53651 - Light's Beacon - Beacon of Light
-// Each source heal has a dedicated beacon copy spell:
-//   53652 - Holy Light, 53653 - Flash of Light, 53654 - Holy Shock
-// Reference: https://kurn.info/blog/holy-how-to-5-to-beacon-or-not-to-beacon/
-class spell_pal_light_s_beacon : public AuraScript
+// 53651 - Light's Beacon
+// Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): in 4.3.4 every heal
+// of the paladin copies to the beacon target through one spell (53652), 50% of it (100% for Holy
+// Light), instead of WotLK's copy spell per heal.
+class spell_pal_lights_beacon : public AuraScript
 {
-    PrepareAuraScript(spell_pal_light_s_beacon);
+    PrepareAuraScript(spell_pal_lights_beacon);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo(
-        {
-            SPELL_PALADIN_BEACON_OF_LIGHT_AURA,
-            SPELL_PALADIN_BEACON_OF_LIGHT_HL,
-            SPELL_PALADIN_BEACON_OF_LIGHT_FOL,
-            SPELL_PALADIN_BEACON_OF_LIGHT_HS,
-            SPELL_PALADIN_HOLY_LIGHT_R1,
-            SPELL_PALADIN_FLASH_OF_LIGHT_R1,
-            SPELL_PALADIN_LAY_ON_HANDS_R1
-        });
+        return ValidateSpellInfo({ SPELL_PALADIN_BEACON_OF_LIGHT_AURA, SPELL_PALADIN_BEACON_OF_LIGHT_HL, SPELL_PALADIN_HOLY_LIGHT_R1 });
     }
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
-        // Don't proc if the heal target is the beacon target (no double heal)
-        if (GetTarget()->HasAura(SPELL_PALADIN_BEACON_OF_LIGHT_AURA, eventInfo.GetActor()->GetGUID()))
-            return false;
-        return true;
+        return eventInfo.GetHealInfo() != nullptr;
     }
 
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
     {
         PreventDefaultAction();
 
-        SpellInfo const* procSpell = eventInfo.GetSpellInfo();
-        if (!procSpell)
+        HealInfo* heal = eventInfo.GetHealInfo();
+        // the share of the whole heal, overhealing included: a heal on a target at full health copies too
+        // (own; CPP took the effective heal only)
+        int32 bp = CalculatePct(int32(heal->GetHeal()), aurEff->GetAmount());
+        if (!bp)
             return;
 
-        HealInfo* healInfo = eventInfo.GetHealInfo();
-        if (!healInfo || !healInfo->GetHeal())
-            return;
+        if (heal->GetSpellInfo() && heal->GetSpellInfo()->Id == SPELL_PALADIN_HOLY_LIGHT_R1)
+            bp *= 2;
 
-        uint32 healSpellId;
-        if (procSpell->IsRankOf(sSpellMgr->AssertSpellInfo(SPELL_PALADIN_HOLY_LIGHT_R1)))
-            healSpellId = SPELL_PALADIN_BEACON_OF_LIGHT_HL;
-        else if (procSpell->IsRankOf(sSpellMgr->AssertSpellInfo(SPELL_PALADIN_FLASH_OF_LIGHT_R1)))
-            healSpellId = SPELL_PALADIN_BEACON_OF_LIGHT_FOL;
-        else
-            healSpellId = SPELL_PALADIN_BEACON_OF_LIGHT_HS;
-
-        // Lay on Hands applies target modifiers before HealInfo is built, so use its unmodified base heal.
-        uint32 healAmount = procSpell->IsRankOf(sSpellMgr->AssertSpellInfo(SPELL_PALADIN_LAY_ON_HANDS_R1)) ?
-            eventInfo.GetActor()->GetMaxHealth() : healInfo->GetHealBeforeTakenMods();
-        int32 heal = CalculatePct(healAmount, aurEff->GetAmount());
-
-        Unit* beaconTarget = GetCaster();
-        if (!beaconTarget || !beaconTarget->HasAura(SPELL_PALADIN_BEACON_OF_LIGHT_AURA, eventInfo.GetActor()->GetGUID()))
-            return;
-
-        eventInfo.GetActor()->CastCustomSpell(healSpellId, SPELLVALUE_BASE_POINT0, heal, beaconTarget, true, nullptr, aurEff, eventInfo.GetActor()->GetGUID());
+        // a party or raid member carrying Light's Beacon (cast by the beacon target) was healed: the paladin
+        // whose Beacon of Light is on that target heals it for the share (CPP)
+        if (Unit* caster = GetCaster())
+            if (Aura* aura = caster->GetAura(SPELL_PALADIN_BEACON_OF_LIGHT_AURA))
+                if (Unit* originalCaster = aura->GetCaster())
+                    originalCaster->CastCustomSpell(SPELL_PALADIN_BEACON_OF_LIGHT_HL, SPELLVALUE_BASE_POINT0, bp, caster, true, nullptr, aurEff);
     }
 
     void Register() override
     {
-        DoCheckProc += AuraCheckProcFn(spell_pal_light_s_beacon::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pal_light_s_beacon::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        DoCheckProc += AuraCheckProcFn(spell_pal_lights_beacon::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_lights_beacon::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -2497,12 +1624,773 @@ class spell_pal_inquisition : public SpellScript
     }
 };
 
+/*
+ * Cataclysm (4.3.4) paladin scripts, ported from The Cataclysm Preservation Project (spell_paladin.cpp
+ * at b061f46) to AzerothCore's script API. Bound in the world DB by scripts/build_world_db.py.
+ */
+
+enum PaladinCataScriptSpells
+{
+    SPELL_PALADIN_ANCIENT_HEALER                        = 86674,
+    SPELL_PALADIN_ANCIENT_CRUSADER                      = 86701,
+    SPELL_PALADIN_ANCIENT_CRUSADER_GUARDIAN             = 86703,
+    SPELL_PALADIN_ANCIENT_FURY                          = 86704,
+    SPELL_PALADIN_ANCIENT_POWER                         = 86700,
+    SPELL_PALADIN_AVENGERS_SHIELD                       = 31935,
+    SPELL_PALADIN_CONSECRATION_TRIGGERED                = 81297,
+    SPELL_PALADIN_CRUSADER_STRIKE                       = 35395,
+    SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_HOLY        = 86669,
+    SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_PROTECTION  = 86659,
+    SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_RETRIBUTION = 86698,
+    SPELL_PALADIN_HAND_OF_LIGHT                         = 96172,
+    SPELL_PALADIN_HOLY_POWER_TALENT_MARKER              = 32733, // server-side
+    SPELL_PALADIN_HOLY_RADIANCE_TRIGGERED               = 86452,
+    SPELL_PALADIN_ILLUMINATED_HEALING                   = 86273,
+    SPELL_PALADIN_ITEM_HEALING_TRANCE                   = 37706,
+    SPELL_PALADIN_JUDGEMENTS_OF_THE_BOLD                = 89906,
+    SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_PASSIVE        = 31878,
+    SPELL_PALADIN_LIGHT_OF_THE_ANCIENT_KINGS            = 86678,
+    SPELL_PALADIN_SPEED_OF_LIGHT                        = 85497,
+    SPELL_PALADIN_TEMPLARS_VERDICT                      = 85256
+};
+
+// 26573 - Consecration
+// The periodic dummy reaches every enemy in the area; only the caster's own tick casts the damage, at
+// the spot Consecration was put down.
+class spell_pal_consecration : public AuraScript
+{
+    PrepareAuraScript(spell_pal_consecration);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_CONSECRATION_TRIGGERED });
+    }
+
+    bool Load() override
+    {
+        if (Unit* caster = GetCaster())
+            _castPos = caster->GetPosition();
+        return true;
+    }
+
+    void HandleEffectPeriodic(AuraEffect const* aurEff)
+    {
+        Unit* caster = GetCaster();
+        if (!caster || GetTarget() != caster)
+            return;
+
+        caster->CastSpell(_castPos.GetPositionX(), _castPos.GetPositionY(), _castPos.GetPositionZ(),
+            SPELL_PALADIN_CONSECRATION_TRIGGERED, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_pal_consecration::HandleEffectPeriodic, EFFECT_1, SPELL_AURA_PERIODIC_DUMMY);
+    }
+
+private:
+    Position _castPos;
+};
+
+// -75806 - Grand Crusader
+class spell_pal_grand_crusader : public AuraScript
+{
+    PrepareAuraScript(spell_pal_grand_crusader);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_AVENGERS_SHIELD });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        Spell const* procSpell = eventInfo.GetProcSpell();
+        return procSpell && eventInfo.GetProcTarget() && eventInfo.GetProcTarget() == procSpell->m_targets.GetUnitTarget();
+    }
+
+    void HandleEffectProc(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+    {
+        if (Player* player = GetTarget()->ToPlayer())
+            player->RemoveSpellCooldown(SPELL_PALADIN_AVENGERS_SHIELD, true);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_grand_crusader::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_grand_crusader::HandleEffectProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
+// 37705 - Healing Discount
+class spell_pal_item_healing_discount : public AuraScript
+{
+    PrepareAuraScript(spell_pal_item_healing_discount);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_ITEM_HEALING_TRANCE });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(GetTarget(), SPELL_PALADIN_ITEM_HEALING_TRANCE, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_item_healing_discount::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
+// 53600 - Shield of the Righteous
+// The holy power multiplies the final damage: x1 for one charge, x3 for two, x6 for three. One charge
+// is taken before the hit, so the power left is 0, 1 or 2.
+class spell_pal_shield_of_the_righteous : public SpellScript
+{
+    PrepareSpellScript(spell_pal_shield_of_the_righteous);
+
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer() && GetCaster()->getClass() == CLASS_PALADIN;
+    }
+
+    void ChangeDamage(SpellEffIndex /*effIndex*/)
+    {
+        uint32 holyPower = GetCaster()->GetPower(POWER_HOLY_POWER);
+        float damageMod = 1.f;
+        if (holyPower >= 1)
+            damageMod = holyPower > 1 ? 6.f : 3.f;
+
+        SetHitDamage(int32(GetHitDamage() * damageMod));
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pal_shield_of_the_righteous::ChangeDamage, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+    }
+};
+
+// 76669 - Illuminated Healing (holy mastery)
+// Heals leave an absorb of the mastery's share of the effective heal, stacking up to a third of the
+// paladin's maximum health.
+class spell_pal_illuminated_healing : public AuraScript
+{
+    PrepareAuraScript(spell_pal_illuminated_healing);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_ILLUMINATED_HEALING });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        Unit* caster = GetCaster();
+        Unit* target = eventInfo.GetProcTarget();
+        HealInfo* heal = eventInfo.GetHealInfo();
+        if (!caster || !target || !heal)
+            return;
+
+        int32 shieldAmount = CalculatePct(int32(heal->GetEffectiveHeal()), aurEff->GetAmount());
+        if (Aura* aura = target->GetAura(SPELL_PALADIN_ILLUMINATED_HEALING, caster->GetGUID()))
+        {
+            if (AuraEffect* eff = aura->GetEffect(EFFECT_0))
+                eff->SetAmount(std::min<int32>(CalculatePct(int32(caster->GetMaxHealth()), 33), eff->GetAmount() + shieldAmount));
+
+            aura->RefreshDuration();
+        }
+        else
+            caster->CastCustomSpell(SPELL_PALADIN_ILLUMINATED_HEALING, SPELLVALUE_BASE_POINT0, shieldAmount, target, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_illuminated_healing::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 76672 - Hand of Light (retribution mastery)
+// Crusader Strike, Templar's Verdict and Divine Storm deal the mastery's share again as holy damage.
+class spell_pal_hand_of_light : public AuraScript
+{
+    PrepareAuraScript(spell_pal_hand_of_light);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_HAND_OF_LIGHT, SPELL_PALADIN_TEMPLARS_VERDICT, SPELL_PALADIN_CRUSADER_STRIKE,
+            SPELL_PALADIN_DIVINE_STORM });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
+        return spellInfo && eventInfo.GetDamageInfo() && (spellInfo->Id == SPELL_PALADIN_TEMPLARS_VERDICT ||
+            spellInfo->Id == SPELL_PALADIN_CRUSADER_STRIKE || spellInfo->Id == SPELL_PALADIN_DIVINE_STORM);
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        Unit* caster = GetCaster();
+        Unit* target = eventInfo.GetProcTarget();
+        if (!caster || !target)
+            return;
+
+        int32 damage = CalculatePct(int32(eventInfo.GetDamageInfo()->GetDamage()), aurEff->GetAmount());
+        caster->CastCustomSpell(SPELL_PALADIN_HAND_OF_LIGHT, SPELLVALUE_BASE_POINT0, damage, target, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_hand_of_light::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_hand_of_light::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
+// 31878 - Judgements of the Wise (Passive), 89901 - Judgements of the Bold (Passive)
+// A judgement restores base mana over time: the effect's percentage of base mana, spread over its ticks.
+class spell_pal_judgements : public AuraScript
+{
+    PrepareAuraScript(spell_pal_judgements);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_MANA, SPELL_PALADIN_JUDGEMENTS_OF_THE_BOLD });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        uint32 spellId = GetSpellInfo()->Id == SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_PASSIVE ?
+            SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_MANA : SPELL_PALADIN_JUDGEMENTS_OF_THE_BOLD;
+
+        Unit* actor = eventInfo.GetActor();
+        SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellId);
+        if (!actor || !spell)
+            return;
+
+        int32 bp = 0;
+        if (uint32 mana = actor->GetCreateMana())
+            bp = int32(CalculatePct(CalculatePct(mana, spell->Effects[EFFECT_0].BasePoints), spell->GetMaxTicks()));
+
+        actor->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, bp, actor, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_judgements::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 31801 - Seal of Truth
+// Melee hits stack Censure (a holy damage over time from attack and spell power); at five stacks they
+// also deal the seal's damage.
+class spell_pal_seal_of_truth : public AuraScript
+{
+    PrepareAuraScript(spell_pal_seal_of_truth);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_CENSURE, SPELL_PALADIN_SEAL_OF_VENGEANCE_EFFECT });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        Unit* caster = GetTarget();
+        Unit* target = eventInfo.GetProcTarget();
+        if (!target)
+            return;
+
+        if (Aura* aura = target->GetAura(SPELL_PALADIN_CENSURE, caster->GetGUID()))
+            if (aura->GetStackAmount() == aura->GetSpellInfo()->StackAmount)
+                caster->CastSpell(target, SPELL_PALADIN_SEAL_OF_VENGEANCE_EFFECT, true, nullptr, aurEff);
+
+        float ap = caster->GetTotalAttackPowerValue(BASE_ATTACK) * 0.0270f;
+        float holy = caster->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY) * 0.01f;
+        caster->CastCustomSpell(SPELL_PALADIN_CENSURE, SPELLVALUE_BASE_POINT0, int32(ap + holy), target, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_seal_of_truth::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 31876 - Communion
+class spell_pal_communion : public AuraScript
+{
+    PrepareAuraScript(spell_pal_communion);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_REPLENISHMENT });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(GetTarget(), SPELL_PALADIN_REPLENISHMENT, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_communion::HandleProc, EFFECT_1, SPELL_AURA_ADD_FLAT_MODIFIER);
+    }
+};
+
+// -85803 - Selfless Healer
+// Healing someone else raises the paladin's damage, more for each holy power charge.
+class spell_pal_selfless_healer : public AuraScript
+{
+    PrepareAuraScript(spell_pal_selfless_healer);
+
+    bool Validate(SpellInfo const* spellInfo) override
+    {
+        return ValidateSpellInfo({ spellInfo->Effects[EFFECT_1].TriggerSpell });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        HealInfo* heal = eventInfo.GetHealInfo();
+        return heal && heal->GetTarget() != GetTarget();
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        Unit* target = GetTarget();
+        uint32 spellId = GetSpellInfo()->Effects[aurEff->GetEffIndex()].TriggerSpell;
+        int32 bp = aurEff->GetAmount() * int32(1 + target->GetPower(POWER_HOLY_POWER));
+        target->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, bp, target, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_selfless_healer::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_selfless_healer::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
+    }
+};
+
+// 86150 - Guardian of Ancient Kings
+// Summons the guardian of the paladin's specialization (holy, protection, retribution) and its aura.
+class spell_pal_guardian_of_ancient_kings : public SpellScript
+{
+    PrepareSpellScript(spell_pal_guardian_of_ancient_kings);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_HOLY, SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_PROTECTION,
+            SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_RETRIBUTION, SPELL_PALADIN_ANCIENT_HEALER, SPELL_PALADIN_ANCIENT_CRUSADER });
+    }
+
+    void HandleDummyEffect()
+    {
+        Player* caster = GetCaster()->ToPlayer();
+        if (!caster)
+            return;
+
+        switch (caster->GetPrimaryTalentTree(caster->GetActiveSpec()))
+        {
+            case TALENT_TREE_PALADIN_HOLY:
+                caster->CastSpell(caster, SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_HOLY, true);
+                caster->CastSpell(caster, SPELL_PALADIN_ANCIENT_HEALER, true);
+                break;
+            case TALENT_TREE_PALADIN_PROTECTION:
+                caster->CastSpell(caster, SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_PROTECTION, true);
+                break;
+            case TALENT_TREE_PALADIN_RETRIBUTION:
+                caster->CastSpell(caster, SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_RETRIBUTION, true);
+                caster->CastSpell(caster, SPELL_PALADIN_ANCIENT_CRUSADER, true);
+                break;
+            default:
+                break;
+        }
+    }
+
+    void Register() override
+    {
+        AfterCast += SpellCastFn(spell_pal_guardian_of_ancient_kings::HandleDummyEffect);
+    }
+};
+
+// 86674 - Ancient Healer
+// The holy guardian repeats the paladin's next five heals (Light of the Ancient Kings: the heal, and a
+// tenth of it to the group around the target).
+class spell_pal_ancient_healer : public AuraScript
+{
+    PrepareAuraScript(spell_pal_ancient_healer);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_LIGHT_OF_THE_ANCIENT_KINGS, SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_HOLY });
+    }
+
+    bool CheckProc(ProcEventInfo& /*eventInfo*/)
+    {
+        return _procCount < 5;
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        HealInfo* heal = eventInfo.GetHealInfo();
+        if (!heal)
+            return;
+
+        int32 bp0 = int32(heal->GetEffectiveHeal());
+        int32 bp1 = CalculatePct(bp0, 10);
+
+        for (Unit* guardian : GetTarget()->m_Controlled)
+            if (guardian->GetUInt32Value(UNIT_CREATED_BY_SPELL) == SPELL_PALADIN_GUARDIAN_OF_ANCIENT_KINGS_HOLY)
+                guardian->CastCustomSpell(heal->GetTarget(), SPELL_PALADIN_LIGHT_OF_THE_ANCIENT_KINGS, &bp0, &bp1, nullptr, true, nullptr, aurEff);
+
+        ++_procCount;
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_ancient_healer::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_ancient_healer::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+
+private:
+    uint8 _procCount = 0;
+};
+
+// 86701 - Ancient Crusader (paladin), 86703 - Ancient Crusader (guardian)
+// Every hit of the paladin or the retribution guardian adds a stack of Ancient Power; when the guardian
+// leaves, the stacks explode as Ancient Fury.
+class spell_pal_ancient_crusader : public AuraScript
+{
+    PrepareAuraScript(spell_pal_ancient_crusader);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_ANCIENT_POWER, SPELL_PALADIN_ANCIENT_CRUSADER_GUARDIAN, SPELL_PALADIN_ANCIENT_FURY });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        if (m_scriptSpellId == SPELL_PALADIN_ANCIENT_CRUSADER_GUARDIAN)
+        {
+            if (TempSummon* summon = GetTarget()->ToTempSummon())
+                if (Unit* summoner = summon->GetSummonerUnit())
+                    summoner->CastSpell(summoner, SPELL_PALADIN_ANCIENT_POWER, true, nullptr, aurEff);
+        }
+        else
+            GetTarget()->CastSpell(GetTarget(), SPELL_PALADIN_ANCIENT_POWER, true, nullptr, aurEff);
+    }
+
+    void AfterRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        if (m_scriptSpellId != SPELL_PALADIN_ANCIENT_CRUSADER)
+            return;
+
+        Unit* target = GetTarget();
+        if (Aura* aura = target->GetAura(SPELL_PALADIN_ANCIENT_POWER))
+        {
+            target->CastSpell(target, SPELL_PALADIN_ANCIENT_FURY, true, nullptr, aurEff);
+            aura->Remove();
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_ancient_crusader::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_pal_ancient_crusader::AfterRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 86704 - Ancient Fury
+// The damage grows with the Ancient Power stacks and is split between the targets.
+class spell_pal_ancient_fury : public SpellScript
+{
+    PrepareSpellScript(spell_pal_ancient_fury);
+
+    void CountTargets(std::list<WorldObject*>& targets)
+    {
+        _targetCount = uint32(targets.size());
+    }
+
+    void CalculateDamage()
+    {
+        Unit* caster = GetCaster();
+        if (!_targetCount || !caster)
+            return;
+
+        if (Aura* powerAura = caster->GetAura(SPELL_PALADIN_ANCIENT_POWER))
+            SetHitDamage(int32(GetHitDamage() * powerAura->GetStackAmount() / _targetCount));
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pal_ancient_fury::CountTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
+        OnHit += SpellHitFn(spell_pal_ancient_fury::CalculateDamage);
+    }
+
+private:
+    uint32 _targetCount = 0;
+};
+
+// 85222 - Light of Dawn
+// Heals the four (six with the glyph) most injured allies in front, more for each holy power charge;
+// effect 1 is not used.
+class spell_pal_light_of_dawn : public SpellScript
+{
+    PrepareSpellScript(spell_pal_light_of_dawn);
+
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer() && GetCaster()->getClass() == CLASS_PALADIN;
+    }
+
+    void FilterTargets(std::list<WorldObject*>& targets)
+    {
+        uint32 const maxTargets = GetCaster()->GetDummyAuraEffect(SPELLFAMILY_PALADIN, PALADIN_ICON_ID_GLYPH_OF_LIGHT_OF_DAWN, EFFECT_0) ? 6 : 4;
+        if (targets.size() > maxTargets)
+        {
+            targets.sort(Acore::HealthPctOrderPred());
+            targets.resize(maxTargets);
+        }
+    }
+
+    void HandleHeal(SpellEffIndex /*effIndex*/)
+    {
+        int32 heal = GetHitHeal();
+        heal += heal * int32(GetCaster()->GetPower(POWER_HOLY_POWER));
+        SetHitHeal(heal);
+    }
+
+    void BlockHeal(SpellEffIndex effIndex)
+    {
+        PreventHitDefaultEffect(effIndex);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pal_light_of_dawn::HandleHeal, EFFECT_0, SPELL_EFFECT_HEAL);
+        OnEffectLaunchTarget += SpellEffectFn(spell_pal_light_of_dawn::BlockHeal, EFFECT_1, SPELL_EFFECT_HEAL);
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pal_light_of_dawn::FilterTargets, EFFECT_0, TARGET_UNIT_CONE_ALLY);
+    }
+};
+
+// 82327 - Holy Radiance
+// The heal is split when it reaches more than six allies; the aura repeats it every tick.
+class spell_pal_holy_radiance : public SpellScript
+{
+    PrepareSpellScript(spell_pal_holy_radiance);
+
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer() && GetCaster()->getClass() == CLASS_PALADIN;
+    }
+
+    void CountTargets(std::list<WorldObject*>& targets)
+    {
+        _targetCount = uint32(targets.size());
+    }
+
+    void HandleHeal(SpellEffIndex /*effIndex*/)
+    {
+        if (int32 heal = GetHitHeal())
+            if (_targetCount > 6)
+                SetHitHeal(heal * 6 / int32(_targetCount));
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pal_holy_radiance::HandleHeal, EFFECT_1, SPELL_EFFECT_HEAL);
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pal_holy_radiance::CountTargets, EFFECT_1, TARGET_UNIT_DEST_AREA_ALLY);
+    }
+
+private:
+    uint32 _targetCount = 0;
+};
+
+class spell_pal_holy_radiance_aura : public AuraScript
+{
+    PrepareAuraScript(spell_pal_holy_radiance_aura);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_HOLY_RADIANCE_TRIGGERED });
+    }
+
+    void HandleEffectPeriodic(AuraEffect const* aurEff)
+    {
+        if (Unit* caster = GetCaster())
+            caster->CastSpell(GetTarget(), SPELL_PALADIN_HOLY_RADIANCE_TRIGGERED, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_pal_holy_radiance_aura::HandleEffectPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+    }
+};
+
+// 642 - Divine Shield
+// Forbearance and the server-side immune marker on the target.
+class spell_pal_divine_shield : public SpellScript
+{
+    PrepareSpellScript(spell_pal_divine_shield);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_FORBEARANCE, SPELL_PALADIN_IMMUNE_SHIELD_MARKER });
+    }
+
+    void HandleForbearance(SpellEffIndex /*effIndex*/)
+    {
+        Unit* target = GetHitUnit();
+        target->AddAura(SPELL_PALADIN_IMMUNE_SHIELD_MARKER, target);
+        GetCaster()->CastSpell(target, SPELL_PALADIN_FORBEARANCE, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pal_divine_shield::HandleForbearance, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
+    }
+};
+
+// -20138 - Protector of the Innocent
+// Procs only on heals of someone else.
+class spell_pal_protector_of_the_innocent : public AuraScript
+{
+    PrepareAuraScript(spell_pal_protector_of_the_innocent);
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        return eventInfo.GetHealInfo() && eventInfo.GetProcTarget() != GetTarget();
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_protector_of_the_innocent::CheckProc);
+    }
+};
+
+// -84800 - Tower of Radiance
+// Procs only on heals of the paladin's own Beacon of Light target.
+class spell_pal_tower_of_radiance : public AuraScript
+{
+    PrepareAuraScript(spell_pal_tower_of_radiance);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_BEACON_OF_LIGHT_AURA });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        return eventInfo.GetProcTarget() && eventInfo.GetProcTarget()->HasAura(SPELL_PALADIN_BEACON_OF_LIGHT_AURA, GetTarget()->GetGUID());
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_tower_of_radiance::CheckProc);
+    }
+};
+
+// 20165 - Seal of Insight
+// Single-target hits heal (15% of attack power and holy spell power) and restore 4% of base mana.
+class spell_pal_seal_of_insight : public AuraScript
+{
+    PrepareAuraScript(spell_pal_seal_of_insight);
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        return !eventInfo.GetSpellInfo() || !eventInfo.GetSpellInfo()->IsAffectingArea();
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        Unit* target = GetTarget();
+        int32 bp0 = int32(CalculatePct(target->GetTotalAttackPowerValue(BASE_ATTACK), 15.f) +
+            CalculatePct(float(target->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_HOLY)), 15.f));
+        int32 bp1 = int32(CalculatePct(float(target->GetCreateMana()), 4.f));
+        uint32 spellId = GetSpellInfo()->Effects[aurEff->GetEffIndex()].TriggerSpell;
+        target->CastCustomSpell(target, spellId, &bp0, &bp1, nullptr, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_seal_of_insight::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pal_seal_of_insight::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
+// 20066 - Repentance
+// Damage breaks it, except Censure's.
+class spell_pal_repentance : public AuraScript
+{
+    PrepareAuraScript(spell_pal_repentance);
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
+        if (!spellInfo)
+            return false;
+
+        return !(spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN && (spellInfo->SpellFamilyFlags[0] & 0x20000000));
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pal_repentance::CheckProc);
+    }
+};
+
+// -85495 - Speed of Light
+class spell_pal_speed_of_light : public AuraScript
+{
+    PrepareAuraScript(spell_pal_speed_of_light);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_SPEED_OF_LIGHT });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastCustomSpell(SPELL_PALADIN_SPEED_OF_LIGHT, SPELLVALUE_BASE_POINT0, aurEff->GetAmount(), GetTarget(), true);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_pal_speed_of_light::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
+    }
+};
+
+// -31828 - Blessed Life
+// At most one holy power charge from it while the server-side cooldown marker is up.
+class spell_pal_blessed_life : public AuraScript
+{
+    PrepareAuraScript(spell_pal_blessed_life);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PALADIN_HOLY_POWER_TALENT_MARKER });
+    }
+
+    bool CheckProcCooldown(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+    {
+        return !GetTarget()->HasAura(SPELL_PALADIN_HOLY_POWER_TALENT_MARKER, GetCasterGUID());
+    }
+
+    void Register() override
+    {
+        DoCheckEffectProc += AuraCheckEffectProcFn(spell_pal_blessed_life::CheckProcCooldown, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
 void AddSC_paladin_spell_scripts()
 {
-    RegisterSpellAndAuraScriptPair(spell_pal_seal_of_command, spell_pal_seal_of_command_aura);
-    RegisterSpellScript(spell_pal_divine_intervention);
     RegisterSpellScript(spell_pal_divine_purpose);
-    RegisterSpellScript(spell_pal_seal_of_light);
     RegisterSpellScript(spell_pal_sacred_shield);
     RegisterSpellScript(spell_pal_ardent_defender);
     RegisterSpellScript(spell_pal_aura_mastery);
@@ -2510,7 +2398,6 @@ void AddSC_paladin_spell_scripts()
     RegisterSpellScript(spell_pal_beacon_of_light);
     RegisterSpellScript(spell_pal_avenging_wrath);
     RegisterSpellScript(spell_pal_blessing_of_faith);
-    RegisterSpellScript(spell_pal_blessing_of_sanctuary);
     RegisterSpellScript(spell_pal_divine_sacrifice);
     RegisterSpellScript(spell_pal_divine_storm);
     RegisterSpellScript(spell_pal_divine_storm_dummy);
@@ -2519,44 +2406,47 @@ void AddSC_paladin_spell_scripts()
     RegisterSpellScript(spell_pal_glyph_of_holy_light);
     RegisterSpellScript(spell_pal_guarded_by_the_light);
     RegisterSpellAndAuraScriptPair(spell_pal_hand_of_sacrifice, spell_pal_hand_of_sacrifice_aura);
-    RegisterSpellScript(spell_pal_hand_of_salvation);
     RegisterSpellScript(spell_pal_holy_shock);
-    RegisterSpellScript(spell_pal_infusion_of_light);
     RegisterSpellScript(spell_pal_item_t6_trinket);
     RegisterSpellScript(spell_pal_judgement);
-    RegisterSpellScript(spell_pal_judgement_of_command);
     RegisterSpellScript(spell_pal_lay_on_hands);
     RegisterSpellScript(spell_pal_righteous_defense);
+    RegisterSpellScript(spell_pal_seal_of_justice);
     RegisterSpellScript(spell_pal_seal_of_righteousness);
     RegisterSpellAndAuraScriptPair(spell_pal_word_of_glory, spell_pal_word_of_glory_aura);
     RegisterSpellScript(spell_pal_templar_s_verdict);
     RegisterSpellScript(spell_pal_inquisition);
     RegisterSpellScript(spell_pal_exorcism);
-    RegisterSpellScriptWithArgs(spell_pal_seal_of_vengeance_aura, "spell_pal_seal_of_vengeance");
-    RegisterSpellScriptWithArgs(spell_pal_seal_of_vengeance_aura, "spell_pal_seal_of_corruption");
     RegisterSpellScript(spell_pal_hand_of_protection);
-    RegisterSpellScript(spell_pal_judgements_of_the_wise);
-    RegisterSpellScript(spell_pal_righteous_vengeance);
-    RegisterSpellScript(spell_pal_sheath_of_light);
-    RegisterSpellScript(spell_pal_judgement_of_light_heal);
-    RegisterSpellScript(spell_pal_judgement_of_wisdom_mana);
-    RegisterSpellScript(spell_pal_spiritual_attunement);
     RegisterSpellScript(spell_pal_t3_6p_bonus);
     RegisterSpellScript(spell_pal_t8_2p_bonus);
-    RegisterSpellScript(spell_pal_glyph_of_divinity);
-    RegisterSpellScript(spell_pal_glyph_of_holy_light_dummy);
-    RegisterSpellScript(spell_pal_heart_of_the_crusader);
-    RegisterSpellScript(spell_pal_improved_lay_of_hands);
     RegisterSpellScript(spell_pal_judgements_of_the_just);
-    RegisterSpellScript(spell_pal_sacred_shield_dummy);
-    RegisterSpellScript(spell_pal_illumination);
-    RegisterSpellScript(spell_pal_immunities);
-    RegisterSpellScriptWithArgs(spell_pal_improved_aura, "spell_pal_improved_concentraction_aura", SPELL_PALADIN_IMPROVED_CONCENTRACTION_AURA);
-    RegisterSpellScriptWithArgs(spell_pal_improved_aura, "spell_pal_improved_devotion_aura", SPELL_PALADIN_IMPROVED_DEVOTION_AURA);
-    RegisterSpellScriptWithArgs(spell_pal_improved_aura, "spell_pal_sanctified_retribution", SPELL_PALADIN_SANCTIFIED_RETRIBUTION_AURA);
-    RegisterSpellScriptWithArgs(spell_pal_improved_aura, "spell_pal_swift_retribution", SPELL_PALADIN_SANCTIFIED_RETRIBUTION_AURA);
     RegisterSpellScriptWithArgs(spell_pal_improved_aura_effect, "spell_pal_improved_concentraction_aura_effect", SPELL_PALADIN_CONCENTRACTION_AURA);
     RegisterSpellScriptWithArgs(spell_pal_improved_aura_effect, "spell_pal_improved_devotion_aura_effect", SPELL_PALADIN_DEVOTION_AURA_R1);
     RegisterSpellScript(spell_pal_sanctified_retribution_effect);
-    RegisterSpellScript(spell_pal_light_s_beacon);
+    RegisterSpellScript(spell_pal_lights_beacon);
+    // Cataclysm (4.3.4), from CPP
+    RegisterSpellScript(spell_pal_consecration);
+    RegisterSpellScript(spell_pal_grand_crusader);
+    RegisterSpellScript(spell_pal_item_healing_discount);
+    RegisterSpellScript(spell_pal_shield_of_the_righteous);
+    RegisterSpellScript(spell_pal_illuminated_healing);
+    RegisterSpellScript(spell_pal_hand_of_light);
+    RegisterSpellScript(spell_pal_judgements);
+    RegisterSpellScript(spell_pal_seal_of_truth);
+    RegisterSpellScript(spell_pal_communion);
+    RegisterSpellScript(spell_pal_selfless_healer);
+    RegisterSpellScript(spell_pal_guardian_of_ancient_kings);
+    RegisterSpellScript(spell_pal_ancient_healer);
+    RegisterSpellScript(spell_pal_ancient_crusader);
+    RegisterSpellScript(spell_pal_ancient_fury);
+    RegisterSpellScript(spell_pal_light_of_dawn);
+    RegisterSpellAndAuraScriptPair(spell_pal_holy_radiance, spell_pal_holy_radiance_aura);
+    RegisterSpellScript(spell_pal_divine_shield);
+    RegisterSpellScript(spell_pal_protector_of_the_innocent);
+    RegisterSpellScript(spell_pal_tower_of_radiance);
+    RegisterSpellScript(spell_pal_seal_of_insight);
+    RegisterSpellScript(spell_pal_repentance);
+    RegisterSpellScript(spell_pal_speed_of_light);
+    RegisterSpellScript(spell_pal_blessed_life);
 }

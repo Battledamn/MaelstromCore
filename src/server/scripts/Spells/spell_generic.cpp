@@ -3998,6 +3998,173 @@ enum GenericLifebloom
     SPELL_FACTION_CHAMPIONS_DRU_LIFEBLOOM_FINAL_HEAL    = 66094
 };
 
+/* 20217 - Blessing of Kings (spell_pal_blessing_of_kings)
+   19740 - Blessing of Might (spell_pal_blessing_of_might)
+   1126 - Mark of the Wild (spell_dru_mark_of_the_wild)
+   21562 - Power Word: Fortitude (spell_pri_power_word_fortitude)
+   27683 - Shadow Protection (spell_pri_shadow_protection)
+   1459 - Arcane Brilliance (spell_mage_arcane_brilliance)
+   61316 - Dalaran Brilliance (spell_mage_dalaran_brilliance) */
+// The dummy's value is the single-target buff; the next spell id is the party and raid version.
+class spell_gen_increase_stats_buff : public SpellScript
+{
+    PrepareSpellScript(spell_gen_increase_stats_buff);
+
+    void HandleDummy(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+        if (!target)
+            return;
+
+        if (target->IsInRaidWith(caster))
+            caster->CastSpell(caster, GetEffectValue() + 1, true);
+        else
+            caster->CastSpell(target, GetEffectValue(), true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_gen_increase_stats_buff::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
+enum Vengeance
+{
+    SPELL_VENGEANCE_TRIGGERED = 76691
+};
+
+// The attack power of Vengeance (4.3.4): 33% of the damage taken from creatures in the last 2 seconds, at
+// most 10% of base health plus Stamina. Ported from The Cataclysm Preservation Project.
+static int32 VengeanceAmount(Unit* target, uint32 damage)
+{
+    uint32 const healthCap = CalculatePct(target->GetCreateHealth(), 10) + uint32(target->GetStat(STAT_STAMINA));
+    return int32(std::min<uint32>(CalculatePct(damage, 33), healthCap));
+}
+
+static void CastVengeance(Unit* target, int32 amount)
+{
+    target->CastCustomSpell(target, SPELL_VENGEANCE_TRIGGERED, &amount, &amount, &amount, true);
+}
+
+// 84839, 84840, 93098, 93099 - Vengeance (the tanks' passive)
+class spell_gen_vengeance : public AuraScript
+{
+    PrepareAuraScript(spell_gen_vengeance);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_VENGEANCE_TRIGGERED });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+        return damageInfo && damageInfo->GetAttacker() && !damageInfo->GetAttacker()->IsPlayer();
+    }
+
+    void HandleEffectProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        Unit* target = GetTarget();
+
+        // the first hit starts the buff; from then on it follows the last two seconds by itself
+        if (!target->GetAura(SPELL_VENGEANCE_TRIGGERED, target->GetGUID()))
+            if (int32 amount = VengeanceAmount(target, eventInfo.GetDamageInfo()->GetDamage()))
+                CastVengeance(target, amount);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_gen_vengeance::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_gen_vengeance::HandleEffectProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 76691 - Vengeance (the attack power buff): renewed every tick from the damage of the last two seconds
+class spell_gen_vengeance_triggered : public AuraScript
+{
+    PrepareAuraScript(spell_gen_vengeance_triggered);
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+        return damageInfo && damageInfo->GetAttacker() && !damageInfo->GetAttacker()->IsPlayer();
+    }
+
+    void HandleEffectProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    {
+        if (uint32 damage = eventInfo.GetDamageInfo()->GetDamage())
+            _damageTaken.push_back({ GameTime::GetGameTimeMS().count(), damage });
+    }
+
+    void HandleEffectPeriodic(AuraEffect const* /*aurEff*/)
+    {
+        Unit* target = GetTarget();
+        uint32 const now = GameTime::GetGameTimeMS().count();
+
+        uint32 damageLastTwoSeconds = 0;
+        std::erase_if(_damageTaken, [now](std::pair<uint32, uint32> const& entry) { return now - entry.first > 2 * IN_MILLISECONDS; });
+        for (auto const& [time, damage] : _damageTaken)
+            damageLastTwoSeconds += damage;
+
+        if (int32 amount = VengeanceAmount(target, damageLastTwoSeconds))
+            CastVengeance(target, amount);
+        else
+            Remove();
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_gen_vengeance_triggered::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_gen_vengeance_triggered::HandleEffectProc, EFFECT_0, SPELL_AURA_MOD_ATTACK_POWER);
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_gen_vengeance_triggered::HandleEffectPeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DUMMY);
+    }
+
+private:
+    std::vector<std::pair<uint32, uint32>> _damageTaken;    // time (ms), damage
+};
+
+/* 19891 - Resistance Aura, 79106, 79107 - Shadow Protection, 8185 - Elemental Resistance (spell_gen_resistance_buff)
+   79060, 79061 - Mark of the Wild, 79062, 79063 - Blessing of Kings (spell_gen_resistance_buff_half) */
+// The resistance these buffs give follows the caster's level by the formula in their 4.3.4 tooltips
+// (level, +5 a level above 70, +7 more a level above 80: 195 at 85), not their base points or scaling;
+// the stat buffs give half of it, less 0.5.
+class spell_gen_resistance_buff : public AuraScript
+{
+    PrepareAuraScript(spell_gen_resistance_buff);
+
+public:
+    spell_gen_resistance_buff(bool half) : AuraScript(), _half(half) { }
+
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
+    {
+        Unit* caster = GetCaster();
+        if (!caster)
+            return;
+
+        if (Unit* owner = caster->GetOwner())                   // the Elemental Resistance totem
+            caster = owner;
+
+        int32 const level = caster->GetLevel();
+        int32 resistance = level;
+        if (level > 70)
+            resistance += (level - 70) * 5;
+        if (level > 80)
+            resistance += (level - 80) * 7;
+
+        amount = _half ? int32(resistance / 2.0f - 0.5f) : resistance;
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_gen_resistance_buff::CalculateAmount, EFFECT_ALL, SPELL_AURA_MOD_RESISTANCE_EXCLUSIVE);
+    }
+
+private:
+    bool _half;
+};
+
 /* 43421 - Lifebloom (spell_hexlord_lifebloom)
    52551 - Lifebloom (spell_tur_ragepaw_lifebloom)
    53608 - Lifebloom (spell_cenarion_scout_lifebloom)
@@ -6344,6 +6511,17 @@ void AddSC_generic_spell_scripts()
     RegisterSpellScriptWithArgs(spell_gen_lifebloom, "spell_cenarion_scout_lifebloom", SPELL_CENARION_SCOUT_LIFEBLOOM_FINAL_HEAL);
     RegisterSpellScriptWithArgs(spell_gen_lifebloom, "spell_twisted_visage_lifebloom", SPELL_TWISTED_VISAGE_LIFEBLOOM_FINAL_HEAL);
     RegisterSpellScriptWithArgs(spell_gen_lifebloom, "spell_faction_champion_dru_lifebloom", SPELL_FACTION_CHAMPIONS_DRU_LIFEBLOOM_FINAL_HEAL);
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_pal_blessing_of_kings");
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_pal_blessing_of_might");
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_dru_mark_of_the_wild");
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_pri_power_word_fortitude");
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_pri_shadow_protection");
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_mage_arcane_brilliance");
+    RegisterSpellScriptWithArgs(spell_gen_increase_stats_buff, "spell_mage_dalaran_brilliance");
+    RegisterSpellScriptWithArgs(spell_gen_resistance_buff, "spell_gen_resistance_buff", false);
+    RegisterSpellScriptWithArgs(spell_gen_resistance_buff, "spell_gen_resistance_buff_half", true);
+    RegisterSpellScript(spell_gen_vengeance);
+    RegisterSpellScript(spell_gen_vengeance_triggered);
     RegisterSpellScriptWithArgs(spell_gen_summon_elemental, "spell_gen_summon_fire_elemental", SPELL_SUMMON_FIRE_ELEMENTAL);
     RegisterSpellScriptWithArgs(spell_gen_summon_elemental, "spell_gen_summon_earth_elemental", SPELL_SUMMON_EARTH_ELEMENTAL);
     RegisterSpellScriptWithArgs(spell_gen_mount, "spell_big_blizzard_bear", 0, SPELL_BIG_BLIZZARD_BEAR_60, SPELL_BIG_BLIZZARD_BEAR_100, SPELL_BIG_BLIZZARD_BEAR_150, SPELL_BIG_BLIZZARD_BEAR_280, SPELL_BIG_BLIZZARD_BEAR_310);
