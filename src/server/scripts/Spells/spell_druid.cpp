@@ -16,13 +16,15 @@
  */
 
 #include "Containers.h"
-#include "GameTime.h"
+#include "DynamicObject.h"
 #include "GridNotifiers.h"
 #include "Player.h"
+#include "Spell.h"
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
+#include "TemporarySummon.h"
 /*
  * Scripts for spells with SPELLFAMILY_DRUID and SPELLFAMILY_GENERIC spells used by druid players.
  * Ordered alphabetically using scriptname.
@@ -31,46 +33,94 @@
 
 enum DruidSpells
 {
-    SPELL_DRUID_GLYPH_OF_WILD_GROWTH        = 62970,
-    SPELL_DRUID_NURTURING_INSTINCT_R1       = 47179,
-    SPELL_DRUID_NURTURING_INSTINCT_R2       = 47180,
+    SPELL_DRUID_ASTRAL_ALIGNMENT            = 90164,
+    SPELL_DRUID_BARKSKIN                    = 22812,
+    SPELL_DRUID_BLOOD_IN_THE_WATER_SCRIPT   = 80863,
+    SPELL_DRUID_BLOOM                       = 90159,
+    SPELL_DRUID_BRUTAL_IMPACT_R1            = 16940,
+    SPELL_DRUID_EFFLORESCENCE_AOE           = 81262,
+    SPELL_DRUID_EFFLORESCENCE_HEAL          = 81269,
+    SPELL_DRUID_EMPOWERED_TOUCH_SCRIPT      = 88433,
+    SPELL_DRUID_ENRAGE_MOD_DAMAGE           = 51185,
+    SPELL_DRUID_ENRAGED_DEFENSE             = 70725,
+    SPELL_DRUID_FERAL_CHARGE_BEAR           = 16979,
+    SPELL_DRUID_FERAL_CHARGE_CAT            = 49376,
     SPELL_DRUID_FERAL_SWIFTNESS_R1          = 17002,
     SPELL_DRUID_FERAL_SWIFTNESS_R2          = 24866,
     SPELL_DRUID_FERAL_SWIFTNESS_PASSIVE_1   = 24867,
     SPELL_DRUID_FERAL_SWIFTNESS_PASSIVE_2   = 24864,
-    SPELL_DRUID_BARKSKIN                    = 22812,
-    SPELL_DRUID_GLYPH_OF_BARKSKIN           = 63057,
+    SPELL_DRUID_FERAL_SWIFTNESS_CLEAR_ROAR  = 97993,
+    SPELL_DRUID_FERAL_SWIFTNESS_CLEAR_CAT   = 97985,
+    SPELL_DRUID_FIREBLOOM                   = 99017,
+    SPELL_DRUID_FRENZIED_REGENERATION_HEAL  = 22845,
+    SPELL_DRUID_FUNGAL_GROWTH_R1            = 78788,
+    SPELL_DRUID_FUNGAL_GROWTH_R2            = 78789,
+    SPELL_DRUID_FUNGAL_GROWTH_SUMMON_R1     = 81291,
+    SPELL_DRUID_FUNGAL_GROWTH_SUMMON_R2     = 81283,
     SPELL_DRUID_GLYPH_OF_BARKSKIN_TRIGGER   = 63058,
-    SPELL_DRUID_ENRAGE_MOD_DAMAGE           = 51185,
+    SPELL_DRUID_GLYPH_OF_FEROCIOUS_BITE     = 101024,
+    SPELL_DRUID_GLYPH_OF_FRENZIED_REGEN     = 54810,
+    SPELL_DRUID_GLYPH_OF_INNERVATE_MANA     = 54833,
+    SPELL_DRUID_GLYPH_OF_STARFIRE           = 54846,
     SPELL_DRUID_GLYPH_OF_TYPHOON            = 62135,
+    SPELL_DRUID_HARMONY                     = 100977,
     SPELL_DRUID_IDOL_OF_FERAL_SHADOWS       = 34241,
     SPELL_DRUID_IDOL_OF_WORSHIP             = 60774,
     SPELL_DRUID_INCREASED_MOONFIRE_DURATION = 38414,
+    SPELL_DRUID_ITEM_T8_BALANCE_RELIC       = 64950,
+    SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS     = 70726,
     SPELL_DRUID_KING_OF_THE_JUNGLE          = 48492,
-    SPELL_DRUID_LIFEBLOOM_ENERGIZE          = 64372,
+    SPELL_DRUID_LACERATE                    = 33745,
+    SPELL_DRUID_LEADER_OF_THE_PACK_HEAL     = 34299,
+    SPELL_DRUID_LEADER_OF_THE_PACK_MANA     = 68285,
+    SPELL_DRUID_LIFEBLOOM                   = 33763,
     SPELL_DRUID_LIFEBLOOM_FINAL_HEAL        = 33778,
     SPELL_DRUID_LIVING_SEED_HEAL            = 48503,
     SPELL_DRUID_LIVING_SEED_PROC            = 48504,
-    SPELL_DRUID_NATURES_SPLENDOR            = 57865,
-    SPELL_DRUID_SURVIVAL_INSTINCTS          = 50322,
-    SPELL_DRUID_SAVAGE_ROAR                 = 62071,
-    SPELL_DRUID_TIGER_S_FURY_ENERGIZE       = 51178,
-    SPELL_DRUID_BEAR_FORM_PASSIVE           = 1178,
-    SPELL_DRUID_DIRE_BEAR_FORM_PASSIVE      = 9635,
-    SPELL_DRUID_ENRAGE                      = 5229,
-    SPELL_DRUID_ENRAGED_DEFENSE             = 70725,
-    SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS     = 70726,
     SPELL_DRUID_MAIM_INTERRUPT              = 32747,
     SPELL_DRUID_MOONGLADE_2P_BONUS          = 37286,
-    // Proc system spells
-    SPELL_DRUID_GLYPH_OF_INNERVATE_MANA     = 54833,
-    SPELL_DRUID_GLYPH_OF_STARFIRE_PROC      = 54846,
-    SPELL_DRUID_GLYPH_OF_RAKE_STUN          = 54820,
-    SPELL_DRUID_LEADER_OF_THE_PACK_HEAL     = 34299,
-    SPELL_DRUID_LEADER_OF_THE_PACK_MANA     = 68285,
-    SPELL_DRUID_GLYPH_OF_REJUV_HEAL         = 54755,
+    SPELL_DRUID_NATURES_BOUNTY              = 96206,
+    SPELL_DRUID_NURTURING_INSTINCT_R1       = 47179,
+    SPELL_DRUID_NURTURING_INSTINCT_R2       = 47180,
+    SPELL_DRUID_PULVERIZE_TRIGGERED         = 80951,
+    SPELL_DRUID_REGROWTH_REFRESH            = 93036,
+    SPELL_DRUID_REJUVENATION                = 774,
+    SPELL_DRUID_REJUVENATION_DIRECT_HEAL    = 64801,
+    SPELL_DRUID_REPLENISHMENT               = 57669,
+    SPELL_DRUID_REVITALIZE_R1               = 48539,
+    SPELL_DRUID_RIP                         = 1079,
+    SPELL_DRUID_RIP_DURATION_LACERATE_DMG   = 60141,
+    SPELL_DRUID_SAVAGE_DEFENDER             = 77494, // guardian mastery
+    SPELL_DRUID_SAVAGE_ROAR                 = 62071,
+    SPELL_DRUID_SHADOWMELD                  = 58984,
+    SPELL_DRUID_SKULL_BASH_CHARGE           = 93983,
+    SPELL_DRUID_SKULL_BASH_INTERRUPT        = 93985,
+    SPELL_DRUID_SKULL_BASH_COST_INCREASE_R1 = 82364,
+    SPELL_DRUID_SKULL_BASH_COST_INCREASE_R2 = 82365,
+    SPELL_DRUID_SOLAR_BEAM_SILENCE          = 81261,
+    SPELL_DRUID_STAMPEDE_R1                 = 78892,
+    SPELL_DRUID_STAMPEDE_R2                 = 78893,
+    SPELL_DRUID_STAMPEDE_BEAR_R1            = 81016,
+    SPELL_DRUID_STAMPEDE_BEAR_R2            = 81017,
+    SPELL_DRUID_STAMPEDE_CAT_R1             = 81021,
+    SPELL_DRUID_STAMPEDE_CAT_R2             = 81022,
+    SPELL_DRUID_STAMPEDE_RAVAGE_MARKER      = 109881,
+    SPELL_DRUID_STARSURGE                   = 78674,
+    SPELL_DRUID_STRENGTH_OF_THE_PANTHER     = 90166,
+    SPELL_DRUID_SURVIVAL_INSTINCTS          = 50322,
+    SPELL_DRUID_T13_FERAL_2P_BONUS          = 105725,
+    SPELL_DRUID_TIGER_S_FURY_ENERGIZE       = 51178,
+    SPELL_DRUID_TREE_OF_LIFE                = 33891,
+    SPELL_DRUID_TREE_OF_LIFE_PASSIVE_1      = 5420,
+    SPELL_DRUID_TREE_OF_LIFE_PASSIVE_2      = 81097,
+    SPELL_DRUID_TREE_OF_LIFE_PASSIVE_3      = 81098,
+    SPELL_DRUID_WILD_MUSHROOM               = 88747,
+    SPELL_DRUID_WILD_MUSHROOM_DAMAGE        = 78777,
+    SPELL_DRUID_WILD_MUSHROOM_SUICIDE       = 92853,
+    SPELL_DRUID_WILD_MUSHROOM_VISUAL        = 92701,
     SPELL_DRUID_ECLIPSE_LUNAR               = 48518,
     SPELL_DRUID_ECLIPSE_SOLAR               = 48517,
+    // Item set and relic bonuses
     SPELL_DRUID_T3_PROC_ENERGIZE_MANA       = 28722,
     SPELL_DRUID_T3_PROC_ENERGIZE_RAGE       = 28723,
     SPELL_DRUID_T3_PROC_ENERGIZE_ENERGY     = 28724,
@@ -80,73 +130,46 @@ enum DruidSpells
     SPELL_DRUID_BLESSING_OF_REMULOS         = 40445,
     SPELL_DRUID_BLESSING_OF_ELUNE           = 40446,
     SPELL_DRUID_BLESSING_OF_CENARIUS        = 40452,
-    SPELL_DRUID_REVITALIZE_ENERGIZE_MANA    = 48542,
-    SPELL_DRUID_REVITALIZE_ENERGIZE_RAGE    = 48541,
-    SPELL_DRUID_REVITALIZE_ENERGIZE_ENERGY  = 48540,
-    SPELL_DRUID_REVITALIZE_ENERGIZE_RP      = 48543,
-    SPELL_DRUID_GLYPH_OF_RIP                = 54818,
-    SPELL_DRUID_RIP_DURATION_LACERATE_DMG   = 60141,
     SPELL_DRUID_REJUVENATION_T10_PROC       = 70691,
     SPELL_DRUID_BALANCE_T10_BONUS           = 70718,
     SPELL_DRUID_BALANCE_T10_BONUS_PROC      = 70721,
     SPELL_DRUID_LANGUISH                    = 71023,
-    // T9 Feral Relic
     SPELL_DRUID_T9_FERAL_RELIC_BEAR         = 67354,
     SPELL_DRUID_T9_FERAL_RELIC_CAT          = 67355,
-    // Frenzied Regeneration
-    SPELL_DRUID_FRENZIED_REGENERATION_HEAL  = 22845,
-    // Insect Swarm
-    SPELL_DRUID_ITEM_T8_BALANCE_RELIC       = 64950,
-    // Nourish
-    SPELL_DRUID_GLYPH_OF_NOURISH            = 62971,
-    // Wild Growth
     SPELL_DRUID_RESTORATION_T10_2P_BONUS    = 70658
 };
 
 enum DruidIcons
 {
     SPELL_ICON_REVITALIZE                   = 2862,
-    SPELL_ICON_ECLIPSE                      = 2856,
-    SPELL_ICON_INNERVATE                    = 62
+    SPELL_ICON_ID_GLYPH_OF_REGROWTH         = 197,
+    SPELL_ICON_ID_DREAMSTATE                = 2255,
+    SPELL_ICON_ID_GLYPH_OF_INNERVATE        = 62,
+    SPELL_ICON_ID_GLYPH_OF_FEROCIOUS_BITE   = 1680,
+    SPELL_ICON_ID_GIFT_OF_THE_EARTHMOTHER   = 3186
 };
 
-// 1178 - Bear Form (Passive)
-// 9635 - Dire Bear Form (Passive)
-class spell_dru_bear_form_passive : public AuraScript
+enum DruidMisc
 {
-    PrepareAuraScript(spell_dru_bear_form_passive);
+    SPELL_CATEGORY_MANGLE_BEAR              = 971
+};
 
-    bool Validate(SpellInfo const* /*spellInfo*/) override
+// 50334 - Berserk
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): in 4.3.4 Berserk no longer
+// removes Tiger's Fury; its effect 1 takes Mangle (Bear)'s cooldown away, so the cooldown running is reset.
+class spell_dru_berserk : public AuraScript
+{
+    PrepareAuraScript(spell_dru_berserk);
+
+    void HandleEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
-        return ValidateSpellInfo({ SPELL_DRUID_ENRAGE, SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS });
-    }
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        if (!GetUnitOwner()->HasAura(SPELL_DRUID_ENRAGE) || GetUnitOwner()->HasAura(SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS))
-        {
-            return;
-        }
-
-        int32 mod = 0;
-        switch (GetId())
-        {
-            case SPELL_DRUID_BEAR_FORM_PASSIVE:
-                mod = -48;
-                break;
-            case SPELL_DRUID_DIRE_BEAR_FORM_PASSIVE:
-                mod = -59;
-                break;
-            default:
-                return;
-        }
-
-        amount += mod;
+        if (Player* player = GetTarget()->ToPlayer())
+            player->RemoveCategoryCooldown(SPELL_CATEGORY_MANGLE_BEAR);
     }
 
     void Register() override
     {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_bear_form_passive::CalculateAmount, EFFECT_0, SPELL_AURA_MOD_BASE_RESISTANCE_PCT);
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_berserk::HandleEffectApply, EFFECT_1, SPELL_AURA_ADD_PCT_MODIFIER, AURA_EFFECT_HANDLE_REAL);
     }
 };
 
@@ -204,11 +227,18 @@ class spell_dru_nurturing_instinct : public AuraScript
     }
 };
 
-/* 5487 - Bear Form
-   9634 - Dire Bear Form */
+// 768 - Cat Form
+// 5487 - Bear Form
+// Feral Swiftness still grants dodge in Cat and Bear Form in 4.3.4 (24867, 24864); the speed and the
+// root and snare removal come from the talent's own data and from Dash and Stampeding Roar.
 class spell_dru_feral_swiftness : public AuraScript
 {
     PrepareAuraScript(spell_dru_feral_swiftness);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_FERAL_SWIFTNESS_PASSIVE_1, SPELL_DRUID_FERAL_SWIFTNESS_PASSIVE_2 });
+    }
 
     void AfterApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
     {
@@ -285,42 +315,6 @@ class spell_dru_omen_of_clarity : public AuraScript
     {
         DoCheckProc += AuraCheckProcFn(spell_dru_omen_of_clarity::CheckProc);
         OnEffectProc += AuraEffectProcFn(spell_dru_omen_of_clarity::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
-    }
-};
-
-// 50419 - Brambles
-class spell_dru_brambles_treant : public AuraScript
-{
-    PrepareAuraScript(spell_dru_brambles_treant);
-
-    bool CheckProc(ProcEventInfo&  /*eventInfo*/)
-    {
-        if (Player* player = GetUnitOwner()->GetSpellModOwner())
-        {
-            int32 amount = 0;
-            if (player->HasAura(SPELL_DRUID_BARKSKIN, player->GetGUID()))
-                player->ApplySpellMod(SPELL_DRUID_BARKSKIN, SPELLMOD_CHANCE_OF_SUCCESS, amount);
-
-            return roll_chance_i(amount);
-        }
-
-        return false;
-    }
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        // xinef: chance of success stores proper amount of damage increase
-        // xinef: little hack because GetSpellModOwner will return nullptr pointer at this point (early summoning stage)
-        if (GetUnitOwner()->IsSummon())
-            if (Unit* owner = GetUnitOwner()->ToTempSummon()->GetSummonerUnit())
-                if (Player* player = owner->GetSpellModOwner())
-                    player->ApplySpellMod(SPELL_DRUID_BARKSKIN, SPELLMOD_CHANCE_OF_SUCCESS, amount);
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_brambles_treant::CalculateAmount, EFFECT_0, SPELL_AURA_MOD_DAMAGE_PERCENT_DONE);
-        DoCheckProc += AuraCheckProcFn(spell_dru_brambles_treant::CheckProc);
     }
 };
 
@@ -451,30 +445,34 @@ class spell_dru_treant_scaling : public AuraScript
     }
 };
 
-// -1850 - Dash
+// 1850 - Dash
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Feral Swiftness gives Dash
+// a chance (the talent's effect 1) to remove all roots and snares. The Cat Form requirement is the
+// spell's own (its shapeshift mask), so the old cast check is gone.
 class spell_dru_dash : public SpellScript
 {
     PrepareSpellScript(spell_dru_dash);
 
-    SpellCastResult CheckCast()
+    bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        Unit* caster = GetCaster();
-        if (caster->GetShapeshiftForm() != FORM_CAT)
-        {
-            SetCustomCastResultMessage(SPELL_CUSTOM_ERROR_MUST_BE_IN_CAT_FORM);
-            return SPELL_FAILED_CUSTOM_ERROR;
-        }
+        return ValidateSpellInfo({ SPELL_DRUID_FERAL_SWIFTNESS_R1, SPELL_DRUID_FERAL_SWIFTNESS_CLEAR_CAT });
+    }
 
-        return SPELL_CAST_OK;
+    void HandleFeralSwiftness(SpellEffIndex /*effIndex*/)
+    {
+        Unit* target = GetHitUnit();
+        if (Aura const* swiftness = target->GetAuraOfRankedSpell(SPELL_DRUID_FERAL_SWIFTNESS_R1, target->GetGUID()))
+            if (roll_chance_i(swiftness->GetSpellInfo()->Effects[EFFECT_1].CalcValue()))
+                target->CastSpell(target, SPELL_DRUID_FERAL_SWIFTNESS_CLEAR_CAT, true);
     }
 
     void Register() override
     {
-        OnCheckCast += SpellCheckCastFn(spell_dru_dash::CheckCast);
+        OnEffectHitTarget += SpellEffectFn(spell_dru_dash::HandleFeralSwiftness, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
     }
 };
 
-// -1850 - Dash
+// 1850 - Dash
 class spell_dru_dash_aura : public AuraScript
 {
     PrepareAuraScript(spell_dru_dash_aura);
@@ -483,9 +481,7 @@ class spell_dru_dash_aura : public AuraScript
     {
         // do not set speed if not in cat form
         if (GetUnitOwner()->GetShapeshiftForm() != FORM_CAT)
-        {
             amount = 0;
-        }
     }
 
     void Register() override
@@ -504,44 +500,21 @@ class spell_dru_enrage : public AuraScript
         return ValidateSpellInfo({ SPELL_DRUID_KING_OF_THE_JUNGLE, SPELL_DRUID_ENRAGE_MOD_DAMAGE, SPELL_DRUID_ENRAGED_DEFENSE, SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS });
     }
 
-    void RecalculateBaseArmor()
-    {
-        // Recalculate modifies the list while we're iterating through it, so let's copy it instead
-        Unit::AuraEffectList const& auras = GetTarget()->GetAuraEffectsByType(SPELL_AURA_MOD_BASE_RESISTANCE_PCT);
-        std::vector<AuraEffect*> aurEffs(auras.begin(), auras.end());
-
-        for (AuraEffect* aurEff : aurEffs)
-        {
-            SpellInfo const* spellInfo = aurEff->GetSpellInfo();
-            // Dire- / Bear Form (Passive)
-            if (spellInfo->SpellFamilyName == SPELLFAMILY_DRUID && spellInfo->SpellFamilyFlags.HasFlag(0x0, 0x0, 0x2))
-                aurEff->RecalculateAmount();
-        }
-    }
-
     void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         Unit* target = GetTarget();
         if (AuraEffect const* aurEff = target->GetAuraEffectOfRankedSpell(SPELL_DRUID_KING_OF_THE_JUNGLE, EFFECT_0))
-        {
-            target->CastCustomSpell(SPELL_DRUID_ENRAGE_MOD_DAMAGE, SPELLVALUE_BASE_POINT0, aurEff->GetAmount(), target, true);
-        }
+            target->CastCustomSpell(SPELL_DRUID_ENRAGE_MOD_DAMAGE, SPELLVALUE_BASE_POINT0, aurEff->GetAmount(), target, true, nullptr, aurEff);
 
         // Item - Druid T10 Feral 4P Bonus
         if (target->HasAura(SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS))
-        {
             target->CastSpell(target, SPELL_DRUID_ENRAGED_DEFENSE, true);
-        }
-
-        RecalculateBaseArmor();
     }
 
     void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         GetTarget()->RemoveAurasDueToSpell(SPELL_DRUID_ENRAGE_MOD_DAMAGE);
         GetTarget()->RemoveAurasDueToSpell(SPELL_DRUID_ENRAGED_DEFENSE);
-
-        RecalculateBaseArmor();
     }
 
     void Register() override
@@ -552,13 +525,15 @@ class spell_dru_enrage : public AuraScript
 };
 
 // 54846 - Glyph of Starfire
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): each Starfire adds 3 sec
+// to Moonfire (or Sunfire), up to 9 sec; Nature's Splendor no longer exists in 4.3.4.
 class spell_dru_glyph_of_starfire : public SpellScript
 {
     PrepareSpellScript(spell_dru_glyph_of_starfire);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_DRUID_INCREASED_MOONFIRE_DURATION, SPELL_DRUID_NATURES_SPLENDOR });
+        return ValidateSpellInfo({ SPELL_DRUID_INCREASED_MOONFIRE_DURATION });
     }
 
     void HandleScriptEffect(SpellEffIndex /*effIndex*/)
@@ -573,8 +548,6 @@ class spell_dru_glyph_of_starfire : public SpellScript
                 uint32 countMax = aura->GetSpellInfo()->GetMaxDuration() + 9000;
                 if (caster->HasAura(SPELL_DRUID_INCREASED_MOONFIRE_DURATION))
                     countMax += 3000;
-                if (caster->HasAura(SPELL_DRUID_NATURES_SPLENDOR))
-                    countMax += 3000;
 
                 if (countMin < countMax)
                 {
@@ -587,6 +560,37 @@ class spell_dru_glyph_of_starfire : public SpellScript
     void Register() override
     {
         OnEffectHitTarget += SpellEffectFn(spell_dru_glyph_of_starfire::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+    }
+};
+
+// 54845 - Glyph of Starfire
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46). (own) The proc row also
+// lets Moonfire through; only Starfire casts the extension, and 54846 itself checks for the Moonfire.
+class spell_dru_glyph_of_starfire_proc : public AuraScript
+{
+    PrepareAuraScript(spell_dru_glyph_of_starfire_proc);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_STARFIRE });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
+        return spellInfo && (spellInfo->SpellFamilyFlags[0] & 0x00000004) && eventInfo.GetProcTarget();
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(eventInfo.GetProcTarget(), SPELL_DRUID_GLYPH_OF_STARFIRE, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_dru_glyph_of_starfire_proc::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_dru_glyph_of_starfire_proc::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -616,101 +620,112 @@ class spell_dru_idol_lifebloom : public AuraScript
 };
 
 // 29166 - Innervate
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the target regains 5% of
+// its own maximum mana ($m1/4), 20% plus Dreamstate when cast on self; cast on someone else, Glyph of
+// Innervate gives the druid 54833 (1% of maximum mana per second). (own) The glyph is cast once when
+// the aura is applied rather than from the amount calculation, which also runs on recalculation.
 class spell_dru_innervate : public AuraScript
 {
     PrepareAuraScript(spell_dru_innervate);
 
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_INNERVATE_MANA });
+    }
+
     void CalculateAmount(AuraEffect const* aurEff, int32& amount, bool& /*canBeRecalculated*/)
     {
-        if (Unit* caster = GetCaster())
-            amount = int32(CalculatePct(caster->GetCreatePowers(POWER_MANA), amount) / aurEff->GetTotalTicks());
-        else
+        Unit* target = GetUnitOwner();
+        uint32 mana = target->GetMaxPower(POWER_MANA);
+        if (!mana || !aurEff->GetTotalTicks())
+        {
             amount = 0;
+            return;
+        }
+
+        int32 percentage = amount / 4;
+
+        // Cast on self: an additional 15%, and Dreamstate adds its amount
+        Unit* caster = GetCaster();
+        if (caster == target)
+        {
+            percentage += 15;
+            if (AuraEffect const* dreamstate = caster->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_DREAMSTATE, EFFECT_0))
+                percentage += dreamstate->GetAmount();
+        }
+
+        amount = int32(CalculatePct(mana, percentage) / aurEff->GetTotalTicks());
+    }
+
+    void HandleGlyph(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (!caster || caster == GetTarget())
+            return;
+
+        if (caster->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_GLYPH_OF_INNERVATE, EFFECT_0))
+            caster->CastSpell(caster, SPELL_DRUID_GLYPH_OF_INNERVATE_MANA, true);
     }
 
     void Register() override
     {
         DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_innervate::CalculateAmount, EFFECT_0, SPELL_AURA_PERIODIC_ENERGIZE);
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_innervate::HandleGlyph, EFFECT_0, SPELL_AURA_PERIODIC_ENERGIZE, AURA_EFFECT_HANDLE_REAL);
     }
 };
 
-// -33763 - Lifebloom
+// 33763 - Lifebloom
+// 94447 - Lifebloom (Tree of Life)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the bloom (effect 1) heals
+// when Lifebloom expires or is dispelled, for the amount the druid's healing bonuses gave it, and casting
+// or refreshing Lifebloom with Revitalize grants Replenishment. The WotLK mana return is gone. (own) The
+// bonus is not divided by the stacks: AzerothCore multiplies the amount by the stacks after this hook.
 class spell_dru_lifebloom : public AuraScript
 {
     PrepareAuraScript(spell_dru_lifebloom);
 
-    enum Spells
-    {
-        SPELL_DRUID_AURA_OF_DESPAIR_1 = 62692,
-        SPELL_DRUID_AURA_OF_DESPAIR_2 = 64848
-    };
-
     bool Validate(SpellInfo const* /*spell*/) override
     {
-        return ValidateSpellInfo({ SPELL_DRUID_LIFEBLOOM_FINAL_HEAL, SPELL_DRUID_LIFEBLOOM_ENERGIZE });
+        return ValidateSpellInfo({ SPELL_DRUID_REVITALIZE_R1, SPELL_DRUID_LIFEBLOOM_FINAL_HEAL, SPELL_DRUID_REPLENISHMENT });
+    }
+
+    void AfterApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        if (Unit* caster = GetCaster())
+            if (caster->GetAuraOfRankedSpell(SPELL_DRUID_REVITALIZE_R1, caster->GetGUID()))
+                caster->CastSpell(caster, SPELL_DRUID_REPLENISHMENT, true);
     }
 
     void AfterRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
     {
-        // Final heal only on duration end
-        if (GetTargetApplication()->GetRemoveMode() != AURA_REMOVE_BY_EXPIRE)
+        AuraRemoveMode removeMode = GetTargetApplication()->GetRemoveMode();
+        if (removeMode != AURA_REMOVE_BY_EXPIRE && removeMode != AURA_REMOVE_BY_ENEMY_SPELL)
             return;
 
-        // final heal
-        int32 stack = GetStackAmount();
         int32 healAmount = aurEff->GetAmount();
-        SpellInfo const* finalHeal = sSpellMgr->GetSpellInfo(SPELL_DRUID_LIFEBLOOM_FINAL_HEAL);
+        if (healAmount <= 0)
+            return;
 
-        if (Unit* caster = GetCaster())
-        {
-            healAmount = caster->SpellHealingBonusDone(GetTarget(), finalHeal, healAmount, HEAL, aurEff->GetEffIndex(), 0.0f, stack);
-            healAmount = GetTarget()->SpellHealingBonusTaken(caster, finalHeal, healAmount, HEAL, stack);
-
-            // restore mana
-            int32 returnmana = GetSpellInfo()->ManaCostPercentage * caster->GetCreateMana() * stack / 100 / 2;
-            if (caster->HasAnyAuras(SPELL_DRUID_AURA_OF_DESPAIR_1, SPELL_DRUID_AURA_OF_DESPAIR_2))
-                returnmana /= 2;
-
-            caster->CastCustomSpell(caster, SPELL_DRUID_LIFEBLOOM_ENERGIZE, &returnmana, nullptr, nullptr, true, nullptr, aurEff, GetCasterGUID());
-        }
         GetTarget()->CastCustomSpell(GetTarget(), SPELL_DRUID_LIFEBLOOM_FINAL_HEAL, &healAmount, nullptr, nullptr, true, nullptr, aurEff, GetCasterGUID());
     }
 
-    void HandleDispel(DispelInfo* dispelInfo)
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
     {
-        if (Unit* target = GetUnitOwner())
-        {
-            if (GetEffect(EFFECT_1))
-            {
-                Unit* caster = GetCaster();
-                int32 healAmount = GetSpellInfo()->Effects[EFFECT_1].CalcValue(caster ? caster : target, 0, target) * dispelInfo->GetRemovedCharges();
-                SpellInfo const* finalHeal = sSpellMgr->GetSpellInfo(SPELL_DRUID_LIFEBLOOM_FINAL_HEAL);
-                if (caster)
-                {
-                    // healing with bonus
-                    healAmount = caster->SpellHealingBonusDone(target, finalHeal, healAmount, HEAL, EFFECT_1, 0.0f, dispelInfo->GetRemovedCharges());
-                    healAmount = target->SpellHealingBonusTaken(caster, finalHeal, healAmount, HEAL, dispelInfo->GetRemovedCharges());
-
-                    // mana amount
-                    int32 mana = CalculatePct(caster->GetCreateMana(), GetSpellInfo()->ManaCostPercentage) * dispelInfo->GetRemovedCharges() / 2;
-                    if (caster->HasAnyAuras(SPELL_DRUID_AURA_OF_DESPAIR_1, SPELL_DRUID_AURA_OF_DESPAIR_2))
-                        mana /= 2;
-
-                    caster->CastCustomSpell(caster, SPELL_DRUID_LIFEBLOOM_ENERGIZE, &mana, nullptr, nullptr, true, nullptr, nullptr, GetCasterGUID());
-                }
-                target->CastCustomSpell(target, SPELL_DRUID_LIFEBLOOM_FINAL_HEAL, &healAmount, nullptr, nullptr, true, nullptr, nullptr, GetCasterGUID());
-            }
-        }
+        if (Unit* caster = GetCaster())
+            amount = int32(caster->SpellHealingBonusDone(GetUnitOwner(), GetSpellInfo(), std::max<int32>(amount, 0), HEAL, EFFECT_1));
     }
 
     void Register() override
     {
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_lifebloom::AfterApply, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
         AfterEffectRemove += AuraEffectRemoveFn(spell_dru_lifebloom::AfterRemove, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
-        AfterDispel += AuraDispelFn(spell_dru_lifebloom::HandleDispel);
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_lifebloom::CalculateAmount, EFFECT_1, SPELL_AURA_DUMMY);
     }
 };
 
 // -48496 - Living Seed
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the seed holds a share of
+// the effective heal, not of the overheal.
 class spell_dru_living_seed : public AuraScript
 {
     PrepareAuraScript(spell_dru_living_seed);
@@ -724,13 +739,13 @@ class spell_dru_living_seed : public AuraScript
     {
         PreventDefaultAction();
 
-        if (!eventInfo.GetHealInfo() || !eventInfo.GetProcTarget())
-        {
+        HealInfo* healInfo = eventInfo.GetHealInfo();
+        if (!healInfo || !eventInfo.GetProcTarget())
             return;
-        }
 
-        int32 amount = CalculatePct(eventInfo.GetHealInfo()->GetHeal(), aurEff->GetAmount());
-        GetTarget()->CastCustomSpell(SPELL_DRUID_LIVING_SEED_PROC, SPELLVALUE_BASE_POINT0, amount, eventInfo.GetProcTarget(), true, nullptr, aurEff);
+        int32 amount = CalculatePct(int32(healInfo->GetEffectiveHeal()), aurEff->GetAmount());
+        if (amount > 0)
+            GetTarget()->CastCustomSpell(SPELL_DRUID_LIVING_SEED_PROC, SPELLVALUE_BASE_POINT0, amount, eventInfo.GetProcTarget(), true, nullptr, aurEff);
     }
 
     void Register() override
@@ -761,107 +776,9 @@ class spell_dru_living_seed_proc : public AuraScript
     }
 };
 
-// 69366 - Moonkin Form (Passive)
-class spell_dru_moonkin_form_passive : public AuraScript
-{
-    PrepareAuraScript(spell_dru_moonkin_form_passive);
-
-    uint32 absorbPct;
-
-    bool Load() override
-    {
-        absorbPct = GetSpellInfo()->Effects[EFFECT_0].CalcValue(GetCaster());
-        return true;
-    }
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        // Set absorbtion amount to unlimited
-        amount = -1;
-    }
-
-    void Absorb(AuraEffect* /*aurEff*/, DamageInfo& dmgInfo, uint32& absorbAmount)
-    {
-        // reduces all damage taken while Stunned in Moonkin Form
-        if (GetTarget()->GetUnitFlags() & (UNIT_FLAG_STUNNED) && GetTarget()->HasAuraWithMechanic(1ULL << MECHANIC_STUN))
-            absorbAmount = CalculatePct(dmgInfo.GetDamage(), absorbPct);
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_moonkin_form_passive::CalculateAmount, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB);
-        OnEffectAbsorb += AuraEffectAbsorbFn(spell_dru_moonkin_form_passive::Absorb, EFFECT_0);
-    }
-};
-
-// 48391 - Owlkin Frenzy
-class spell_dru_owlkin_frenzy : public AuraScript
-{
-    PrepareAuraScript(spell_dru_owlkin_frenzy);
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        amount = CalculatePct(GetUnitOwner()->GetCreatePowers(POWER_MANA), amount);
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_owlkin_frenzy::CalculateAmount, EFFECT_2, SPELL_AURA_PERIODIC_ENERGIZE);
-    }
-};
-
-// -16972 - Predatory Strikes
-class spell_dru_predatory_strikes : public AuraScript
-{
-    PrepareAuraScript(spell_dru_predatory_strikes);
-
-    void UpdateAmount(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        if (Player* target = GetTarget()->ToPlayer())
-            target->UpdateAttackPowerAndDamage();
-    }
-
-    void Register() override
-    {
-        AfterEffectApply += AuraEffectApplyFn(spell_dru_predatory_strikes::UpdateAmount, EFFECT_ALL, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_CHANGE_AMOUNT_MASK);
-        AfterEffectRemove += AuraEffectRemoveFn(spell_dru_predatory_strikes::UpdateAmount, EFFECT_ALL, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_CHANGE_AMOUNT_MASK);
-    }
-};
-
-// 33851 - Primal Tenacity
-class spell_dru_primal_tenacity : public AuraScript
-{
-    PrepareAuraScript(spell_dru_primal_tenacity);
-
-    uint32 absorbPct;
-
-    bool Load() override
-    {
-        absorbPct = GetSpellInfo()->Effects[EFFECT_1].CalcValue(GetCaster());
-        return true;
-    }
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        // Set absorbtion amount to unlimited
-        amount = -1;
-    }
-
-    void Absorb(AuraEffect* /*aurEff*/, DamageInfo& dmgInfo, uint32& absorbAmount)
-    {
-        // reduces all damage taken while Stunned in Cat Form
-        if (GetTarget()->GetShapeshiftForm() == FORM_CAT && GetTarget()->HasUnitFlag(UNIT_FLAG_STUNNED) && GetTarget()->HasAuraWithMechanic(1ULL << MECHANIC_STUN))
-            absorbAmount = CalculatePct(dmgInfo.GetDamage(), absorbPct);
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_primal_tenacity::CalculateAmount, EFFECT_1, SPELL_AURA_SCHOOL_ABSORB);
-        OnEffectAbsorb += AuraEffectAbsorbFn(spell_dru_primal_tenacity::Absorb, EFFECT_1);
-    }
-};
-
-// -1079 - Rip
+// 1079 - Rip
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): each tick gains 2.07% of
+// attack power per combo point (the tooltip's formula, so Rip needs no attack power bonus data).
 class spell_dru_rip : public AuraScript
 {
     PrepareAuraScript(spell_dru_rip);
@@ -878,8 +795,7 @@ class spell_dru_rip : public AuraScript
 
         if (Unit* caster = GetCaster())
         {
-            // 0.01 * $AP * cp
-            uint8 cp = caster->ToPlayer()->GetComboPoints();
+            uint8 cp = caster->GetComboPoints();
 
             // Idol of Feral Shadows. Can't be handled as SpellMod due its dependency from CPs
             if (AuraEffect const* idol = caster->GetAuraEffect(SPELL_DRUID_IDOL_OF_FERAL_SHADOWS, EFFECT_0))
@@ -888,7 +804,7 @@ class spell_dru_rip : public AuraScript
             else if (AuraEffect const* idol2 = caster->GetAuraEffect(SPELL_DRUID_IDOL_OF_WORSHIP, EFFECT_0))
                 amount += cp * idol2->GetAmount();
 
-            amount += int32(CalculatePct(caster->GetTotalAttackPowerValue(BASE_ATTACK), cp));
+            amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * 0.0207f * cp);
         }
     }
 
@@ -898,35 +814,36 @@ class spell_dru_rip : public AuraScript
     }
 };
 
-// 62606 - Savage Defense
+// 62600 - Savage Defense
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): a critical strike in Bear
+// Form gives a single shield (62606) absorbing 35% of attack power, increased by the Savage Defender
+// mastery. (own) The mastery multiplies the share ("increases the damage absorbed by X%") where CPP added
+// the two percentages.
 class spell_dru_savage_defense : public AuraScript
 {
     PrepareAuraScript(spell_dru_savage_defense);
 
-    uint32 absorbPct;
-
-    bool Load() override
+    bool Validate(SpellInfo const* spellInfo) override
     {
-        absorbPct = GetSpellInfo()->Effects[EFFECT_0].CalcValue(GetCaster());
-        return true;
+        return ValidateSpellInfo({ spellInfo->Effects[EFFECT_0].TriggerSpell });
     }
 
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
     {
-        // Set absorbtion amount to unlimited
-        amount = -1;
-    }
+        PreventDefaultAction();
+        Unit* target = GetTarget();
 
-    void Absorb(AuraEffect* aurEff, DamageInfo& /*dmgInfo*/, uint32& absorbAmount)
-    {
-        absorbAmount = uint32(CalculatePct(GetTarget()->GetTotalAttackPowerValue(BASE_ATTACK), absorbPct));
-        aurEff->SetAmount(0);
+        float absorbPct = float(aurEff->GetAmount());
+        if (AuraEffect const* mastery = target->GetAuraEffect(SPELL_DRUID_SAVAGE_DEFENDER, EFFECT_0))
+            AddPct(absorbPct, mastery->GetAmount());
+
+        int32 amount = int32(CalculatePct(target->GetTotalAttackPowerValue(BASE_ATTACK), absorbPct));
+        target->CastCustomSpell(target, GetSpellInfo()->Effects[aurEff->GetEffIndex()].TriggerSpell, &amount, nullptr, nullptr, true, nullptr, aurEff);
     }
 
     void Register() override
     {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_savage_defense::CalculateAmount, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB);
-        OnEffectAbsorb += AuraEffectAbsorbFn(spell_dru_savage_defense::Absorb, EFFECT_0);
+        OnEffectProc += AuraEffectProcFn(spell_dru_savage_defense::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
     }
 };
 
@@ -977,23 +894,7 @@ class spell_dru_savage_roar_aura : public AuraScript
     }
 };
 
-// -50294 - Starfall
-class spell_dru_starfall_aoe : public SpellScript
-{
-    PrepareSpellScript(spell_dru_starfall_aoe);
-
-    void FilterTargets(std::list<WorldObject*>& targets)
-    {
-        targets.remove(GetExplTargetUnit());
-    }
-
-    void Register() override
-    {
-        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dru_starfall_aoe::FilterTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ENEMY);
-    }
-};
-
-// -50286 - Starfall
+// 50286 - Starfall
 class spell_dru_starfall_dummy : public SpellScript
 {
     PrepareSpellScript(spell_dru_starfall_dummy);
@@ -1063,6 +964,9 @@ class spell_dru_survival_instincts : public SpellScript
     }
 };
 
+// 61336 - Survival Instincts
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): in 4.3.4 it reduces all
+// damage taken by 50% (50322's own amount) instead of the WotLK maximum health increase.
 class spell_dru_survival_instincts_aura : public AuraScript
 {
     PrepareAuraScript(spell_dru_survival_instincts_aura);
@@ -1074,9 +978,7 @@ class spell_dru_survival_instincts_aura : public AuraScript
 
     void AfterApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
     {
-        Unit* target = GetTarget();
-        int32 bp0 = target->CountPctFromMaxHealth(aurEff->GetAmount());
-        target->CastCustomSpell(target, SPELL_DRUID_SURVIVAL_INSTINCTS, &bp0, nullptr, nullptr, true);
+        GetTarget()->CastSpell(GetTarget(), SPELL_DRUID_SURVIVAL_INSTINCTS, true, nullptr, aurEff);
     }
 
     void AfterRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
@@ -1092,19 +994,21 @@ class spell_dru_survival_instincts_aura : public AuraScript
 };
 
 // 40121 - Swift Flight Form (Passive)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): 310% flying speed comes with
+// Master Riding (riding skill 375) in 4.3.4, not with owning a 310% mount.
 class spell_dru_swift_flight_passive : public AuraScript
 {
     PrepareAuraScript(spell_dru_swift_flight_passive);
 
     bool Load() override
     {
-        return GetCaster()->IsPlayer();
+        return GetCaster() && GetCaster()->IsPlayer();
     }
 
     void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
     {
         if (Player* caster = GetCaster()->ToPlayer())
-            if (caster->Has310Flyer(false))
+            if (caster->GetSkillValue(SKILL_RIDING) >= 375)
                 amount = 310;
     }
 
@@ -1114,10 +1018,61 @@ class spell_dru_swift_flight_passive : public AuraScript
     }
 };
 
-// -5217 - Tiger's Fury
+// 33943 - Flight Form
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): no flight form while
+// transformed into something that cannot mount. (own) Only a transform blocks it; CPP's check also
+// refused the cast from Cat or Bear Form, which shift straight into Flight Form.
+class spell_dru_flight_form : public SpellScript
+{
+    PrepareSpellScript(spell_dru_flight_form);
+
+    SpellCastResult CheckCast()
+    {
+        Unit* caster = GetCaster();
+        if (caster->getTransForm() && caster->IsInDisallowedMountForm())
+            return SPELL_FAILED_NOT_SHAPESHIFT;
+
+        return SPELL_CAST_OK;
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_dru_flight_form::CheckCast);
+    }
+};
+
+// 40120 - Swift Flight Form
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): sniffed shapeshift amounts.
+class spell_dru_swift_flight_form : public AuraScript
+{
+    PrepareAuraScript(spell_dru_swift_flight_form);
+
+    bool Load() override
+    {
+        return GetCaster() && GetCaster()->IsPlayer();
+    }
+
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
+    {
+        if (Player* caster = GetCaster()->ToPlayer())
+            amount = caster->GetSkillValue(SKILL_RIDING) >= 375 ? 240 : 239;
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_swift_flight_form::CalculateAmount, EFFECT_0, SPELL_AURA_MOD_SHAPESHIFT);
+    }
+};
+
+// 5217 - Tiger's Fury
 class spell_dru_tiger_s_fury : public SpellScript
 {
     PrepareSpellScript(spell_dru_tiger_s_fury);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_TIGER_S_FURY_ENERGIZE });
+    }
 
     void OnHit()
     {
@@ -1131,7 +1086,7 @@ class spell_dru_tiger_s_fury : public SpellScript
     }
 };
 
-// -61391 - Typhoon
+// 61391 - Typhoon
 class spell_dru_typhoon : public SpellScript
 {
     PrepareSpellScript(spell_dru_typhoon);
@@ -1193,23 +1148,28 @@ class spell_dru_t10_restoration_4p_bonus : public SpellScript
     }
 };
 
-// -48438 - Wild Growth
+// 48438 - Wild Growth
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the most injured raid
+// members up to effect 2's value (5, Glyph of Wild Growth adds one through its modifier), two more in
+// Tree of Life.
 class spell_dru_wild_growth : public SpellScript
 {
     PrepareSpellScript(spell_dru_wild_growth);
 
-    bool Validate(SpellInfo const* spellInfo) override
+    bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        if (spellInfo->Effects[EFFECT_2].IsEffect() || spellInfo->Effects[EFFECT_2].CalcValue() <= 0)
-            return false;
-        return true;
+        return ValidateSpellInfo({ SPELL_DRUID_TREE_OF_LIFE });
     }
 
     void FilterTargets(std::list<WorldObject*>& targets)
     {
         targets.remove_if(Acore::RaidCheck(GetCaster(), false));
 
-        uint32 const maxTargets = GetCaster()->HasAura(SPELL_DRUID_GLYPH_OF_WILD_GROWTH) ? 6 : 5;
+        uint32 maxTargets = uint32(std::max<int32>(GetSpellInfo()->Effects[EFFECT_2].CalcValue(GetCaster()), 0));
+
+        // Tree of Life: two more targets
+        if (GetCaster()->HasAura(SPELL_DRUID_TREE_OF_LIFE))
+            maxTargets += 2;
 
         if (targets.size() > maxTargets)
         {
@@ -1235,59 +1195,47 @@ private:
     std::list<WorldObject*> _targets;
 };
 
-// -50334 - Berserk
-class spell_dru_berserk : public SpellScript
+// 48438 - Wild Growth (AuraScript)
+// 4.3.4 keeps the falling heal ("applied quickly at first, and slows down").
+class spell_dru_wild_growth_aura : public AuraScript
 {
-    PrepareSpellScript(spell_dru_berserk);
+    PrepareAuraScript(spell_dru_wild_growth_aura);
 
-    void HandleAfterCast()
+    bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        Unit* caster = GetCaster();
+        return ValidateSpellInfo({ SPELL_DRUID_RESTORATION_T10_2P_BONUS });
+    }
 
-        if (caster->IsPlayer())
-        {
-            // Remove tiger fury / mangle(bear)
-            const uint32 TigerFury[6] = { 5217, 6793, 9845, 9846, 50212, 50213 };
-            const uint32 DireMaul[6] = { 33878, 33986, 33987, 48563, 48564 };
+    void SetTickHeal(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
+    {
+        _baseTick = amount;
+        if (Unit* caster = GetCaster())
+            if (AuraEffect const* bonus = caster->GetAuraEffect(SPELL_DRUID_RESTORATION_T10_2P_BONUS, EFFECT_0))
+                AddPct(_baseReduction, -bonus->GetAmount());
+    }
 
-            // remove aura
-            for (auto& i : TigerFury)
-                caster->RemoveAurasDueToSpell(i);
+    void HandleTickUpdate(AuraEffect* aurEff)
+    {
+        // Wild Growth = first tick gains a 6% bonus, reduced by 2% each tick
+        float reduction = _baseReduction;
+        reduction *= (aurEff->GetTickNumber() - 1);
 
-            // reset dire bear maul cd
-            for (auto& i : DireMaul)
-                caster->ToPlayer()->RemoveSpellCooldown(i, true);
-        }
+        float const bonus = 6.f - reduction;
+        int32 const amount = int32(_baseTick + CalculatePct(_baseTick, bonus));
+        aurEff->SetAmount(amount);
     }
 
     void Register() override
     {
-        AfterCast += SpellCastFn(spell_dru_berserk::HandleAfterCast);
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_wild_growth_aura::SetTickHeal, EFFECT_0, SPELL_AURA_PERIODIC_HEAL);
+        OnEffectUpdatePeriodic += AuraEffectUpdatePeriodicFn(spell_dru_wild_growth_aura::HandleTickUpdate, EFFECT_0, SPELL_AURA_PERIODIC_HEAL);
     }
+
+    float _baseTick = 0.f;
+    float _baseReduction = 2.f;
 };
 
-// 24905 - Moonkin Form (Passive)
-class spell_dru_moonkin_form_passive_proc : public AuraScript
-{
-    PrepareAuraScript(spell_dru_moonkin_form_passive_proc);
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        if (SpellInfo const* spellInfo = eventInfo.GetSpellInfo())
-        {
-            return !spellInfo->IsAffectingArea();
-        }
-
-        return false;
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_dru_moonkin_form_passive_proc::CheckProc);
-    }
-};
-
-// -774 - Rejuvenation
+// 774 - Rejuvenation
 class spell_dru_rejuvenation_moonglade_2_set : public AuraScript
 {
     PrepareAuraScript(spell_dru_rejuvenation_moonglade_2_set);
@@ -1341,76 +1289,10 @@ private:
     ObjectGuid _casterGUID;
 };
 
-// 54832 - Glyph of Innervate
-class spell_dru_glyph_of_innervate : public AuraScript
-{
-    PrepareAuraScript(spell_dru_glyph_of_innervate);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_INNERVATE_MANA });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        return spellInfo && spellInfo->SpellIconID == SPELL_ICON_INNERVATE;
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
-    {
-        PreventDefaultAction();
-        Unit* caster = GetTarget();
-        int32 manaPercent = aurEff->GetAmount();
-        int32 bp = caster->GetCreatePowers(POWER_MANA) * manaPercent / 100 / 10;
-        caster->CastCustomSpell(SPELL_DRUID_GLYPH_OF_INNERVATE_MANA, SPELLVALUE_BASE_POINT0, bp, caster, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_dru_glyph_of_innervate::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_dru_glyph_of_innervate::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// 54821 - Glyph of Rake
-class spell_dru_glyph_of_rake : public AuraScript
-{
-    PrepareAuraScript(spell_dru_glyph_of_rake);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_RAKE_STUN });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        if (!spellInfo)
-            return false;
-
-        // Check if it's Rake (SpellVisual 750 and Effect 1 is periodic damage)
-        if (spellInfo->SpellVisual[0] != 750 || spellInfo->Effects[EFFECT_1].ApplyAuraName != SPELL_AURA_PERIODIC_DAMAGE)
-            return false;
-
-        Unit* target = eventInfo.GetActionTarget();
-        return target && target->IsCreature();
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        GetTarget()->CastSpell(eventInfo.GetActionTarget(), SPELL_DRUID_GLYPH_OF_RAKE_STUN, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_dru_glyph_of_rake::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_dru_glyph_of_rake::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// 24932 - Leader of the Pack
+// 17007 - Leader of the Pack
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): in 4.3.4 the talent itself
+// procs on melee critical strikes in Cat or Bear Form (6 sec cooldown in spell_proc), healing 4% of
+// maximum health (34299's amount) and restoring 8% of maximum mana (68285's amount).
 class spell_dru_leader_of_the_pack : public AuraScript
 {
     PrepareAuraScript(spell_dru_leader_of_the_pack);
@@ -1420,69 +1302,36 @@ class spell_dru_leader_of_the_pack : public AuraScript
         return ValidateSpellInfo({ SPELL_DRUID_LEADER_OF_THE_PACK_HEAL, SPELL_DRUID_LEADER_OF_THE_PACK_MANA });
     }
 
+    bool CheckProc(ProcEventInfo& /*eventInfo*/)
+    {
+        ShapeshiftForm form = GetTarget()->GetShapeshiftForm();
+        return form == FORM_CAT || form == FORM_BEAR;
+    }
+
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
     {
         PreventDefaultAction();
         Unit* target = GetTarget();
-        int32 healAmount = aurEff->GetAmount();
-        if (healAmount <= 0)
-            return;
 
-        // 6 second internal cooldown
-        if (target->IsPlayer() && target->ToPlayer()->HasSpellCooldown(SPELL_DRUID_LEADER_OF_THE_PACK_HEAL))
-            return;
+        int32 heal = 0;
+        if (int32 pct = sSpellMgr->GetSpellInfo(SPELL_DRUID_LEADER_OF_THE_PACK_HEAL)->Effects[EFFECT_0].CalcValue())
+            heal = int32(target->CountPctFromMaxHealth(pct));
 
-        int32 bp = target->CountPctFromMaxHealth(healAmount);
-        target->CastCustomSpell(SPELL_DRUID_LEADER_OF_THE_PACK_HEAL, SPELLVALUE_BASE_POINT0, bp, target, true, nullptr, aurEff);
+        int32 mana = 0;
+        if (int32 pct = sSpellMgr->GetSpellInfo(SPELL_DRUID_LEADER_OF_THE_PACK_MANA)->Effects[EFFECT_0].CalcValue())
+            mana = CalculatePct(int32(target->GetMaxPower(POWER_MANA)), pct);
 
-        if (target->IsPlayer())
-            target->ToPlayer()->AddSpellCooldown(SPELL_DRUID_LEADER_OF_THE_PACK_HEAL, 0, 6 * IN_MILLISECONDS);
+        if (heal > 0)
+            target->CastCustomSpell(SPELL_DRUID_LEADER_OF_THE_PACK_HEAL, SPELLVALUE_BASE_POINT0, heal, target, true, nullptr, aurEff);
 
-        // Improved Leader of the Pack - mana regen (only for self-cast aura)
-        if (aurEff->GetCasterGUID() == target->GetGUID())
-        {
-            int32 manaAmount = CalculatePct(target->GetMaxPower(POWER_MANA), healAmount * 2);
-            target->CastCustomSpell(SPELL_DRUID_LEADER_OF_THE_PACK_MANA, SPELLVALUE_BASE_POINT0, manaAmount, target, true, nullptr, aurEff);
-        }
+        if (mana > 0)
+            target->CastCustomSpell(SPELL_DRUID_LEADER_OF_THE_PACK_MANA, SPELLVALUE_BASE_POINT0, mana, target, true, nullptr, aurEff);
     }
 
     void Register() override
     {
-        OnEffectProc += AuraEffectProcFn(spell_dru_leader_of_the_pack::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
-    }
-};
-
-// 54754 - Glyph of Rejuvenation
-class spell_dru_glyph_of_rejuvenation : public AuraScript
-{
-    PrepareAuraScript(spell_dru_glyph_of_rejuvenation);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_REJUV_HEAL });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        Unit* target = eventInfo.GetActionTarget();
-        if (!target)
-            return false;
-
-        // Only proc if target is below health threshold
-        return target->HealthBelowPct(GetSpellInfo()->Effects[EFFECT_0].CalcValue());
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        int32 bp = CalculatePct(static_cast<int32>(eventInfo.GetHealInfo()->GetHeal()), aurEff->GetAmount());
-        GetTarget()->CastCustomSpell(SPELL_DRUID_GLYPH_OF_REJUV_HEAL, SPELLVALUE_BASE_POINT0, bp, eventInfo.GetActionTarget(), true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_dru_glyph_of_rejuvenation::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_dru_glyph_of_rejuvenation::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        DoCheckProc += AuraCheckProcFn(spell_dru_leader_of_the_pack::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_dru_leader_of_the_pack::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -1498,8 +1347,7 @@ enum DruidEclipseSpells
     SPELL_DRUID_EUPHORIA_MANA_ENERGIZE      = 81070,
     SPELL_DRUID_NATURES_GRACE               = 16880,
     SPELL_DRUID_LUNAR_SHOWER                = 33603,
-    SPELL_DRUID_ITEM_T11_BALANCE_4P_BONUS   = 90163,
-    SPELL_DRUID_ASTRAL_ALIGNMENT            = 90164
+    SPELL_DRUID_ITEM_T11_BALANCE_4P_BONUS   = 90163
 };
 
 enum DruidEclipseIcons
@@ -1726,57 +1574,6 @@ private:
     int32 _euphoriaEnergyAmount = 0;
 };
 
-// -48539 - Revitalize
-class spell_dru_revitalize : public AuraScript
-{
-    PrepareAuraScript(spell_dru_revitalize);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({
-            SPELL_DRUID_REVITALIZE_ENERGIZE_MANA,
-            SPELL_DRUID_REVITALIZE_ENERGIZE_RAGE,
-            SPELL_DRUID_REVITALIZE_ENERGIZE_ENERGY,
-            SPELL_DRUID_REVITALIZE_ENERGIZE_RP
-        });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        if (!roll_chance_i(aurEff->GetAmount()))
-            return;
-
-        Unit* target = eventInfo.GetActionTarget();
-        uint32 spellId;
-
-        switch (target->getPowerType())
-        {
-            case POWER_MANA:
-                spellId = SPELL_DRUID_REVITALIZE_ENERGIZE_MANA;
-                break;
-            case POWER_RAGE:
-                spellId = SPELL_DRUID_REVITALIZE_ENERGIZE_RAGE;
-                break;
-            case POWER_ENERGY:
-                spellId = SPELL_DRUID_REVITALIZE_ENERGIZE_ENERGY;
-                break;
-            case POWER_RUNIC_POWER:
-                spellId = SPELL_DRUID_REVITALIZE_ENERGIZE_RP;
-                break;
-            default:
-                return;
-        }
-
-        eventInfo.GetActor()->CastSpell(target, spellId, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_dru_revitalize::HandleProc, EFFECT_0, SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
-    }
-};
-
 // 28716 - Rejuvenation (T3 2P Bonus)
 class spell_dru_t3_2p_bonus : public AuraScript
 {
@@ -1954,17 +1751,16 @@ class spell_dru_item_t6_trinket : public AuraScript
     }
 };
 
-// 54815 - Glyph of Shred
+// 54815 - Glyph of Bloodletting (Glyph of Shred in WotLK)
+// Shred or Mangle extend the caster's Rip by 2 sec, up to 6 sec. (own) In 4.3.4 Glyph of Rip adds damage,
+// not duration, so it no longer raises the cap; the T7 bonus (60141) still adds 4 sec to Rip.
 class spell_dru_glyph_of_shred : public AuraScript
 {
     PrepareAuraScript(spell_dru_glyph_of_shred);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({
-            SPELL_DRUID_GLYPH_OF_RIP,
-            SPELL_DRUID_RIP_DURATION_LACERATE_DMG
-        });
+        return ValidateSpellInfo({ SPELL_DRUID_RIP_DURATION_LACERATE_DMG });
     }
 
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
@@ -1972,21 +1768,24 @@ class spell_dru_glyph_of_shred : public AuraScript
         PreventDefaultAction();
 
         Unit* caster = eventInfo.GetActor();
+        Unit* target = eventInfo.GetActionTarget();
+        if (!caster || !target)
+            return;
+
         // Try to find Rip on the target
-        if (AuraEffect const* rip = eventInfo.GetActionTarget()->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_DRUID, 0x00800000, 0x0, 0x0, caster->GetGUID()))
+        if (AuraEffect const* rip = target->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_DRUID, 0x00800000, 0x0, 0x0, caster->GetGUID()))
         {
-            // Rip's max duration, includes modifiers like Glyph of Rip
+            // Rip's max duration, includes the extensions so far
             uint32 countMin = rip->GetBase()->GetMaxDuration();
 
             // Just Rip's max duration without other spells
             uint32 countMax = rip->GetSpellInfo()->GetMaxDuration();
 
-            // Add possible auras' and Glyph of Shred's max duration
-            countMax += 3 * aurEff->GetAmount() * IN_MILLISECONDS;                                          // Glyph of Shred -> +6 seconds
-            countMax += caster->HasAura(SPELL_DRUID_GLYPH_OF_RIP) ? 4 * IN_MILLISECONDS : 0;                // Glyph of Rip -> +4 seconds
-            countMax += caster->HasAura(SPELL_DRUID_RIP_DURATION_LACERATE_DMG) ? 4 * IN_MILLISECONDS : 0;   // T7 set bonus -> +4 seconds
+            // Add the glyph's 3 extensions and the T7 bonus
+            countMax += 3 * aurEff->GetAmount() * IN_MILLISECONDS;
+            countMax += caster->HasAura(SPELL_DRUID_RIP_DURATION_LACERATE_DMG) ? 4 * IN_MILLISECONDS : 0;
 
-            // If min < max that means caster didn't cast 3 shred yet
+            // If min < max the caster has not used up the extensions yet
             if (countMin < countMax)
             {
                 rip->GetBase()->SetDuration(rip->GetBase()->GetDuration() + aurEff->GetAmount() * IN_MILLISECONDS);
@@ -1998,28 +1797,6 @@ class spell_dru_glyph_of_shred : public AuraScript
     void Register() override
     {
         OnEffectProc += AuraEffectProcFn(spell_dru_glyph_of_shred::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
-// 54845 - Glyph of Starfire (Dummy)
-class spell_dru_glyph_of_starfire_dummy : public AuraScript
-{
-    PrepareAuraScript(spell_dru_glyph_of_starfire_dummy);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_STARFIRE_PROC });
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-        eventInfo.GetActor()->CastSpell(eventInfo.GetActionTarget(), SPELL_DRUID_GLYPH_OF_STARFIRE_PROC, true, nullptr, aurEff);
-    }
-
-    void Register() override
-    {
-        OnEffectProc += AuraEffectProcFn(spell_dru_glyph_of_starfire_dummy::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -2148,39 +1925,54 @@ class spell_dru_t9_feral_relic : public AuraScript
 };
 
 // 22842 - Frenzied Regeneration
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): raises health to 30% if it
+// is lower, then converts up to 10 rage a second into 0.3% of maximum health per rage point; with the
+// Glyph of Frenzied Regeneration (54810) it converts nothing and boosts healing taken instead.
 class spell_dru_frenzied_regeneration : public AuraScript
 {
     PrepareAuraScript(spell_dru_frenzied_regeneration);
 
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_DRUID_FRENZIED_REGENERATION_HEAL });
+        return ValidateSpellInfo({ SPELL_DRUID_FRENZIED_REGENERATION_HEAL, SPELL_DRUID_GLYPH_OF_FRENZIED_REGEN });
     }
 
-    void HandlePeriodic(AuraEffect const* aurEff)
+    void HandleHealthAfterApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
     {
         Unit* target = GetTarget();
-        if (target->getPowerType() != POWER_RAGE)
+        int32 pct = aurEff->GetAmount();
+        if (target->GetHealthPct() < float(pct))
+            target->SetHealth(target->CountPctFromMaxHealth(pct));
+    }
+
+    void HandleRegeneration(AuraEffect const* aurEff)
+    {
+        Unit* target = GetTarget();
+        if (target->HasAura(SPELL_DRUID_GLYPH_OF_FRENZIED_REGEN))
             return;
 
-        uint32 rage = target->GetPower(POWER_RAGE);
+        // rage is stored x10: up to 10 rage (100) a tick
+        uint32 rage = std::min<uint32>(target->GetPower(POWER_RAGE), 100);
         if (!rage)
             return;
 
-        int32 const mod = std::min(static_cast<int32>(rage), 100);
-        int32 const points = GetSpellInfo()->Effects[EFFECT_1].CalcValue(target);
-        int32 const regen = CalculatePct(target->GetMaxHealth(), points * mod / 100.f);
-        target->CastCustomSpell(SPELL_DRUID_FRENZIED_REGENERATION_HEAL, SPELLVALUE_BASE_POINT0, regen, target, true, nullptr, aurEff);
-        target->SetPower(POWER_RAGE, rage - mod);
+        float healthPct = aurEff->GetAmount() / 100.0f;
+        int32 heal = int32(CalculatePct(float(target->GetMaxHealth()), healthPct) * (rage / 10));
+        if (heal <= 0)
+            return;
+
+        target->ModifyPower(POWER_RAGE, -int32(rage));
+        target->CastCustomSpell(SPELL_DRUID_FRENZIED_REGENERATION_HEAL, SPELLVALUE_BASE_POINT0, heal, target, true, nullptr, aurEff);
     }
 
     void Register() override
     {
-        OnEffectPeriodic += AuraEffectPeriodicFn(spell_dru_frenzied_regeneration::HandlePeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_dru_frenzied_regeneration::HandleRegeneration, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_frenzied_regeneration::HandleHealthAfterApply, EFFECT_1, SPELL_AURA_MOD_INCREASE_HEALTH_2, AURA_EFFECT_HANDLE_REAL);
     }
 };
 
-// -5570 - Insect Swarm
+// 5570 - Insect Swarm
 class spell_dru_insect_swarm : public AuraScript
 {
     PrepareAuraScript(spell_dru_insect_swarm);
@@ -2199,90 +1991,1161 @@ class spell_dru_insect_swarm : public AuraScript
 };
 
 // 50464 - Nourish
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): 20% more healing when the
+// druid's Rejuvenation, Regrowth, Lifebloom or Wild Growth is on the target (the WotLK Glyph of Nourish
+// is Glyph of Starsurge in 4.3.4).
 class spell_dru_nourish : public SpellScript
 {
     PrepareSpellScript(spell_dru_nourish);
 
-    void HandleHeal(SpellEffIndex /*effIndex*/)
+    void HandleHealBonus(SpellEffIndex /*effIndex*/)
     {
         Unit* caster = GetCaster();
         Unit* target = GetHitUnit();
         if (!target)
             return;
 
-        int32 heal = GetHitHeal();
-
-        // Glyph of Nourish
-        if (AuraEffect const* aurEff = caster->GetAuraEffect(SPELL_DRUID_GLYPH_OF_NOURISH, EFFECT_0))
+        Unit::AuraEffectList const& periodicHeals = target->GetAuraEffectsByType(SPELL_AURA_PERIODIC_HEAL);
+        bool applyBonus = std::any_of(periodicHeals.begin(), periodicHeals.end(), [guid = caster->GetGUID()](AuraEffect const* aurEff)
         {
-            uint32 auraCount = 0;
+            if (aurEff->GetCasterGUID() != guid || aurEff->GetSpellInfo()->SpellFamilyName != SPELLFAMILY_DRUID)
+                return false;
 
-            Unit::AuraEffectList const& periodicHeals = target->GetAuraEffectsByType(SPELL_AURA_PERIODIC_HEAL);
-            for (AuraEffect const* hot : periodicHeals)
-            {
-                if (caster->GetGUID() == hot->GetCasterGUID())
-                    ++auraCount;
-            }
+            return bool(aurEff->GetSpellInfo()->SpellFamilyFlags.HasFlag(0x10 | 0x40, 0x10 | 0x4000000, 0));
+        });
 
-            AddPct(heal, aurEff->GetAmount() * auraCount);
-        }
-
-        SetHitHeal(heal);
+        if (applyBonus)
+            SetEffectValue(int32(GetEffectValue() * 1.2f));
     }
 
     void Register() override
     {
-        OnEffectHitTarget += SpellEffectFn(spell_dru_nourish::HandleHeal, EFFECT_0, SPELL_EFFECT_HEAL);
+        OnEffectLaunchTarget += SpellEffectFn(spell_dru_nourish::HandleHealBonus, EFFECT_0, SPELL_EFFECT_HEAL);
     }
 };
 
-// -48438 - Wild Growth (AuraScript)
-class spell_dru_wild_growth_aura : public AuraScript
+// 90164 - Astral Alignment
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): each critical strike uses
+// up one of the three stacks.
+class spell_dru_astral_alignment : public AuraScript
 {
-    PrepareAuraScript(spell_dru_wild_growth_aura);
+    PrepareAuraScript(spell_dru_astral_alignment);
 
-    bool Validate(SpellInfo const* /*spellInfo*/) override
+    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
     {
-        return ValidateSpellInfo({ SPELL_DRUID_RESTORATION_T10_2P_BONUS });
-    }
-
-    void SetTickHeal(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        _baseTick = amount;
-        if (Unit* caster = GetCaster())
-            if (AuraEffect const* bonus = caster->GetAuraEffect(SPELL_DRUID_RESTORATION_T10_2P_BONUS, EFFECT_0))
-                AddPct(_baseReduction, -bonus->GetAmount());
-    }
-
-    void HandleTickUpdate(AuraEffect* aurEff)
-    {
-        // Wild Growth = first tick gains a 6% bonus, reduced by 2% each tick
-        float reduction = _baseReduction;
-        reduction *= (aurEff->GetTickNumber() - 1);
-
-        float const bonus = 6.f - reduction;
-        int32 const amount = int32(_baseTick + CalculatePct(_baseTick, bonus));
-        aurEff->SetAmount(amount);
+        PreventDefaultAction();
+        GetAura()->ModStackAmount(-1);
     }
 
     void Register() override
     {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_wild_growth_aura::SetTickHeal, EFFECT_0, SPELL_AURA_PERIODIC_HEAL);
-        OnEffectUpdatePeriodic += AuraEffectUpdatePeriodicFn(spell_dru_wild_growth_aura::HandleTickUpdate, EFFECT_0, SPELL_AURA_PERIODIC_HEAL);
+        OnEffectProc += AuraEffectProcFn(spell_dru_astral_alignment::HandleProc, EFFECT_0, SPELL_AURA_MOD_SPELL_CRIT_CHANCE);
+    }
+};
+
+// -80318 - Blood in the Water
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Ferocious Bite on a target at
+// or below 25% health (60% with the T13 feral 2P bonus) refreshes Rip, 50% chance per rank. (own) Rank 1's
+// effect 0 is a proc trigger, rank 2's a dummy, so the handler takes either aura type.
+class spell_dru_blood_in_the_water : public AuraScript
+{
+    PrepareAuraScript(spell_dru_blood_in_the_water);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_BLOOD_IN_THE_WATER_SCRIPT, SPELL_DRUID_T13_FERAL_2P_BONUS });
     }
 
-    float _baseTick = 0.f;
-    float _baseReduction = 2.f;
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+        if (!damageInfo || !damageInfo->GetVictim())
+            return false;
+
+        float healthPct = float(GetSpellInfo()->Effects[EFFECT_0].CalcValue());
+
+        // T13 Bonus
+        if (GetTarget()->HasAura(SPELL_DRUID_T13_FERAL_2P_BONUS))
+            healthPct = float(sSpellMgr->GetSpellInfo(SPELL_DRUID_T13_FERAL_2P_BONUS)->Effects[EFFECT_1].CalcValue());
+
+        return damageInfo->GetVictim()->GetHealthPct() <= healthPct && roll_chance_i(50 * GetSpellInfo()->GetRank());
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(eventInfo.GetProcTarget(), SPELL_DRUID_BLOOD_IN_THE_WATER_SCRIPT, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_dru_blood_in_the_water::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_dru_blood_in_the_water::HandleProc, EFFECT_0, SPELL_AURA_ANY);
+    }
+};
+
+// 80863 - Blood in the Water
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46).
+class spell_dru_blood_in_the_water_script : public SpellScript
+{
+    PrepareSpellScript(spell_dru_blood_in_the_water_script);
+
+    bool Validate(SpellInfo const* /*spell*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_RIP });
+    }
+
+    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
+    {
+        if (Aura* aura = GetHitUnit()->GetAura(SPELL_DRUID_RIP, GetCaster()->GetGUID()))
+            aura->RefreshDuration();
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_blood_in_the_water_script::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+    }
+};
+
+// -34151 - Efflorescence (proc aura)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Swiftmend leaves a patch
+// (81262) whose effect 1 holds the talent's share of the effective heal.
+class spell_dru_effloresence : public AuraScript
+{
+    PrepareAuraScript(spell_dru_effloresence);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_EFFLORESCENCE_AOE });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+
+        HealInfo* healInfo = eventInfo.GetHealInfo();
+        if (!healInfo || !healInfo->GetTarget())
+            return;
+
+        int32 healAmount = CalculatePct(int32(healInfo->GetEffectiveHeal()), aurEff->GetAmount());
+        if (healAmount > 0)
+            GetTarget()->CastCustomSpell(healInfo->GetTarget(), SPELL_DRUID_EFFLORESCENCE_AOE, nullptr, &healAmount, nullptr, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_dru_effloresence::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
+// 81262 - Efflorescence (area effect)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46).
+class spell_dru_effloresence_aoe : public AuraScript
+{
+    PrepareAuraScript(spell_dru_effloresence_aoe);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_EFFLORESCENCE_HEAL });
+    }
+
+    void HandleEffectPeriodic(AuraEffect const* aurEff)
+    {
+        if (Unit* caster = GetCaster())
+            if (DynamicObject* dyn = caster->GetDynObject(aurEff->GetId()))
+                caster->CastSpell(dyn->GetPositionX(), dyn->GetPositionY(), dyn->GetPositionZ(), SPELL_DRUID_EFFLORESCENCE_HEAL, true, nullptr, aurEff, caster->GetGUID());
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_dru_effloresence_aoe::HandleEffectPeriodic, EFFECT_1, SPELL_AURA_PERIODIC_DUMMY);
+    }
+};
+
+// 81269 - Efflorescence (heal)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the three most injured
+// allies are healed for the patch's amount.
+class spell_dru_effloresence_heal : public SpellScript
+{
+    PrepareSpellScript(spell_dru_effloresence_heal);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_EFFLORESCENCE_AOE });
+    }
+
+    void FilterTargets(std::list<WorldObject*>& targets)
+    {
+        if (targets.size() > 3)
+        {
+            targets.sort(Acore::HealthPctOrderPred());
+            targets.resize(3);
+        }
+    }
+
+    void HandleHeal(SpellEffIndex /*effIndex*/)
+    {
+        if (Unit* caster = GetCaster())
+            if (Aura const* aura = caster->GetAura(SPELL_DRUID_EFFLORESCENCE_AOE, caster->GetGUID()))
+                if (AuraEffect const* aurEff = aura->GetEffect(EFFECT_1))
+                    if (int32 heal = aurEff->GetAmount())
+                        SetHitHeal(heal);
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dru_effloresence_heal::FilterTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ALLY);
+        OnEffectHitTarget += SpellEffectFn(spell_dru_effloresence_heal::HandleHeal, EFFECT_0, SPELL_EFFECT_HEAL);
+    }
+};
+
+// -33879 - Empowered Touch
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Healing Touch, Regrowth and
+// Nourish have the talent's effect 1 chance to refresh the druid's Lifebloom on the target.
+class spell_dru_empowered_touch : public AuraScript
+{
+    PrepareAuraScript(spell_dru_empowered_touch);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_EMPOWERED_TOUCH_SCRIPT });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        AuraEffect const* chance = GetEffect(EFFECT_1);
+        return chance && eventInfo.GetProcTarget() && roll_chance_i(chance->GetAmount());
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(eventInfo.GetProcTarget(), SPELL_DRUID_EMPOWERED_TOUCH_SCRIPT, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_dru_empowered_touch::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_dru_empowered_touch::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
+    }
+};
+
+// 88433 - Empowered Touch
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the refresh also grants
+// Replenishment with Revitalize, like recasting Lifebloom.
+class spell_dru_empowered_touch_script : public SpellScript
+{
+    PrepareSpellScript(spell_dru_empowered_touch_script);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_LIFEBLOOM, SPELL_DRUID_REVITALIZE_R1, SPELL_DRUID_REPLENISHMENT });
+    }
+
+    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        if (Aura* aura = GetHitUnit()->GetAura(SPELL_DRUID_LIFEBLOOM, caster->GetGUID()))
+        {
+            aura->RefreshDuration();
+            if (caster->GetAuraOfRankedSpell(SPELL_DRUID_REVITALIZE_R1, caster->GetGUID()))
+                caster->CastSpell(caster, SPELL_DRUID_REPLENISHMENT, true);
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_empowered_touch_script::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+    }
+};
+
+// 339 - Entangling Roots
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): damage breaks the roots
+// after four hits on a target of the caster's level, one more or fewer per two levels of difference (at
+// least two), one more in Tree of Life.
+class spell_dru_entangling_roots : public AuraScript
+{
+    PrepareAuraScript(spell_dru_entangling_roots);
+
+    static constexpr int16 DEFAULT_PROCS = 4; // the allowed procs on a target of the caster's level
+    static constexpr int16 MINIMUM_PROCS = 2;
+
+    void CalculateProcAmount(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (!caster)
+            return;
+
+        int16 offset = (int16(caster->GetLevel()) - int16(GetTarget()->GetLevel())) / 2;
+        _allowedProcs = uint8(std::max<int16>(MINIMUM_PROCS, DEFAULT_PROCS + offset));
+        if (caster->GetShapeshiftForm() == FORM_TREE)
+            ++_allowedProcs;
+    }
+
+    bool CheckProc(ProcEventInfo& /*eventInfo*/)
+    {
+        if (_allowedProcs != 0)
+            --_allowedProcs;
+
+        return _allowedProcs == 0;
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_entangling_roots::CalculateProcAmount, EFFECT_0, SPELL_AURA_MOD_ROOT, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
+        DoCheckProc += AuraCheckProcFn(spell_dru_entangling_roots::CheckProc);
+    }
+
+private:
+    uint8 _allowedProcs = 0;
+};
+
+// 16979 - Feral Charge (Bear Form)
+// 49376 - Feral Charge (Cat Form)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): with Stampede, the bear
+// charge gives melee haste (81016/81017) and the cat charge a free Ravage! (81021/81022). (own) The rank is
+// read from the talent spell itself: the triggered spells have no rank chain.
+class spell_dru_feral_charge : public SpellScript
+{
+    PrepareSpellScript(spell_dru_feral_charge);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DRUID_STAMPEDE_R1,
+                SPELL_DRUID_STAMPEDE_R2,
+                SPELL_DRUID_STAMPEDE_BEAR_R1,
+                SPELL_DRUID_STAMPEDE_BEAR_R2,
+                SPELL_DRUID_STAMPEDE_CAT_R1,
+                SPELL_DRUID_STAMPEDE_CAT_R2
+            });
+    }
+
+    void CastStampede(uint32 rank1SpellId, uint32 rank2SpellId)
+    {
+        Unit* caster = GetCaster();
+        if (caster->HasAura(SPELL_DRUID_STAMPEDE_R2))
+            caster->CastSpell(caster, rank2SpellId, true);
+        else if (caster->HasAura(SPELL_DRUID_STAMPEDE_R1))
+            caster->CastSpell(caster, rank1SpellId, true);
+    }
+
+    void HandleBearFormEffect(SpellEffIndex /*effIndex*/)
+    {
+        CastStampede(SPELL_DRUID_STAMPEDE_BEAR_R1, SPELL_DRUID_STAMPEDE_BEAR_R2);
+    }
+
+    void HandleCatFormEffect(SpellEffIndex /*effIndex*/)
+    {
+        CastStampede(SPELL_DRUID_STAMPEDE_CAT_R1, SPELL_DRUID_STAMPEDE_CAT_R2);
+    }
+
+    void Register() override
+    {
+        if (m_scriptSpellId == SPELL_DRUID_FERAL_CHARGE_BEAR)
+            OnEffectLaunchTarget += SpellEffectFn(spell_dru_feral_charge::HandleBearFormEffect, EFFECT_0, SPELL_EFFECT_CHARGE);
+        else if (m_scriptSpellId == SPELL_DRUID_FERAL_CHARGE_CAT)
+            OnEffectLaunchTarget += SpellEffectFn(spell_dru_feral_charge::HandleCatFormEffect, EFFECT_0, SPELL_EFFECT_TRIGGER_SPELL);
+    }
+};
+
+// 97985 - Feral Swiftness Clear (Dash, Stampeding Roar in Cat Form)
+// 97993 - Feral Swiftness Clear (Stampeding Roar in Bear Form)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): removes all roots and snares.
+class spell_dru_feral_swiftness_clear : public SpellScript
+{
+    PrepareSpellScript(spell_dru_feral_swiftness_clear);
+
+    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
+    {
+        GetHitUnit()->RemoveAppliedAuras([](AuraApplication const* aurApp)
+        {
+            uint64 mechanicMask = aurApp->GetBase()->GetSpellInfo()->GetSpellMechanicMaskByEffectMask(MAX_EFFECT_MASK);
+            return (mechanicMask & ((1ULL << MECHANIC_ROOT) | (1ULL << MECHANIC_SNARE))) != 0;
+        });
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_feral_swiftness_clear::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+    }
+};
+
+// 22568 - Ferocious Bite
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): 10.9% of attack power per
+// combo point, and up to 35 more energy doubling the damage; Glyph of Ferocious Bite heals per 10 energy
+// spent. (own) The bonus goes into the effect's value at launch, so the whole hit gets the energy bonus.
+class spell_dru_ferocious_bite : public SpellScript
+{
+    PrepareSpellScript(spell_dru_ferocious_bite);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_GLYPH_OF_FEROCIOUS_BITE });
+    }
+
+    bool Load() override
+    {
+        return GetCaster()->IsPlayer() && GetCaster()->getClass() == CLASS_DRUID;
+    }
+
+    void ChangeDamage(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+
+        int32 damage = GetEffectValue();
+        damage += int32(caster->GetComboPoints() * caster->GetTotalAttackPowerValue(BASE_ATTACK) * 0.109f);
+
+        // converts each extra point of energy (up to 35 energy) into additional damage
+        int32 energy = -caster->ModifyPower(POWER_ENERGY, -35);
+        AddPct(damage, energy * 100.0f / 35.0f);
+        SetEffectValue(damage);
+
+        // Glyph of Ferocious Bite
+        if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_GLYPH_OF_FEROCIOUS_BITE, EFFECT_0))
+        {
+            int32 bp = aurEff->GetAmount() * ((GetSpell()->GetPowerCost() + energy) / 10);
+            if (bp > 0)
+                caster->CastCustomSpell(caster, SPELL_DRUID_GLYPH_OF_FEROCIOUS_BITE, &bp, nullptr, nullptr, true);
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_dru_ferocious_bite::ChangeDamage, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+    }
+};
+
+// 99017 - Firebloom
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): heals the most injured ally.
+class spell_dru_firebloom : public SpellScript
+{
+    PrepareSpellScript(spell_dru_firebloom);
+
+    void FilterTargets(std::list<WorldObject*>& targets)
+    {
+        if (targets.size() < 2)
+            return;
+
+        targets.sort(Acore::HealthPctOrderPred());
+        targets.resize(1);
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dru_firebloom::FilterTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ALLY);
+    }
+};
+
+// 77495 - Harmony (restoration mastery)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): direct heals give the
+// mastery's amount as a periodic healing bonus (100977).
+class spell_dru_harmony : public AuraScript
+{
+    PrepareAuraScript(spell_dru_harmony);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_HARMONY });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastCustomSpell(SPELL_DRUID_HARMONY, SPELLVALUE_BASE_POINT0, aurEff->GetAmount(), GetTarget(), true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_dru_harmony::HandleProc, EFFECT_0, SPELL_AURA_ADD_PCT_MODIFIER);
+    }
+};
+
+// 100977 - Harmony
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Bloom (T12 restoration
+// bonus) ends with Harmony.
+class spell_dru_harmony_triggered : public AuraScript
+{
+    PrepareAuraScript(spell_dru_harmony_triggered);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_BLOOM });
+    }
+
+    void RemoveEffect(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->RemoveAurasDueToSpell(SPELL_DRUID_BLOOM);
+    }
+
+    void Register() override
+    {
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dru_harmony_triggered::RemoveEffect, EFFECT_0, SPELL_AURA_ADD_PCT_MODIFIER, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 90165 - Item - Druid T11 Feral 4P Bonus
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Mangle stacks Strength of
+// the Panther.
+class spell_dru_item_t11_feral_4p_bonus : public AuraScript
+{
+    PrepareAuraScript(spell_dru_item_t11_feral_4p_bonus);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_STRENGTH_OF_THE_PANTHER });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(GetTarget(), SPELL_DRUID_STRENGTH_OF_THE_PANTHER, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_dru_item_t11_feral_4p_bonus::HandleProc, EFFECT_0, SPELL_AURA_ADD_PCT_MODIFIER);
+    }
+};
+
+// -33881 - Nature's Ward (own: neither CPP nor TrinityCore script it). A hit that leaves the druid below 50%
+// health casts a free Rejuvenation on them, with the talent's chance (effect 0: 50% at rank 1, 100% at rank 2).
+class spell_dru_natures_ward : public AuraScript
+{
+    PrepareAuraScript(spell_dru_natures_ward);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_REJUVENATION });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+        if (!damageInfo || !damageInfo->GetDamage())
+            return false;
+
+        return GetTarget()->HealthBelowPctDamaged(50, damageInfo->GetDamage()) && roll_chance_i(GetEffect(EFFECT_0)->GetAmount());
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+    {
+        PreventDefaultAction();
+        GetTarget()->CastSpell(GetTarget(), SPELL_DRUID_REJUVENATION, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_dru_natures_ward::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_dru_natures_ward::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 6807 - Maul
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the tooltip's
+// 35 + 19% of attack power - 1 replaces the effect's base points.
+class spell_dru_maul : public SpellScript
+{
+    PrepareSpellScript(spell_dru_maul);
+
+    void HandleDamage(SpellEffIndex /*effIndex*/)
+    {
+        SetEffectValue(int32(35 + GetCaster()->GetTotalAttackPowerValue(BASE_ATTACK) * 0.19f - 1));
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_dru_maul::HandleDamage, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+    }
+};
+
+// 16913 - Moonfury
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): losing the balance talent
+// (respec) clears the eclipse markers and auras and empties the eclipse bar.
+class spell_dru_moonfire : public AuraScript
+{
+    PrepareAuraScript(spell_dru_moonfire);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DRUID_LUNAR_ECLIPSE_MARKER,
+                SPELL_DRUID_SOLAR_ECLIPSE_MARKER,
+                SPELL_DRUID_ECLIPSE_SOLAR,
+                SPELL_DRUID_ECLIPSE_LUNAR,
+                SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE
+            });
+    }
+
+    void RemoveEffect(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* target = GetTarget();
+        target->RemoveAurasDueToSpell(SPELL_DRUID_SOLAR_ECLIPSE_SUNFIRE);
+        target->RemoveAurasDueToSpell(SPELL_DRUID_LUNAR_ECLIPSE_MARKER);
+        target->RemoveAurasDueToSpell(SPELL_DRUID_SOLAR_ECLIPSE_MARKER);
+        target->RemoveAurasDueToSpell(SPELL_DRUID_ECLIPSE_SOLAR);
+        target->RemoveAurasDueToSpell(SPELL_DRUID_ECLIPSE_LUNAR);
+        target->SetPower(POWER_ECLIPSE, 0);
+    }
+
+    void Register() override
+    {
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dru_moonfire::RemoveEffect, EFFECT_0, SPELL_AURA_ADD_PCT_MODIFIER, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// -17074 - Nature's Bounty
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): with the druid's
+// Rejuvenation on three or more targets, Nourish casts faster (96206); a 1 sec tick drops the targets
+// whose Rejuvenation ended. (own) The cast time reduction is passed negative, as 96206's data has it.
+class spell_dru_natures_bounty : public AuraScript
+{
+    PrepareAuraScript(spell_dru_natures_bounty);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_NATURES_BOUNTY, SPELL_DRUID_REJUVENATION });
+    }
+
+    void CalcPeriodic(AuraEffect const* /*aurEff*/, bool& isPeriodic, int32& period)
+    {
+        isPeriodic = true;
+        period = 1 * IN_MILLISECONDS;
+    }
+
+    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        if (Unit* target = eventInfo.GetProcTarget())
+            if (std::find(_rejuvenationTargets.begin(), _rejuvenationTargets.end(), target->GetGUID()) == _rejuvenationTargets.end())
+                _rejuvenationTargets.push_back(target->GetGUID());
+
+        if (_rejuvenationTargets.size() >= 3 && !_bountyActive)
+        {
+            int32 bp = -GetSpellInfo()->Effects[EFFECT_1].CalcValue();
+            GetTarget()->CastCustomSpell(SPELL_DRUID_NATURES_BOUNTY, SPELLVALUE_BASE_POINT0, bp, GetTarget(), true);
+            _bountyActive = true;
+        }
+    }
+
+    void HandlePeriodic(AuraEffect const* /*aurEff*/)
+    {
+        Unit* target = GetTarget();
+        for (auto itr = _rejuvenationTargets.begin(); itr != _rejuvenationTargets.end();)
+        {
+            Unit* healTarget = ObjectAccessor::GetUnit(*target, *itr);
+            if (!healTarget || !healTarget->HasAura(SPELL_DRUID_REJUVENATION, target->GetGUID()))
+                itr = _rejuvenationTargets.erase(itr);
+            else
+                ++itr;
+        }
+
+        if (_bountyActive && _rejuvenationTargets.size() < 3)
+        {
+            target->RemoveAurasDueToSpell(SPELL_DRUID_NATURES_BOUNTY, target->GetGUID());
+            _bountyActive = false;
+        }
+    }
+
+    void Register() override
+    {
+        DoEffectCalcPeriodic += AuraEffectCalcPeriodicFn(spell_dru_natures_bounty::CalcPeriodic, EFFECT_0, SPELL_AURA_ADD_FLAT_MODIFIER);
+        OnEffectProc += AuraEffectProcFn(spell_dru_natures_bounty::HandleProc, EFFECT_0, SPELL_AURA_ADD_FLAT_MODIFIER);
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_dru_natures_bounty::HandlePeriodic, EFFECT_0, SPELL_AURA_ADD_FLAT_MODIFIER);
+    }
+
+private:
+    std::vector<ObjectGuid> _rejuvenationTargets;
+    bool _bountyActive = false;
+};
+
+// 9005 - Pounce
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Shadowmeld's stealth does
+// not allow it, only Prowl.
+class spell_dru_pounce : public SpellScript
+{
+    PrepareSpellScript(spell_dru_pounce);
+
+    SpellCastResult CheckCast()
+    {
+        if (GetCaster()->HasAura(SPELL_DRUID_SHADOWMELD))
+            return SPELL_FAILED_TARGET_AURASTATE;
+
+        return SPELL_CAST_OK;
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_dru_pounce::CheckCast);
+    }
+};
+
+// 6785 - Ravage
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): as Pounce.
+class spell_dru_ravage : public SpellScript
+{
+    PrepareSpellScript(spell_dru_ravage);
+
+    SpellCastResult CheckCast()
+    {
+        if (GetCaster()->HasAura(SPELL_DRUID_SHADOWMELD))
+            return SPELL_FAILED_TARGET_AURASTATE;
+
+        return SPELL_CAST_OK;
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_dru_ravage::CheckCast);
+    }
+};
+
+// 80313 - Pulverize
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the normalized weapon
+// damage bonus (effect 2) counts once per Lacerate stack, and consuming the stacks gives 3% melee critical
+// strike chance each (80951). AzerothCore sums all weapon effects in one handler, so effect 2's value is
+// set before it runs.
+class spell_dru_pulverize : public SpellScript
+{
+    PrepareSpellScript(spell_dru_pulverize);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_PULVERIZE_TRIGGERED, SPELL_DRUID_LACERATE });
+    }
+
+    void HandleLacerateBonus(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        uint8 stacks = 0;
+        if (Aura const* lacerate = GetHitUnit()->GetAura(SPELL_DRUID_LACERATE, caster->GetGUID()))
+            stacks = lacerate->GetStackAmount();
+
+        GetSpell()->SetSpellValue(SPELLVALUE_BASE_POINT2, GetSpellInfo()->Effects[EFFECT_2].CalcValue(caster) * stacks);
+    }
+
+    void HandleLacerateRemoval(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        if (Aura* lacerate = GetHitUnit()->GetAura(SPELL_DRUID_LACERATE, caster->GetGUID()))
+        {
+            int32 critPerStack = sSpellMgr->GetSpellInfo(SPELL_DRUID_PULVERIZE_TRIGGERED)->Effects[EFFECT_0].CalcValue(caster);
+            caster->CastCustomSpell(SPELL_DRUID_PULVERIZE_TRIGGERED, SPELLVALUE_BASE_POINT0, critPerStack * lacerate->GetStackAmount(), caster, TRIGGERED_FULL_MASK);
+            lacerate->Remove();
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_dru_pulverize::HandleLacerateBonus, EFFECT_0, SPELL_EFFECT_WEAPON_PERCENT_DAMAGE);
+        OnEffectHitTarget += SpellEffectFn(spell_dru_pulverize::HandleLacerateRemoval, EFFECT_0, SPELL_EFFECT_WEAPON_PERCENT_DAMAGE);
+    }
+};
+
+// 8936 - Regrowth
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): with the Glyph of Regrowth
+// the last tick refreshes Regrowth on a target at or below the glyph's health percentage.
+class spell_dru_regrowth : public AuraScript
+{
+    PrepareAuraScript(spell_dru_regrowth);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_REGROWTH_REFRESH });
+    }
+
+    void HandleGlyphEffect(AuraEffect const* aurEff)
+    {
+        Unit* caster = GetCaster();
+        if (!caster)
+            return;
+
+        if (aurEff->GetTickNumber() < aurEff->GetTotalTicks() - 1)
+            return;
+
+        if (AuraEffect const* glyphEffect = caster->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_GLYPH_OF_REGROWTH, EFFECT_0))
+            if (GetTarget()->GetHealthPct() <= float(glyphEffect->GetAmount()))
+                caster->CastSpell(GetTarget(), SPELL_DRUID_REGROWTH_REFRESH, true);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_dru_regrowth::HandleGlyphEffect, EFFECT_1, SPELL_AURA_PERIODIC_HEAL);
+    }
+};
+
+// 93036 - Regrowth Refresh
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): a plain refresh with rolling
+// ticks (sniffed), not the 6 sec the script effect suggests.
+class spell_dru_regrowth_refresh : public SpellScript
+{
+    PrepareSpellScript(spell_dru_regrowth_refresh);
+
+    void HandleScriptEffect(SpellEffIndex /*effIndex*/)
+    {
+        if (AuraEffect* aurEff = GetHitUnit()->GetAuraEffect(SPELL_AURA_PERIODIC_HEAL, SPELLFAMILY_DRUID, 0x40, 0, 0, GetCaster()->GetGUID()))
+            aurEff->GetBase()->RefreshDuration();
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_regrowth_refresh::HandleScriptEffect, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+    }
+};
+
+// 774 - Rejuvenation
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Gift of the Earthmother
+// heals at once for its share of Rejuvenation's whole periodic healing.
+class spell_dru_rejuvenation : public AuraScript
+{
+    PrepareAuraScript(spell_dru_rejuvenation);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_REJUVENATION_DIRECT_HEAL });
+    }
+
+    void HandleGiftOfTheEarthmother(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (!caster)
+            return;
+
+        if (AuraEffect const* giftEffect = caster->GetDummyAuraEffect(SPELLFAMILY_DRUID, SPELL_ICON_ID_GIFT_OF_THE_EARTHMOTHER, EFFECT_1))
+        {
+            int32 bp = CalculatePct(aurEff->GetAmount() * int32(aurEff->GetTotalTicks()), giftEffect->GetAmount());
+            if (bp > 0)
+                caster->CastCustomSpell(GetTarget(), SPELL_DRUID_REJUVENATION_DIRECT_HEAL, &bp, nullptr, nullptr, true, nullptr, aurEff);
+        }
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_rejuvenation::HandleGiftOfTheEarthmother, EFFECT_0, SPELL_AURA_PERIODIC_HEAL, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
+    }
+};
+
+// 93400 - Shooting Stars
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): resets Starsurge.
+class spell_dru_shooting_stars : public SpellScript
+{
+    PrepareSpellScript(spell_dru_shooting_stars);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_STARSURGE });
+    }
+
+    void HandleCooldownReset(SpellEffIndex /*effIndex*/)
+    {
+        if (Player* player = GetHitUnit()->ToPlayer())
+            player->RemoveSpellCooldown(SPELL_DRUID_STARSURGE, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_shooting_stars::HandleCooldownReset, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
+    }
+};
+
+// 80964 - Skull Bash (Bear Form)
+// 80965 - Skull Bash (Cat Form)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): charge, interrupt, and with
+// Brutal Impact a cost increase on the target's spells. (own) The three are cast triggered.
+class spell_dru_skull_bash : public SpellScript
+{
+    PrepareSpellScript(spell_dru_skull_bash);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DRUID_SKULL_BASH_CHARGE,
+                SPELL_DRUID_SKULL_BASH_INTERRUPT,
+                SPELL_DRUID_SKULL_BASH_COST_INCREASE_R1,
+                SPELL_DRUID_SKULL_BASH_COST_INCREASE_R2,
+                SPELL_DRUID_BRUTAL_IMPACT_R1
+            });
+    }
+
+    void HandleDummyEffect(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+        caster->CastSpell(target, SPELL_DRUID_SKULL_BASH_CHARGE, true);
+        caster->CastSpell(target, SPELL_DRUID_SKULL_BASH_INTERRUPT, true);
+        if (Aura const* aura = caster->GetAuraOfRankedSpell(SPELL_DRUID_BRUTAL_IMPACT_R1, caster->GetGUID()))
+            caster->CastSpell(target, aura->GetSpellInfo()->GetRank() == 1 ? SPELL_DRUID_SKULL_BASH_COST_INCREASE_R1 : SPELL_DRUID_SKULL_BASH_COST_INCREASE_R2, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_skull_bash::HandleDummyEffect, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
+// 78675 - Solar Beam
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): every half second the beam
+// silences the enemies in it.
+class spell_dru_solar_beam : public AuraScript
+{
+    PrepareAuraScript(spell_dru_solar_beam);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_SOLAR_BEAM_SILENCE });
+    }
+
+    void HandleEffectPeriodic(AuraEffect const* aurEff)
+    {
+        if (DynamicObject* dyn = GetTarget()->GetDynObject(aurEff->GetId()))
+            GetTarget()->CastSpell(dyn->GetPositionX(), dyn->GetPositionY(), dyn->GetPositionZ(), SPELL_DRUID_SOLAR_BEAM_SILENCE, true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_dru_solar_beam::HandleEffectPeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DUMMY);
+    }
+};
+
+// 81021 - Stampede (Ravage!, rank 1)
+// 81022 - Stampede (Ravage!, rank 2)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the Ravage marker lasts as
+// long as the free Ravage!.
+class spell_dru_stampede_triggered : public AuraScript
+{
+    PrepareAuraScript(spell_dru_stampede_triggered);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_STAMPEDE_RAVAGE_MARKER });
+    }
+
+    void AfterApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->CastSpell(GetTarget(), SPELL_DRUID_STAMPEDE_RAVAGE_MARKER, true);
+    }
+
+    void AfterRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->RemoveAurasDueToSpell(SPELL_DRUID_STAMPEDE_RAVAGE_MARKER, GetTarget()->GetGUID());
+    }
+
+    void Register() override
+    {
+        // SPELL_AURA_ANY: the two ranks use different aura types on effect 0
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_stampede_triggered::AfterApply, EFFECT_0, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dru_stampede_triggered::AfterRemove, EFFECT_0, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 77761 - Stampeding Roar (Bear Form)
+// 77764 - Stampeding Roar (Cat Form)
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Feral Swiftness gives the
+// roar its chance to clear roots and snares from everyone it hits.
+class spell_dru_stampeding_roar : public SpellScript
+{
+    PrepareSpellScript(spell_dru_stampeding_roar);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_FERAL_SWIFTNESS_R1, SPELL_DRUID_FERAL_SWIFTNESS_CLEAR_ROAR });
+    }
+
+    void HandleFeralSwiftness(SpellEffIndex /*effIndex*/)
+    {
+        Unit* target = GetHitUnit();
+        if (GetCaster() != target)
+            return;
+
+        if (Aura const* swiftness = target->GetAuraOfRankedSpell(SPELL_DRUID_FERAL_SWIFTNESS_R1, target->GetGUID()))
+            if (roll_chance_i(swiftness->GetSpellInfo()->Effects[EFFECT_1].CalcValue()))
+                target->CastSpell(target, SPELL_DRUID_FERAL_SWIFTNESS_CLEAR_ROAR, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_stampeding_roar::HandleFeralSwiftness, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
+    }
+};
+
+// 99015 - Item - Druid T12 Restoration 4P Bonus
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): Swiftmend's effective heal
+// is repeated on an injured ally nearby (Firebloom).
+class spell_dru_t12_restoration_4p_bonus : public AuraScript
+{
+    PrepareAuraScript(spell_dru_t12_restoration_4p_bonus);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_FIREBLOOM });
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+
+        HealInfo* healInfo = eventInfo.GetHealInfo();
+        if (!healInfo || !eventInfo.GetProcTarget())
+            return;
+
+        int32 heal = int32(healInfo->GetEffectiveHeal());
+        if (heal > 0)
+            GetTarget()->CastCustomSpell(SPELL_DRUID_FIREBLOOM, SPELLVALUE_BASE_POINT0, heal, eventInfo.GetProcTarget(), true, nullptr, aurEff);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_dru_t12_restoration_4p_bonus::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 33891 - Tree of Life
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): the form's three passives.
+class spell_dru_tree_of_life : public AuraScript
+{
+    PrepareAuraScript(spell_dru_tree_of_life);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DRUID_TREE_OF_LIFE_PASSIVE_1,
+                SPELL_DRUID_TREE_OF_LIFE_PASSIVE_2,
+                SPELL_DRUID_TREE_OF_LIFE_PASSIVE_3
+            });
+    }
+
+    void AfterApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* target = GetTarget();
+        target->CastSpell(target, SPELL_DRUID_TREE_OF_LIFE_PASSIVE_1, true, nullptr, aurEff);
+        target->CastSpell(target, SPELL_DRUID_TREE_OF_LIFE_PASSIVE_2, true, nullptr, aurEff);
+        target->CastSpell(target, SPELL_DRUID_TREE_OF_LIFE_PASSIVE_3, true, nullptr, aurEff);
+    }
+
+    void AfterRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* target = GetTarget();
+        target->RemoveAurasDueToSpell(SPELL_DRUID_TREE_OF_LIFE_PASSIVE_1);
+        target->RemoveAurasDueToSpell(SPELL_DRUID_TREE_OF_LIFE_PASSIVE_2);
+        target->RemoveAurasDueToSpell(SPELL_DRUID_TREE_OF_LIFE_PASSIVE_3);
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_tree_of_life::AfterApply, EFFECT_0, SPELL_AURA_MOD_SHAPESHIFT, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dru_tree_of_life::AfterRemove, EFFECT_0, SPELL_AURA_MOD_SHAPESHIFT, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// Wild Mushrooms are summoned as plain allied summons (SummonProperties 3069), which AzerothCore does
+// not register as the caster's minions, so they are found around the caster by entry and summoner.
+static constexpr float WILD_MUSHROOM_SEARCH_RANGE = 100.0f;
+
+static std::list<TempSummon*> GetWildMushrooms(Unit* caster)
+{
+    std::list<TempSummon*> mushrooms;
+    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_DRUID_WILD_MUSHROOM);
+    if (!spellInfo)
+        return mushrooms;
+
+    std::list<Creature*> creatures;
+    caster->GetCreatureListWithEntryInGrid(creatures, uint32(spellInfo->Effects[EFFECT_0].MiscValue), WILD_MUSHROOM_SEARCH_RANGE);
+    for (Creature* creature : creatures)
+        if (TempSummon* summon = creature->ToTempSummon())
+            if (summon->IsAlive() && summon->GetSummonerGUID() == caster->GetGUID())
+                mushrooms.push_back(summon);
+
+    return mushrooms;
+}
+
+// 88747 - Wild Mushroom
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): at most three mushrooms
+// (effect 0's value); a fourth replaces the oldest.
+class spell_dru_wild_mushroom : public SpellScript
+{
+    PrepareSpellScript(spell_dru_wild_mushroom);
+
+    void HandleSummon()
+    {
+        std::list<TempSummon*> mushrooms = GetWildMushrooms(GetCaster());
+        if (mushrooms.size() <= uint32(std::max<int32>(GetSpellInfo()->Effects[EFFECT_0].BasePoints, 0)))
+            return;
+
+        TempSummon* oldestMushroom = nullptr;
+        for (TempSummon* mushroom : mushrooms)
+            if (!oldestMushroom || mushroom->GetTimer() < oldestMushroom->GetTimer())
+                oldestMushroom = mushroom;
+
+        if (oldestMushroom)
+            oldestMushroom->UnSummon();
+    }
+
+    void Register() override
+    {
+        AfterCast += SpellCastFn(spell_dru_wild_mushroom::HandleSummon);
+    }
+};
+
+// 88751 - Wild Mushroom: Detonate
+// Ported from The Cataclysm Preservation Project (spell_druid.cpp at b061f46): every mushroom explodes,
+// leaving Fungal Growth with the talent. (own) The damage and Fungal Growth are cast at the mushroom's
+// position (both are destination spells).
+class spell_dru_wild_mushroom_detonate : public SpellScript
+{
+    PrepareSpellScript(spell_dru_wild_mushroom_detonate);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DRUID_WILD_MUSHROOM,
+                SPELL_DRUID_WILD_MUSHROOM_DAMAGE,
+                SPELL_DRUID_WILD_MUSHROOM_SUICIDE,
+                SPELL_DRUID_WILD_MUSHROOM_VISUAL,
+                SPELL_DRUID_FUNGAL_GROWTH_R1,
+                SPELL_DRUID_FUNGAL_GROWTH_R2,
+                SPELL_DRUID_FUNGAL_GROWTH_SUMMON_R1,
+                SPELL_DRUID_FUNGAL_GROWTH_SUMMON_R2
+            });
+    }
+
+    void HandleDummy(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        for (TempSummon* mushroom : GetWildMushrooms(caster))
+        {
+            float x = mushroom->GetPositionX();
+            float y = mushroom->GetPositionY();
+            float z = mushroom->GetPositionZ();
+
+            if (caster->HasAura(SPELL_DRUID_FUNGAL_GROWTH_R1))
+                caster->CastSpell(x, y, z, SPELL_DRUID_FUNGAL_GROWTH_SUMMON_R1, true);
+            else if (caster->HasAura(SPELL_DRUID_FUNGAL_GROWTH_R2))
+                caster->CastSpell(x, y, z, SPELL_DRUID_FUNGAL_GROWTH_SUMMON_R2, true);
+
+            caster->CastSpell(x, y, z, SPELL_DRUID_WILD_MUSHROOM_DAMAGE, true);
+            mushroom->CastSpell(mushroom, SPELL_DRUID_WILD_MUSHROOM_VISUAL, true);
+            mushroom->CastSpell(mushroom, SPELL_DRUID_WILD_MUSHROOM_SUICIDE, true);
+            mushroom->UnSummon(1500ms);
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_wild_mushroom_detonate::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
 };
 
 void AddSC_druid_spell_scripts()
 {
-    RegisterSpellScript(spell_dru_bear_form_passive);
     RegisterSpellScript(spell_dru_t10_balance_4p_bonus);
     RegisterSpellScript(spell_dru_nurturing_instinct);
     RegisterSpellScript(spell_dru_feral_swiftness);
     RegisterSpellScript(spell_dru_omen_of_clarity);
-    RegisterSpellScript(spell_dru_brambles_treant);
     RegisterSpellScript(spell_dru_barkskin);
     RegisterSpellScript(spell_dru_glyph_of_barkskin);
     RegisterSpellScript(spell_dru_treant_scaling);
@@ -2290,19 +3153,15 @@ void AddSC_druid_spell_scripts()
     RegisterSpellAndAuraScriptPair(spell_dru_dash, spell_dru_dash_aura);
     RegisterSpellScript(spell_dru_enrage);
     RegisterSpellScript(spell_dru_glyph_of_starfire);
+    RegisterSpellScript(spell_dru_glyph_of_starfire_proc);
     RegisterSpellScript(spell_dru_idol_lifebloom);
     RegisterSpellScript(spell_dru_innervate);
     RegisterSpellScript(spell_dru_lifebloom);
     RegisterSpellScript(spell_dru_living_seed);
     RegisterSpellScript(spell_dru_living_seed_proc);
-    RegisterSpellScript(spell_dru_moonkin_form_passive);
-    RegisterSpellScript(spell_dru_owlkin_frenzy);
-    RegisterSpellScript(spell_dru_predatory_strikes);
-    RegisterSpellScript(spell_dru_primal_tenacity);
     RegisterSpellScript(spell_dru_rip);
     RegisterSpellScript(spell_dru_savage_defense);
     RegisterSpellAndAuraScriptPair(spell_dru_savage_roar, spell_dru_savage_roar_aura);
-    RegisterSpellScript(spell_dru_starfall_aoe);
     RegisterSpellScript(spell_dru_starfall_dummy);
     RegisterSpellAndAuraScriptPair(spell_dru_survival_instincts, spell_dru_survival_instincts_aura);
     RegisterSpellScript(spell_dru_swift_flight_passive);
@@ -2310,27 +3169,58 @@ void AddSC_druid_spell_scripts()
     RegisterSpellScript(spell_dru_typhoon);
     RegisterSpellScript(spell_dru_t10_restoration_4p_bonus);
     RegisterSpellAndAuraScriptPair(spell_dru_wild_growth, spell_dru_wild_growth_aura);
-    RegisterSpellScript(spell_dru_moonkin_form_passive_proc);
     RegisterSpellScript(spell_dru_rejuvenation_moonglade_2_set);
-    // Proc system scripts
-    RegisterSpellScript(spell_dru_glyph_of_innervate);
-    RegisterSpellScript(spell_dru_glyph_of_rake);
     RegisterSpellScript(spell_dru_leader_of_the_pack);
-    RegisterSpellScript(spell_dru_glyph_of_rejuvenation);
     RegisterSpellScript(spell_dru_eclipse);
     RegisterSpellScript(spell_dru_eclipse_mastery_driver_passive);
-    RegisterSpellScript(spell_dru_revitalize);
     RegisterSpellScript(spell_dru_t3_2p_bonus);
     RegisterSpellScript(spell_dru_t3_6p_bonus);
     RegisterSpellScript(spell_dru_t3_8p_bonus);
     RegisterSpellScript(spell_dru_t4_2p_bonus);
     RegisterSpellScript(spell_dru_item_t6_trinket);
     RegisterSpellScript(spell_dru_glyph_of_shred);
-    RegisterSpellScript(spell_dru_glyph_of_starfire_dummy);
     RegisterSpellScript(spell_dru_t10_restoration_4p_bonus_dummy);
     RegisterSpellScript(spell_dru_maim_interrupt);
     RegisterSpellScript(spell_dru_t9_feral_relic);
     RegisterSpellScript(spell_dru_frenzied_regeneration);
     RegisterSpellScript(spell_dru_insect_swarm);
     RegisterSpellScript(spell_dru_nourish);
+    // Cataclysm (4.3.4), from CPP
+    RegisterSpellScript(spell_dru_astral_alignment);
+    RegisterSpellScript(spell_dru_blood_in_the_water);
+    RegisterSpellScript(spell_dru_blood_in_the_water_script);
+    RegisterSpellScript(spell_dru_effloresence);
+    RegisterSpellScript(spell_dru_effloresence_aoe);
+    RegisterSpellScript(spell_dru_effloresence_heal);
+    RegisterSpellScript(spell_dru_empowered_touch);
+    RegisterSpellScript(spell_dru_empowered_touch_script);
+    RegisterSpellScript(spell_dru_entangling_roots);
+    RegisterSpellScript(spell_dru_feral_charge);
+    RegisterSpellScript(spell_dru_feral_swiftness_clear);
+    RegisterSpellScript(spell_dru_ferocious_bite);
+    RegisterSpellScript(spell_dru_firebloom);
+    RegisterSpellScript(spell_dru_flight_form);
+    RegisterSpellScript(spell_dru_harmony);
+    RegisterSpellScript(spell_dru_harmony_triggered);
+    RegisterSpellScript(spell_dru_item_t11_feral_4p_bonus);
+    RegisterSpellScript(spell_dru_maul);
+    RegisterSpellScript(spell_dru_natures_ward);
+    RegisterSpellScript(spell_dru_moonfire);
+    RegisterSpellScript(spell_dru_natures_bounty);
+    RegisterSpellScript(spell_dru_pounce);
+    RegisterSpellScript(spell_dru_pulverize);
+    RegisterSpellScript(spell_dru_ravage);
+    RegisterSpellScript(spell_dru_regrowth);
+    RegisterSpellScript(spell_dru_regrowth_refresh);
+    RegisterSpellScript(spell_dru_rejuvenation);
+    RegisterSpellScript(spell_dru_shooting_stars);
+    RegisterSpellScript(spell_dru_skull_bash);
+    RegisterSpellScript(spell_dru_solar_beam);
+    RegisterSpellScript(spell_dru_stampede_triggered);
+    RegisterSpellScript(spell_dru_stampeding_roar);
+    RegisterSpellScript(spell_dru_swift_flight_form);
+    RegisterSpellScript(spell_dru_t12_restoration_4p_bonus);
+    RegisterSpellScript(spell_dru_tree_of_life);
+    RegisterSpellScript(spell_dru_wild_mushroom);
+    RegisterSpellScript(spell_dru_wild_mushroom_detonate);
 }

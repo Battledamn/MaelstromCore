@@ -1637,8 +1637,9 @@ void AuraEffect::HandleShapeshiftBoosts(Unit* target, bool apply) const
                         }
                         target->CastSpell(target, spellId3, true, nullptr, this, target->GetGUID());
                     }
-                    // Master Shapeshifter - Cat
-                    if (AuraEffect const* aurEff = target->GetDummyAuraEffect(SPELLFAMILY_GENERIC, 2851, 0))
+                    // Master Shapeshifter - Cat. In 4.3.4 the talent (48411) is a healing done aura (its Tree of Life
+                    // part), no longer a dummy; the forms' buffs are cast here (CPP)
+                    if (AuraEffect const* aurEff = target->GetAuraEffect(SPELL_AURA_MOD_HEALING_DONE_PERCENT, SPELLFAMILY_GENERIC, 2851, EFFECT_0))
                     {
                         int32 bp = aurEff->GetAmount();
                         target->CastCustomSpell(target, 48420, &bp, nullptr, nullptr, true);
@@ -1647,7 +1648,7 @@ void AuraEffect::HandleShapeshiftBoosts(Unit* target, bool apply) const
                 case FORM_DIREBEAR:
                 case FORM_BEAR:
                     // Master Shapeshifter - Bear
-                    if (AuraEffect const* aurEff = target->GetDummyAuraEffect(SPELLFAMILY_GENERIC, 2851, 0))
+                    if (AuraEffect const* aurEff = target->GetAuraEffect(SPELL_AURA_MOD_HEALING_DONE_PERCENT, SPELLFAMILY_GENERIC, 2851, EFFECT_0))
                     {
                         int32 bp = aurEff->GetAmount();
                         target->CastCustomSpell(target, 48418, &bp, nullptr, nullptr, true);
@@ -1661,21 +1662,13 @@ void AuraEffect::HandleShapeshiftBoosts(Unit* target, bool apply) const
                     break;
                 case FORM_MOONKIN:
                     // Master Shapeshifter - Moonkin
-                    if (AuraEffect const* aurEff = target->GetDummyAuraEffect(SPELLFAMILY_GENERIC, 2851, 0))
+                    if (AuraEffect const* aurEff = target->GetAuraEffect(SPELL_AURA_MOD_HEALING_DONE_PERCENT, SPELLFAMILY_GENERIC, 2851, EFFECT_0))
                     {
                         int32 bp = aurEff->GetAmount();
                         target->CastCustomSpell(target, 48421, &bp, nullptr, nullptr, true);
                     }
                     // Always cast Moonkin Aura
                     target->CastSpell(target, 24907, true, nullptr, this, target->GetGUID());
-                    break;
-                // Master Shapeshifter - Tree of Life
-                case FORM_TREE:
-                    if (AuraEffect const* aurEff = target->GetDummyAuraEffect(SPELLFAMILY_GENERIC, 2851, 0))
-                    {
-                        int32 bp = aurEff->GetAmount();
-                        target->CastCustomSpell(target, 48422, &bp, nullptr, nullptr, true);
-                    }
                     break;
             }
         }
