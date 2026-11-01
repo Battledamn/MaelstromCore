@@ -1912,6 +1912,7 @@ void SpellMgr::LoadSpellGroupStackRules()
         // we have to 'guess' what effect this group corresponds to
         {
             std::unordered_multiset<uint32 /*auraName*/> frequencyContainer;
+            std::unordered_map<uint32 /*auraName*/, std::size_t /*spellCount*/> sharedCount;
 
             // only waylay for the moment (shared group)
             std::vector<std::vector<uint32 /*auraName*/>> const SubGroups =
@@ -1922,6 +1923,7 @@ void SpellMgr::LoadSpellGroupStackRules()
             for (uint32 spellId : spellIds)
             {
                 SpellInfo const* spellInfo = AssertSpellInfo(spellId);
+                std::unordered_set<uint32> spellAuraNames;
                 for (SpellEffectInfo const& spellEffectInfo : spellInfo->GetEffects())
                 {
                     if (!spellEffectInfo.IsAura())
@@ -1939,7 +1941,35 @@ void SpellMgr::LoadSpellGroupStackRules()
                     }
 
                     frequencyContainer.insert(auraName);
+                    spellAuraNames.insert(auraName);
                 }
+
+                for (uint32 auraName : spellAuraNames)
+                    ++sharedCount[auraName];
+            }
+
+            // 4.3.4: every aura type all spells of the group carry. The most frequent one alone missed half of a
+            // tie: Blessing of Kings and Mark of the Wild carry stats (137) and resistances (143), Trueshot Aura
+            // and Blessing of Might melee and ranged attack power, Bloodlust three haste auras; the other half
+            // stacked.
+            for (auto const& [auraName, spellCount] : sharedCount)
+            {
+                if (spellCount != spellIds.size())
+                    continue;
+
+                bool inSubGroup = false;
+                for (std::vector<uint32> const& subGroup : SubGroups)
+                {
+                    if (auraName == subGroup.front())
+                    {
+                        auraTypes.insert(subGroup.begin(), subGroup.end());
+                        inSubGroup = true;
+                        break;
+                    }
+                }
+
+                if (!inSubGroup)
+                    auraTypes.insert(auraName);
             }
 
             uint32 auraType = 0;

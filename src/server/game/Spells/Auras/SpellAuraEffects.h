@@ -60,6 +60,7 @@ public:
 
     int32 GetMiscValueB() const;
     int32 GetMiscValue() const;
+    bool IsAffectingTotalStat(int32 stat) const;
     AuraType GetAuraType() const;
     int32 GetAmount() const { return m_isAuraEnabled ? m_amount : 0; }
     int32 GetForcedAmount() const { return m_amount; }

@@ -332,7 +332,9 @@ enum SpellGroup
     SPELL_GROUP_NONE             = 0,
     SPELL_GROUP_ELIXIR_BATTLE    = 1,
     SPELL_GROUP_ELIXIR_GUARDIAN  = 2,
-    SPELL_GROUP_CORE_RANGE_MAX   = 3
+    SPELL_GROUP_ELIXIR_UNSTABLE  = 3,   // 4.3.4 (CPP, TDB 434): the unstable elixirs
+    SPELL_GROUP_ELIXIR_SHATTRATH = 4,   // the Shattrath flasks
+    SPELL_GROUP_CORE_RANGE_MAX   = 5
 };
 
 namespace std

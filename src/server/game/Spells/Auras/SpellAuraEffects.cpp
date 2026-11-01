@@ -500,6 +500,16 @@ int32 AuraEffect::GetMiscValue() const
     return m_spellInfo->Effects[m_effIndex].MiscValue;
 }
 
+// SPELL_AURA_MOD_TOTAL_STAT_PERCENTAGE: in 4.3.4 the stats are a mask in MiscValueB (15: the four primary
+// stats, e.g. Mark of the Wild; 4: Stamina, e.g. Touched by the Light), MiscValue is not the stat; without
+// a mask, MiscValue is the stat or -1 for all (TrinityCore 4.3.4)
+bool AuraEffect::IsAffectingTotalStat(int32 stat) const
+{
+    if (int32 const statMask = GetMiscValueB())
+        return (statMask & (1 << stat)) != 0;
+    return GetMiscValue() == stat || GetMiscValue() == -1;
+}
+
 AuraType AuraEffect::GetAuraType() const
 {
     return (AuraType)m_spellInfo->Effects[m_effIndex].ApplyAuraName;
@@ -4450,7 +4460,7 @@ void AuraEffect::HandleModTotalPercentStat(AuraApplication const* aurApp, uint8 
 
     Unit* target = aurApp->GetTarget();
 
-    if (GetMiscValue() < -1 || GetMiscValue() > 4)
+    if (!GetMiscValueB() && (GetMiscValue() < -1 || GetMiscValue() > 4))
     {
         LOG_ERROR("spells.aura.effect", "WARNING: Misc Value for SPELL_AURA_MOD_PERCENT_STAT not valid");
         return;
@@ -4462,11 +4472,11 @@ void AuraEffect::HandleModTotalPercentStat(AuraApplication const* aurApp, uint8 
 
     for (int32 i = STAT_STRENGTH; i < MAX_STATS; i++)
     {
-        if (GetMiscValue() == i || GetMiscValue() == -1)
+        if (IsAffectingTotalStat(i))
         {
             float amount = target->GetTotalAuraMultiplier(SPELL_AURA_MOD_TOTAL_STAT_PERCENTAGE, [i](AuraEffect const* aurEff)
             {
-                return (aurEff->GetMiscValue() == i || aurEff->GetMiscValue() == -1);
+                return aurEff->IsAffectingTotalStat(i);
             });
 
             if (target->GetPctModifierValue(UnitMods(UNIT_MOD_STAT_START + i), TOTAL_PCT) == amount)
@@ -4479,7 +4489,7 @@ void AuraEffect::HandleModTotalPercentStat(AuraApplication const* aurApp, uint8 
     }
 
     // recalculate current HP/MP after applying aura modifications (only for spells with SPELL_ATTR0_UNK4 0x00000010 flag)
-    if (GetMiscValue() == STAT_STAMINA && m_spellInfo->HasAttribute(SPELL_ATTR0_IS_ABILITY))
+    if (IsAffectingTotalStat(STAT_STAMINA) && m_spellInfo->HasAttribute(SPELL_ATTR0_IS_ABILITY))
         target->SetHealth(std::max<uint32>(uint32(healthPct * target->GetMaxHealth() * 0.01f), (alive ? 1 : 0)));
 }
 

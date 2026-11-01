@@ -6314,9 +6314,7 @@ void Unit::UpdateStatBuffMod(Stats stat)
 
     factor *= GetTotalAuraMultiplier(SPELL_AURA_MOD_TOTAL_STAT_PERCENTAGE, [stat](AuraEffect const* aurEff) -> bool
     {
-        if (aurEff->GetMiscValue() == -1 || aurEff->GetMiscValue() == stat)
-            return true;
-        return false;
+        return aurEff->IsAffectingTotalStat(AsUnderlyingType(stat));
     });
 
     modPos *= factor;
