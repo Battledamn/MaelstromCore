@@ -1907,6 +1907,9 @@ public:
         m_cinematic = cine;
     }
 
+    [[nodiscard]] uint32 GetMovie() const { return m_movie; }
+    void SetMovie(uint32 movie) { m_movie = movie; }
+
     ActionButton* addActionButton(uint8 button, uint32 action, uint8 type);
     void removeActionButton(uint8 button);
     ActionButton const* GetActionButton(uint8 button);
@@ -3031,6 +3034,7 @@ private:
     JoinedChannelsList m_channels;
 
     uint8 m_cinematic;
+    uint32 m_movie;
 
     TradeData* m_trade;
 
