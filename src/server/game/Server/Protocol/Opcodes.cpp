@@ -541,6 +541,7 @@ void OpcodeTable::Initialize()
     /*0x4C07*/ DEFINE_HANDLER(CMSG_CAST_SPELL,                                                       STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleCastSpellOpcode                    );
     /*0x0115*/ DEFINE_HANDLER(CMSG_CANCEL_CAST,                                                      STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleCancelCastOpcode                   );
     /*0x4D16*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_CAST_FAILED,                                        STATUS_NEVER);
+    /*0x71B6*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_CATEGORY_COOLDOWN,                                  STATUS_NEVER);
     /*0x6415*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SPELL_START,                                        STATUS_NEVER);
     /*0x6E16*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SPELL_GO,                                           STATUS_NEVER);
     /*0x4535*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SPELL_FAILURE,                                      STATUS_NEVER);
@@ -892,7 +893,7 @@ void OpcodeTable::Initialize()
     /*0x0942*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_CONNECT_TO,                                        STATUS_NEVER);
     /*0x0140*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_RESUME_COMMS,                                      STATUS_NEVER);
     /*0x730E*/ DEFINE_HANDLER(CMSG_SAVE_CUF_PROFILES,                                               STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
-    /*0x7102*/ DEFINE_HANDLER(CMSG_REQUEST_CATEGORY_COOLDOWNS,                                      STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );
+    /*0x7102*/ DEFINE_HANDLER(CMSG_REQUEST_CATEGORY_COOLDOWNS,                                      STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::HandleRequestCategoryCooldowns          );
     /*0x0412*/ DEFINE_HANDLER(CMSG_LFG_LOCK_INFO_REQUEST,                                           STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleLfgPlayerLockInfoRequestOpcode     );
     /*0x4B25*/ DEFINE_HANDLER(CMSG_PET_CANCEL_AURA,                                                  STATUS_LOGGEDIN,   PROCESS_INPLACE,        &WorldSession::HandlePetCancelAuraOpcode                );
     /*0x026C*/ DEFINE_HANDLER(CMSG_PLAYER_AI_CHEAT,                                                  STATUS_NEVER,      PROCESS_INPLACE,        &WorldSession::Handle_NULL                              );

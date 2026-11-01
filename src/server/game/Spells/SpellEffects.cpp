@@ -32,6 +32,7 @@
 #include "GossipDef.h"
 #include "GridNotifiers.h"
 #include "Group.h"
+#include "Guild.h"
 #include "InstanceScript.h"
 #include "Language.h"
 #include "Log.h"
@@ -236,14 +237,14 @@ pEffect SpellEffects[TOTAL_SPELL_EFFECTS] =
     &Spell::EffectNULL,                                     //163 unused
     &Spell::EffectRemoveAura,                               //164 SPELL_EFFECT_REMOVE_AURA
     &Spell::EffectDamageFromMaxHealthPCT,                   //165 SPELL_EFFECT_DAMAGE_FROM_MAX_HEALTH_PCT
-    &Spell::EffectNULL,                                     //166 SPELL_EFFECT_GIVE_CURRENCY needs Cataclysm currencies
+    &Spell::EffectGiveCurrency,                             //166 SPELL_EFFECT_GIVE_CURRENCY
     &Spell::EffectNULL,                                     //167 SPELL_EFFECT_UPDATE_PLAYER_PHASE needs condition phasing
     &Spell::EffectNULL,                                     //168 SPELL_EFFECT_ALLOW_CONTROL_PET
     &Spell::EffectDestroyItem,                              //169 SPELL_EFFECT_DESTROY_ITEM
     &Spell::EffectUpdateZoneAurasAndPhases,                 //170 SPELL_EFFECT_UPDATE_ZONE_AURAS_AND_PHASES
     &Spell::EffectNULL,                                     //171 SPELL_EFFECT_SUMMON_PERSONAL_GAMEOBJECT needs private objects
-    &Spell::EffectNULL,                                     //172 SPELL_EFFECT_RESURRECT_WITH_AURA
-    &Spell::EffectNULL,                                     //173 SPELL_EFFECT_UNLOCK_GUILD_VAULT_TAB needs guild perks
+    &Spell::EffectResurrectWithAura,                        //172 SPELL_EFFECT_RESURRECT_WITH_AURA
+    &Spell::EffectUnlockGuildVaultTab,                      //173 SPELL_EFFECT_UNLOCK_GUILD_VAULT_TAB
     &Spell::EffectApplyAura,                                //174 SPELL_EFFECT_APPLY_AURA_2
     &Spell::EffectUnused,                                   //175 SPELL_EFFECT_175 unused
     &Spell::EffectSanctuary,                                //176 SPELL_EFFECT_SANCTUARY_2
@@ -4992,6 +4993,58 @@ void Spell::EffectResurrect(SpellEffIndex effIndex)
 
     target->setResurrectRequestData(unitCaster->GetGUID(), unitCaster->GetMapId(), unitCaster->GetPositionX(), unitCaster->GetPositionY(), unitCaster->GetPositionZ(), health, mana);
     SendResurrectRequest(target);
+}
+
+// 4.x (CPP): the target gets currency, the effect's amount of its MiscValue currency
+void Spell::EffectGiveCurrency(SpellEffIndex effIndex)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)
+        return;
+
+    if (Player* player = unitTarget ? unitTarget->ToPlayer() : nullptr)
+        player->ModifyCurrency(m_spellInfo->Effects[effIndex].MiscValue, damage);
+}
+
+// 4.x (CPP): a resurrection offer that also applies the effect's trigger spell when accepted (Mass
+// Resurrection: Recently Mass Resurrected, which also blocks a second offer while it lasts)
+void Spell::EffectResurrectWithAura(SpellEffIndex effIndex)
+{
+    Unit* unitCaster = m_caster->ToUnit();
+    if (!unitCaster || effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)
+        return;
+
+    Player* target = unitTarget ? unitTarget->ToPlayer() : nullptr;
+    if (!target || target->IsAlive() || !target->IsInWorld() || target->isResurrectRequested())
+        return;
+
+    uint32 resurrectAura = 0;
+    if (sSpellMgr->GetSpellInfo(m_spellInfo->Effects[effIndex].TriggerSpell))
+        resurrectAura = m_spellInfo->Effects[effIndex].TriggerSpell;
+
+    if (resurrectAura && target->HasAura(resurrectAura))
+        return;
+
+    uint32 health = target->CountPctFromMaxHealth(damage);
+    uint32 mana = CalculatePct(target->GetMaxPower(POWER_MANA), damage);
+
+    ExecuteLogEffectResurrect(effIndex, target);
+    target->setResurrectRequestData(unitCaster->GetGUID(), unitCaster->GetMapId(), unitCaster->GetPositionX(),
+        unitCaster->GetPositionY(), unitCaster->GetPositionZ(), health, mana, resurrectAura);
+    SendResurrectRequest(target);
+}
+
+// 4.x (CPP): buys the guild bank tab given by the effect's base points (counted from 1)
+void Spell::EffectUnlockGuildVaultTab(SpellEffIndex effIndex)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT)
+        return;
+
+    Player* caster = m_caster->ToPlayer();
+    if (!caster)
+        return;
+
+    if (Guild* guild = caster->GetGuild())
+        guild->HandleBuyBankTab(caster->GetSession(), uint8(m_spellInfo->Effects[effIndex].BasePoints - 1));
 }
 
 void Spell::EffectAddExtraAttacks(SpellEffIndex effIndex)

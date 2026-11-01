@@ -592,6 +592,11 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
     spell->prepare(&targets);
 }
 
+void WorldSession::HandleRequestCategoryCooldowns(WorldPacket& /*recvPacket*/)
+{
+    _player->SendSpellCategoryCooldowns();
+}
+
 void WorldSession::HandleCancelCastOpcode(WorldPacket& recvPacket)
 {
     uint32 spellId;

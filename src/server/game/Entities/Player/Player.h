@@ -144,38 +144,38 @@ struct PlayerTalent
     bool IsInSpec(uint8 spec) { return (specMask & (1 << spec)); }
 };
 
-enum TalentTree // talent tabs
+enum TalentTree // TalentTab.dbc IDs of 4.3.4 (CPP)
 {
-    TALENT_TREE_WARRIOR_ARMS = 161,
-    TALENT_TREE_WARRIOR_FURY = 164,
-    TALENT_TREE_WARRIOR_PROTECTION = 163,
-    TALENT_TREE_PALADIN_HOLY = 382,
-    TALENT_TREE_PALADIN_PROTECTION = 383,
-    TALENT_TREE_PALADIN_RETRIBUTION = 381,
-    TALENT_TREE_HUNTER_BEAST_MASTERY = 361,
-    TALENT_TREE_HUNTER_MARKSMANSHIP = 363,
-    TALENT_TREE_HUNTER_SURVIVAL = 362,
+    TALENT_TREE_WARRIOR_ARMS = 746,
+    TALENT_TREE_WARRIOR_FURY = 815,
+    TALENT_TREE_WARRIOR_PROTECTION = 845,
+    TALENT_TREE_PALADIN_HOLY = 831,
+    TALENT_TREE_PALADIN_PROTECTION = 839,
+    TALENT_TREE_PALADIN_RETRIBUTION = 855,
+    TALENT_TREE_HUNTER_BEAST_MASTERY = 811,
+    TALENT_TREE_HUNTER_MARKSMANSHIP = 807,
+    TALENT_TREE_HUNTER_SURVIVAL = 809,
     TALENT_TREE_ROGUE_ASSASSINATION = 182,
     TALENT_TREE_ROGUE_COMBAT = 181,
     TALENT_TREE_ROGUE_SUBTLETY = 183,
-    TALENT_TREE_PRIEST_DISCIPLINE = 201,
-    TALENT_TREE_PRIEST_HOLY = 202,
-    TALENT_TREE_PRIEST_SHADOW = 203,
+    TALENT_TREE_PRIEST_DISCIPLINE = 760,
+    TALENT_TREE_PRIEST_HOLY = 813,
+    TALENT_TREE_PRIEST_SHADOW = 795,
     TALENT_TREE_DEATH_KNIGHT_BLOOD = 398,
     TALENT_TREE_DEATH_KNIGHT_FROST = 399,
     TALENT_TREE_DEATH_KNIGHT_UNHOLY = 400,
     TALENT_TREE_SHAMAN_ELEMENTAL = 261,
     TALENT_TREE_SHAMAN_ENHANCEMENT = 263,
     TALENT_TREE_SHAMAN_RESTORATION = 262,
-    TALENT_TREE_MAGE_ARCANE = 81,
-    TALENT_TREE_MAGE_FIRE = 41,
-    TALENT_TREE_MAGE_FROST = 61,
-    TALENT_TREE_WARLOCK_AFFLICTION = 302,
-    TALENT_TREE_WARLOCK_DEMONOLOGY = 303,
-    TALENT_TREE_WARLOCK_DESTRUCTION = 301,
-    TALENT_TREE_DRUID_BALANCE = 283,
-    TALENT_TREE_DRUID_FERAL_COMBAT = 281,
-    TALENT_TREE_DRUID_RESTORATION = 282
+    TALENT_TREE_MAGE_ARCANE = 799,
+    TALENT_TREE_MAGE_FIRE = 851,
+    TALENT_TREE_MAGE_FROST = 823,
+    TALENT_TREE_WARLOCK_AFFLICTION = 871,
+    TALENT_TREE_WARLOCK_DEMONOLOGY = 867,
+    TALENT_TREE_WARLOCK_DESTRUCTION = 865,
+    TALENT_TREE_DRUID_BALANCE = 752,
+    TALENT_TREE_DRUID_FERAL_COMBAT = 750,
+    TALENT_TREE_DRUID_RESTORATION = 748
 };
 
 #define SPEC_MASK_ALL 255
@@ -1742,6 +1742,7 @@ public:
     void ModifyCurrency(uint32 currencyId, int32 amount, bool suppressChatLog = false);
     void SendKnownSpells(bool firstLogin = false);
     void SendSpellModifiers() const;
+    void SendSpellModifier(SpellModOp op, SpellModType type, flag96 const& mask) const;
     void SendLearnPacket(uint32 spellId, bool learn);
     bool addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool temporary = false, bool learnFromSkill = false);
     bool _addSpell(uint32 spellId, uint8 addSpecMask, bool temporary, bool learnFromSkill = false,
@@ -1778,6 +1779,8 @@ public:
     void _removeTalentAurasAndSpells(uint32 spellId);
     void _addTalentAurasAndSpells(uint32 spellId);
     // the active spec's primary tree spells and masteries, learned as temporary spells (not saved)
+    void _addPrimaryTalentTreeSpell(uint32 spellId);
+    void _removePrimaryTalentTreeSpell(uint32 spellId);
     void _addPrimaryTalentTreeSpells();
     void _removePrimaryTalentTreeSpells(uint32 talentTabId);
     [[nodiscard]] bool HasTalent(uint32 spell_id, uint8 spec) const;
@@ -1859,6 +1862,7 @@ public:
     void ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs) override;
     void RemoveSpellCooldown(uint32 spell_id, bool update = false);
     void SendClearCooldown(uint32 spell_id, Unit* target);
+    void SendSpellCategoryCooldowns() const;
 
     GlobalCooldownMgr& GetGlobalCooldownMgr() { return m_GlobalCooldownMgr; }
 
@@ -1872,7 +1876,8 @@ public:
     void UpdatePotionCooldown(Spell* spell = nullptr);
     void AtExitCombat() override;
 
-    void setResurrectRequestData(ObjectGuid guid, uint32 mapId, float X, float Y, float Z, uint32 health, uint32 mana)
+    void setResurrectRequestData(ObjectGuid guid, uint32 mapId, float X, float Y, float Z, uint32 health, uint32 mana,
+        uint32 appliedAura = 0)
     {
         m_resurrectGUID = guid;
         m_resurrectMap = mapId;
@@ -1881,6 +1886,7 @@ public:
         m_resurrectZ = Z;
         m_resurrectHealth = health;
         m_resurrectMana = mana;
+        m_resurrectAura = appliedAura;
     }
     void clearResurrectRequestData() { setResurrectRequestData(ObjectGuid::Empty, 0, 0.0f, 0.0f, 0.0f, 0, 0); }
     [[nodiscard]] bool isResurrectRequestedBy(ObjectGuid guid) const { return m_resurrectGUID && m_resurrectGUID == guid; }
@@ -3003,6 +3009,7 @@ private:
     uint32 m_resurrectMap;
     float m_resurrectX, m_resurrectY, m_resurrectZ;
     uint32 m_resurrectHealth, m_resurrectMana;
+    uint32 m_resurrectAura = 0;                             // 4.x: applied on accepting (Mass Resurrection)
 
     WorldSession* m_session;
 

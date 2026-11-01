@@ -8684,45 +8684,30 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
     // Done fixed damage bonus auras
     DoneAdvertisedBenefit += SpellBaseDamageBonusDone(spellProto->GetSchoolMask(), true);
 
-    // Check for table values
-    float coeff = spellProto->Effects[effIndex].BonusMultiplier;
-    SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(spellProto->Id);
-    if (bonus)
+    // 4.3.4: the client's own coefficients (CPP): spell power per effect (SpellEffect.dbc), attack power
+    // per spell (Spell.dbc). A spell_bonus_data row overrides both, e.g. with 0 for a spell whose script
+    // computes the whole tooltip formula itself. 3.3.5a's low level penalty and its "no bonus for damage
+    // class none" rule are gone: the 4.3.4 data gives such spells a coefficient of 0 itself.
+    float coeff = spellProto->Effects[effIndex].BonusMultiplier * spellProto->GetSpellScalingMultiplier(GetLevel(), false);
+    float apCoeff = spellProto->BonusCoefficientFromAP;
+    if (SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(spellProto->Id))
     {
-        if (damagetype == DOT)
-        {
-            coeff = bonus->dot_damage;
-            if (bonus->ap_dot_bonus > 0)
-            {
-                WeaponAttackType attType = (spellProto->IsRangedWeaponSpell() && spellProto->DmgClass != SPELL_DAMAGE_CLASS_MELEE) ? RANGED_ATTACK : BASE_ATTACK;
-                float APbonus = float(victim->GetTotalAuraModifier(attType == BASE_ATTACK ? SPELL_AURA_MELEE_ATTACK_POWER_ATTACKER_BONUS : SPELL_AURA_RANGED_ATTACK_POWER_ATTACKER_BONUS));
-                APbonus += GetTotalAttackPowerValue(attType);
-                DoneTotal += int32(bonus->ap_dot_bonus * stack * ApCoeffMod * APbonus);
-            }
-        }
-        else
-        {
-            coeff = bonus->direct_damage;
-            if (bonus->ap_bonus > 0)
-            {
-                WeaponAttackType attType = (spellProto->IsRangedWeaponSpell() && spellProto->DmgClass != SPELL_DAMAGE_CLASS_MELEE) ? RANGED_ATTACK : BASE_ATTACK;
-                float APbonus = float(victim->GetTotalAuraModifier(attType == BASE_ATTACK ? SPELL_AURA_MELEE_ATTACK_POWER_ATTACKER_BONUS : SPELL_AURA_RANGED_ATTACK_POWER_ATTACKER_BONUS));
-                APbonus += GetTotalAttackPowerValue(attType);
-                DoneTotal += int32(bonus->ap_bonus * stack * ApCoeffMod * APbonus);
-            }
-        }
+        coeff = damagetype == DOT ? bonus->dot_damage : bonus->direct_damage;
+        apCoeff = damagetype == DOT ? bonus->ap_dot_bonus : bonus->ap_bonus;
     }
-    else
+
+    if (apCoeff > 0.0f)
     {
-        // No bonus damage for SPELL_DAMAGE_CLASS_NONE class spells by default
-        if (spellProto->DmgClass == SPELL_DAMAGE_CLASS_NONE)
-            return uint32(std::max((float(pdamage) + DoneTotal) * DoneTotalMod, 0.0f));
+        WeaponAttackType attType = (spellProto->IsRangedWeaponSpell() && spellProto->DmgClass != SPELL_DAMAGE_CLASS_MELEE) ? RANGED_ATTACK : BASE_ATTACK;
+        float APbonus = float(victim->GetTotalAuraModifier(attType == BASE_ATTACK ? SPELL_AURA_MELEE_ATTACK_POWER_ATTACKER_BONUS : SPELL_AURA_RANGED_ATTACK_POWER_ATTACKER_BONUS));
+        APbonus += GetTotalAttackPowerValue(attType);
+        DoneTotal += int32(apCoeff * stack * ApCoeffMod * APbonus);
     }
 
     // Default calculation
     if (coeff && DoneAdvertisedBenefit)
     {
-        float factorMod = CalculateLevelPenalty(spellProto) * stack;
+        float factorMod = float(stack);
 
         if (Player* modOwner = GetSpellModOwner())
         {
@@ -9140,6 +9125,14 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                                     return 100.0f;
                                 break;
                             }
+                            // Word of Glory: Last Word (4.3.4), on targets at 35% health or less
+                            else if (spellProto->SpellFamilyFlags[2] & 0x00004000)
+                            {
+                                if (GetHealthPct() <= 35.0f)
+                                    if (AuraEffect const* lastWord = caster->GetDummyAuraEffect(SPELLFAMILY_PALADIN, 2139, EFFECT_0))
+                                        crit_chance += lastWord->GetAmount();
+                                break;
+                            }
                             break;
                         case SPELLFAMILY_SHAMAN:
                             // Lava Burst
@@ -9473,38 +9466,24 @@ uint32 Unit::SpellHealingBonusDone(Unit* victim, SpellInfo const* spellProto, ui
 
     // Done fixed damage bonus auras
     DoneAdvertisedBenefit += SpellBaseHealingBonusDone(spellProto->GetSchoolMask(), true);
-    float coeff = spellProto->Effects[effIndex].BonusMultiplier;
 
-    // Check for table values
-    SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(spellProto->Id);
-    if (bonus)
+    // 4.3.4: the client's own coefficients, overridden by a spell_bonus_data row (see SpellDamageBonusDone)
+    float coeff = spellProto->Effects[effIndex].BonusMultiplier * spellProto->GetSpellScalingMultiplier(GetLevel(), false);
+    float apCoeff = spellProto->BonusCoefficientFromAP;
+    if (SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(spellProto->Id))
     {
-        if (damagetype == DOT)
-        {
-            coeff = bonus->dot_damage;
-            if (bonus->ap_dot_bonus > 0)
-                DoneTotal += int32(bonus->ap_dot_bonus * ApCoeffMod * stack * GetTotalAttackPowerValue(
-                                       (spellProto->IsRangedWeaponSpell() && spellProto->DmgClass != SPELL_DAMAGE_CLASS_MELEE) ? RANGED_ATTACK : BASE_ATTACK));
-        }
-        else
-        {
-            coeff = bonus->direct_damage;
-            if (bonus->ap_bonus > 0)
-                DoneTotal += int32(bonus->ap_bonus * ApCoeffMod * stack * GetTotalAttackPowerValue(
-                                       (spellProto->IsRangedWeaponSpell() && spellProto->DmgClass != SPELL_DAMAGE_CLASS_MELEE) ? RANGED_ATTACK : BASE_ATTACK));
-        }
+        coeff = damagetype == DOT ? bonus->dot_damage : bonus->direct_damage;
+        apCoeff = damagetype == DOT ? bonus->ap_dot_bonus : bonus->ap_bonus;
     }
-    else
-    {
-        // No bonus healing for SPELL_DAMAGE_CLASS_NONE class spells by default
-        if (spellProto->DmgClass == SPELL_DAMAGE_CLASS_NONE)
-            return healamount;
-    }
+
+    if (apCoeff > 0.0f)
+        DoneTotal += int32(apCoeff * ApCoeffMod * stack * GetTotalAttackPowerValue(
+                               (spellProto->IsRangedWeaponSpell() && spellProto->DmgClass != SPELL_DAMAGE_CLASS_MELEE) ? RANGED_ATTACK : BASE_ATTACK));
 
     // Default calculation
     if (DoneAdvertisedBenefit)
     {
-        float factorMod = CalculateLevelPenalty(spellProto) * stack;
+        float factorMod = float(stack);
         if (Player* modOwner = GetSpellModOwner())
         {
             coeff *= 100.0f;

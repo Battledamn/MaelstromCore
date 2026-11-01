@@ -945,6 +945,9 @@ static const std::size_t bonusSkillLevelsSize =
 
 bool Player::UpdateSkillPro(uint16 SkillId, int32 Chance, uint32 step)
 {
+    // 4.x: SPELL_AURA_INCREASE_SKILL_GAIN_CHANCE (CPP SkillGainChance)
+    Chance = int32(Chance * GetTotalAuraMultiplier(SPELL_AURA_INCREASE_SKILL_GAIN_CHANCE));
+
     LOG_DEBUG("entities.player.skills",
               "UpdateSkillPro(SkillId {}, Chance {:3.1f}%)", SkillId,
               Chance / 10.0f);

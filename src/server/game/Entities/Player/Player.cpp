@@ -1663,6 +1663,9 @@ void Player::ProcessDelayedOperations()
         SetPower(POWER_ENERGY, GetMaxPower(POWER_ENERGY));
 
         SpawnCorpseBones();
+
+        if (m_resurrectAura)
+            CastSpell(this, m_resurrectAura, true);
     }
 
     if (m_DelayedOperations & DELAYED_SAVE_PLAYER)
@@ -10256,22 +10259,50 @@ void Player::AddSpellMod(SpellModifier* mod, bool apply)
 {
     LOG_DEBUG("spells.aura", "Player::AddSpellMod {}", mod->spellId);
     if (apply)
-    {
         m_spellMods[mod->op].insert(mod);
-    }
     else
-    {
         m_spellMods[mod->op].erase(mod);
-        // mods bound to aura will be removed in AuraEffect::~AuraEffect
-        if (!mod->ownerAura)
-            delete mod;
+
+    // 4.x: the client keeps one total per modifier and class bit and changes only what it is sent, so the
+    // changed modifier's bits are sent with their new total, 0 included: a removed modifier (a talent
+    // reset, an aura running out) is cleared on the client too (CPP). At login the whole table is sent.
+    if (!GetSession()->PlayerLoading())
+        SendSpellModifier(mod->op, mod->type, mod->mask);
+
+    // mods bound to aura will be removed in AuraEffect::~AuraEffect
+    if (!apply && !mod->ownerAura)
+        delete mod;
+}
+
+void Player::SendSpellModifier(SpellModOp op, SpellModType type, flag96 const& mask) const
+{
+    WorldPackets::Spells::SetSpellModifier packet(type == SPELLMOD_FLAT ? SMSG_SET_FLAT_SPELL_MODIFIER : SMSG_SET_PCT_SPELL_MODIFIER);
+    WorldPackets::Spells::SpellModifier modifier;
+    modifier.ModIndex = op;
+    for (uint8 classIndex = 0; classIndex < 96; ++classIndex)
+    {
+        if (!(mask[classIndex / 32] & (uint32(1) << (classIndex % 32))))
+            continue;
+
+        float value = 0.0f;
+        for (SpellModifier const* spellModifier : m_spellMods[op])
+            if (spellModifier->type == type && (spellModifier->mask[classIndex / 32] & (uint32(1) << (classIndex % 32))))
+                value += spellModifier->value;
+
+        modifier.ModifierData.push_back({ value, classIndex });
     }
 
-    SendSpellModifiers();
+    if (modifier.ModifierData.empty())
+        return;
+
+    packet.Modifiers.push_back(std::move(modifier));
+    SendDirectMessage(packet.Write());
 }
 
 void Player::SendSpellModifiers() const
 {
+    // the whole table, 0 included, so a client that still holds modifiers from an earlier session (it
+    // keeps them across a relog) starts clean
     auto sendModifiers = [this](SpellModType type, OpcodeServer opcode)
     {
         WorldPackets::Spells::SetSpellModifier packet(opcode);
@@ -10288,8 +10319,7 @@ void Player::SendSpellModifiers() const
                     if (spellModifier->type == type && (spellModifier->mask & mask))
                         value += spellModifier->value;
 
-                if (value != 0.0f)
-                    modifier.ModifierData.push_back({ value, classIndex });
+                modifier.ModifierData.push_back({ value, classIndex });
             }
 
             if (!modifier.ModifierData.empty())
@@ -10487,6 +10517,10 @@ void Player::ModifyCurrency(uint32 currencyId, int32 amount, bool suppressChatLo
                   GetGUID().ToString(), currencyId);
         return;
     }
+
+    // 4.x: SPELL_AURA_MOD_CURRENCY_GAIN raises the gains of its currency (CPP)
+    if (amount > 0)
+        amount = int32(amount * GetTotalAuraMultiplierByMiscValue(SPELL_AURA_MOD_CURRENCY_GAIN, currencyId));
 
     int64 current = GetCurrency(currencyId, false);
     int64 updated = current + amount;
@@ -11469,6 +11503,26 @@ void Player::AddSpellAndCategoryCooldowns(SpellInfo const* spellInfo, uint32 ite
         if (catrec > 0 && !spellInfo->HasAttribute(SPELL_ATTR6_NO_CATEGORY_COOLDOWN_MODS))
         {
             ApplySpellMod(spellInfo->Id, SPELLMOD_COOLDOWN, catrec, spell);
+        }
+
+        // 4.x: the category's cooldown modifiers change every cooldown of a spell with that category
+        // (CPP SpellHistory::StartCooldown)
+        if (uint32 categoryId = spellInfo->GetCategory())
+            if (int32 categoryModifier = GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN, categoryId))
+            {
+                if (rec > 0)
+                    rec += categoryModifier;
+                if (catrec > 0)
+                    catrec += categoryModifier;
+            }
+
+        // haste shortens the cooldowns this aura affects, as the client predicts (Sanctity of Battle:
+        // Crusader Strike, Divine Storm; CPP SpellHistory::StartCooldown)
+        if (HasAuraTypeWithAffectMask(SPELL_AURA_MOD_SPELL_COOLDOWN_BY_HASTE, spellInfo))
+        {
+            float const haste = GetFloatValue(UNIT_MOD_CAST_HASTE);
+            rec = int32(rec * haste);
+            catrec = int32(catrec * haste);
         }
 
         if (int32 cooldownMod = GetTotalAuraModifier(SPELL_AURA_MOD_COOLDOWN))
@@ -13503,6 +13557,9 @@ void Player::ResurectUsingRequestData()
     SetPower(POWER_ENERGY, GetMaxPower(POWER_ENERGY));
 
     SpawnCorpseBones();
+
+    if (m_resurrectAura)
+        CastSpell(this, m_resurrectAura, true);
 }
 
 void Player::SetClientControl(Unit* target, bool allowMove, bool packetOnly /*= false*/)
@@ -15482,6 +15539,32 @@ void Player::RemoveAtLoginFlag(AtLoginFlags flags, bool persist /*= false*/)
     }
 }
 
+// 4.x: the cooldown changes of the player's SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN auras, per category, which
+// the client applies to its cooldowns (CPP)
+void Player::SendSpellCategoryCooldowns() const
+{
+    std::vector<std::pair<uint32, int32>> categories;
+    for (AuraEffect const* aurEff : GetAuraEffectsByType(SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN))
+    {
+        uint32 const categoryId = aurEff->GetMiscValue();
+        auto itr = std::ranges::find(categories, categoryId, &std::pair<uint32, int32>::first);
+        if (itr == categories.end())
+            categories.emplace_back(categoryId, -aurEff->GetAmount());
+        else
+            itr->second -= aurEff->GetAmount();
+    }
+
+    WorldPacket data(SMSG_CATEGORY_COOLDOWN, 4 + 8 * categories.size());
+    data.WriteBits(categories.size(), 23);
+    data.FlushBits();
+    for (auto const& [categoryId, modCooldown] : categories)
+    {
+        data << uint32(categoryId);
+        data << int32(modCooldown);
+    }
+    SendDirectMessage(&data);
+}
+
 void Player::SendClearCooldown(uint32 spell_id, Unit* target)
 {
     WorldPacket data(SMSG_CLEAR_COOLDOWN, 4 + 8);
@@ -16239,6 +16322,31 @@ void Player::_LoadPrimaryTalentTrees(std::string_view talentTrees)
     }
 }
 
+// _addSpell and removeSpell tell the client nothing about a temporary passive (3.3.5a form auras), but a
+// 4.x specialization's passives and mastery are in the spellbook: these are told at a spec change
+static bool IsSilentTemporarySpell(uint32 spellId)
+{
+    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+    return spellInfo && ((spellInfo->HasAttribute(SpellAttr0(SPELL_ATTR0_PASSIVE | SPELL_ATTR0_DO_NOT_DISPLAY)) &&
+        spellInfo->HasAnyAura()) || spellInfo->HasEffect(SPELL_EFFECT_LEARN_SPELL));
+}
+
+void Player::_addPrimaryTalentTreeSpell(uint32 spellId)
+{
+    bool const known = HasSpell(spellId);
+    _addSpell(spellId, SPEC_MASK_ALL, true);
+    if (!known && HasSpell(spellId) && IsInWorld() && !isBeingLoaded() && IsSilentTemporarySpell(spellId))
+        SendLearnPacket(spellId, true);
+}
+
+void Player::_removePrimaryTalentTreeSpell(uint32 spellId)
+{
+    bool const known = HasSpell(spellId);
+    removeSpell(spellId, SPEC_MASK_ALL, true);
+    if (known && !HasSpell(spellId) && IsInWorld() && IsSilentTemporarySpell(spellId))
+        SendLearnPacket(spellId, false);
+}
+
 void Player::_addPrimaryTalentTreeSpells()
 {
     uint32 const talentTabId = GetPrimaryTalentTree(GetActiveSpec());
@@ -16250,13 +16358,13 @@ void Player::_addPrimaryTalentTreeSpells()
     // so they follow the spec: re-added at login and spec switch, dropped at talent reset
     if (std::vector<uint32> const* primarySpells = GetTalentTreePrimarySpells(talentTabId))
         for (uint32 spellId : *primarySpells)
-            _addSpell(spellId, SPEC_MASK_ALL, true);
+            _addPrimaryTalentTreeSpell(spellId);
 
     // the specialization's mastery, once the class's Mastery has been trained (level 80)
     if (CanUseMastery())
         for (uint32 masterySpellId : talentTab->MasterySpellID)
             if (masterySpellId)
-                _addSpell(masterySpellId, SPEC_MASK_ALL, true);
+                _addPrimaryTalentTreeSpell(masterySpellId);
 
     UpdateMastery();
 }
@@ -16269,14 +16377,14 @@ void Player::_removePrimaryTalentTreeSpells(uint32 talentTabId)
 
     if (std::vector<uint32> const* primarySpells = GetTalentTreePrimarySpells(talentTabId))
         for (uint32 spellId : *primarySpells)
-            removeSpell(spellId, SPEC_MASK_ALL, true);
+            _removePrimaryTalentTreeSpell(spellId);
 
     for (uint32 masterySpellId : talentTab->MasterySpellID)
     {
         if (!masterySpellId)
             continue;
 
-        removeSpell(masterySpellId, SPEC_MASK_ALL, true);
+        _removePrimaryTalentTreeSpell(masterySpellId);
         RemoveAurasDueToSpell(masterySpellId);
     }
 }

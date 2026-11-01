@@ -370,6 +370,9 @@ public:
     void EffectSummonObject(SpellEffIndex effIndex);
     void EffectSurvey(SpellEffIndex effIndex);
     void EffectResurrect(SpellEffIndex effIndex);
+    void EffectGiveCurrency(SpellEffIndex effIndex);
+    void EffectResurrectWithAura(SpellEffIndex effIndex);
+    void EffectUnlockGuildVaultTab(SpellEffIndex effIndex);
     void EffectParry(SpellEffIndex effIndex);
     void EffectBlock(SpellEffIndex effIndex);
     void EffectLeap(SpellEffIndex effIndex);

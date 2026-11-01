@@ -283,6 +283,9 @@ public:
     void HandleModCombatSpeedPct(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleModAttackSpeed(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleModMeleeSpeedPct(AuraApplication const* aurApp, uint8 mode, bool apply) const;
+    void HandleAuraModNoActions(AuraApplication const* aurApp, uint8 mode, bool apply) const;
+    void HandleAuraForceWeather(AuraApplication const* aurApp, uint8 mode, bool apply) const;
+    void HandleModSpellCategoryCooldown(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleAuraModRangedHaste(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     void HandleRangedAmmoHaste(AuraApplication const* aurApp, uint8 mode, bool apply) const;
     //   combat rating

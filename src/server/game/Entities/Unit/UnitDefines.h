@@ -311,6 +311,7 @@ enum UnitFlags2 : uint32
     UNIT_FLAG2_UNK2                         = 0x00010000,
     UNIT_FLAG2_PLAY_DEATH_ANIM              = 0x00020000,       // Plays special death animation upon death
     UNIT_FLAG2_ALLOW_CHEAT_SPELLS           = 0x00040000,       // Allows casting spells with AttributesEx7 & SPELL_ATTR7_DEBUG_SPELL
+    UNIT_FLAG2_NO_ACTIONS                   = 0x00800000,       // 4.x: SPELL_AURA_MOD_NO_ACTIONS (CPP)
     UNIT_FLAG2_UNUSED_6                     = 0x01000000
 };
 DEFINE_ENUM_FLAG(UnitFlags2);

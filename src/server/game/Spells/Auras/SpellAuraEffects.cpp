@@ -25,6 +25,7 @@
 #include "GameTime.h"
 #include "GridNotifiers.h"
 #include "Log.h"
+#include "MiscPackets.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
@@ -38,6 +39,7 @@
 #include "Unit.h"
 #include "Util.h"
 #include "Vehicle.h"
+#include "Weather.h"
 #include "WorldPacket.h"
 
 /// @todo: this import is not necessary for compilation and marked as unused by the IDE
@@ -279,7 +281,7 @@ pAuraEffectHandler AuraEffectHandler[TOTAL_AURAS] =
     &AuraEffect::HandleNULL,                                      //214 Tamed Pet Passive
     &AuraEffect::HandleArenaPreparation,                          //215 SPELL_AURA_ARENA_PREPARATION
     &AuraEffect::HandleModCastingSpeed,                           //216 SPELL_AURA_HASTE_SPELLS
-    &AuraEffect::HandleNULL,                                      //217 69106 - killing spree helper - unknown use
+    &AuraEffect::HandleModMeleeSpeedPct,                      //217 SPELL_AURA_MOD_MELEE_HASTE_2
     &AuraEffect::HandleAuraModRangedHaste,                        //218 SPELL_AURA_HASTE_RANGED
     &AuraEffect::HandleModManaRegen,                              //219 SPELL_AURA_MOD_MANA_REGEN_FROM_STAT
     &AuraEffect::HandleModRatingFromStat,                         //220 SPELL_AURA_MOD_RATING_FROM_STAT
@@ -383,7 +385,7 @@ pAuraEffectHandler AuraEffectHandler[TOTAL_AURAS] =
     &AuraEffect::HandleMastery,                                   //318 SPELL_AURA_MASTERY
     &AuraEffect::HandleModMeleeSpeedPct,                          //319 SPELL_AURA_MOD_MELEE_HASTE_3
     &AuraEffect::HandleAuraModRangedHaste,                        //320 SPELL_AURA_MOD_RANGED_HASTE_2
-    &AuraEffect::HandleNULL,                                      //321 SPELL_AURA_MOD_NO_ACTIONS
+    &AuraEffect::HandleAuraModNoActions,                      //321 SPELL_AURA_MOD_NO_ACTIONS
     &AuraEffect::HandleNULL,                                      //322 SPELL_AURA_INTERFERE_TARGETTING
     &AuraEffect::HandleUnused,                                    //323 unused (4.3.4)
     &AuraEffect::HandleNULL,                                      //324 SPELL_AURA_324
@@ -393,7 +395,7 @@ pAuraEffectHandler AuraEffectHandler[TOTAL_AURAS] =
     &AuraEffect::HandleNoImmediateEffect,                         //328 SPELL_AURA_PROC_ON_POWER_AMOUNT implemented in AuraEffect::HandleProc
     &AuraEffect::HandleNoImmediateEffect,                         //329 SPELL_AURA_MOD_RUNE_REGEN_SPEED implemented in Spell::TakeRunePower
     &AuraEffect::HandleNoImmediateEffect,                         //330 SPELL_AURA_CAST_WHILE_WALKING implemented in Spell::prepare, Spell::update, Unit::RemoveAurasWithInterruptFlags
-    &AuraEffect::HandleNULL,                                      //331 SPELL_AURA_FORCE_WEATHER
+    &AuraEffect::HandleAuraForceWeather,                      //331 SPELL_AURA_FORCE_WEATHER
     &AuraEffect::HandleNoImmediateEffect,                         //332 SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS implemented in Unit::GetCastSpellInfo
     &AuraEffect::HandleNoImmediateEffect,                         //333 SPELL_AURA_OVERRIDE_ACTIONBAR_SPELLS_TRIGGERED implemented in Unit::GetCastSpellInfo
     &AuraEffect::HandleNULL,                                      //334 SPELL_AURA_MOD_BLIND
@@ -401,17 +403,17 @@ pAuraEffectHandler AuraEffectHandler[TOTAL_AURAS] =
     &AuraEffect::HandleNULL,                                      //336 SPELL_AURA_MOUNT_RESTRICTIONS
     &AuraEffect::HandleNoImmediateEffect,                         //337 SPELL_AURA_MOD_VENDOR_ITEMS_PRICES implemented in Player::BuyItemFromVendorSlot
     &AuraEffect::HandleNoImmediateEffect,                         //338 SPELL_AURA_MOD_DURABILITY_LOSS implemented in Player::DurabilityLoss
-    &AuraEffect::HandleNULL,                                      //339 SPELL_AURA_INCREASE_SKILL_GAIN_CHANCE
+    &AuraEffect::HandleNoImmediateEffect,                     //339 SPELL_AURA_INCREASE_SKILL_GAIN_CHANCE implemented in Player::UpdateSkillPro
     &AuraEffect::HandleNULL,                                      //340 SPELL_AURA_MOD_RESURRECTED_HEALTH_BY_GUILD_MEMBER needs guild perks
-    &AuraEffect::HandleNULL,                                      //341 SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN
+    &AuraEffect::HandleModSpellCategoryCooldown,              //341 SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN also in Player::AddSpellAndCategoryCooldowns
     &AuraEffect::HandleModMeleeRangedSpeedPct,                    //342 SPELL_AURA_MOD_MELEE_RANGED_HASTE_2
     &AuraEffect::HandleNoImmediateEffect,                         //343 SPELL_AURA_MOD_MELEE_DAMAGE_FROM_CASTER implemented in Unit::MeleeDamageBonusDone
     &AuraEffect::HandleNoImmediateEffect,                         //344 SPELL_AURA_MOD_AUTOATTACK_DAMAGE implemented in Unit::MeleeDamageBonusDone
     &AuraEffect::HandleNoImmediateEffect,                         //345 SPELL_AURA_BYPASS_ARMOR_FOR_CASTER implemented in Unit::CalcArmorReducedDamage
     &AuraEffect::HandleNULL,                                      //346 SPELL_AURA_ENABLE_ALT_POWER needs the alternate power bar
-    &AuraEffect::HandleNULL,                                      //347 SPELL_AURA_MOD_SPELL_COOLDOWN_BY_HASTE
+    &AuraEffect::HandleNoImmediateEffect,                         //347 SPELL_AURA_MOD_SPELL_COOLDOWN_BY_HASTE implemented in Player::AddSpellAndCategoryCooldowns
     &AuraEffect::HandleNULL,                                      //348 SPELL_AURA_DEPOSIT_BONUS_MONEY_IN_GUILD_BANK_ON_LOOT needs guild perks
-    &AuraEffect::HandleNULL,                                      //349 SPELL_AURA_MOD_CURRENCY_GAIN needs Cataclysm currencies
+    &AuraEffect::HandleNoImmediateEffect,                     //349 SPELL_AURA_MOD_CURRENCY_GAIN implemented in Player::ModifyCurrency
     &AuraEffect::HandleNULL,                                      //350 SPELL_AURA_MOD_GATHERING_ITEMS_GAINED_PERCENT
     &AuraEffect::HandleNULL,                                      //351 SPELL_AURA_MOD_CURRENCY_CATEGORY_GAIN_PCT needs Cataclysm currencies
     &AuraEffect::HandleNULL,                                      //352 SPELL_AURA_ENABLE_ALTERED_FORM
@@ -4945,6 +4947,63 @@ void AuraEffect::HandleModMeleeSpeedPct(AuraApplication const* aurApp, uint8 mod
         target->ApplyHasteRegenMod(float(GetAmount()), apply);
 }
 
+// 4.x: the unit can take no actions; spells whose prevention type is "no actions" are stopped (CPP)
+void AuraEffect::HandleAuraModNoActions(AuraApplication const* aurApp, uint8 mode, bool apply) const
+{
+    if (!(mode & AURA_EFFECT_HANDLE_REAL))
+        return;
+
+    Unit* target = aurApp->GetTarget();
+    if (apply)
+    {
+        target->SetFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_NO_ACTIONS);
+
+        for (uint32 i = CURRENT_MELEE_SPELL; i < CURRENT_MAX_SPELL; ++i)
+            if (Spell* spell = target->GetCurrentSpell(CurrentSpellTypes(i)))
+                if (spell->m_spellInfo->PreventionType == SPELL_PREVENTION_TYPE_NO_ACTIONS)
+                    target->InterruptSpell(CurrentSpellTypes(i), false);
+    }
+    else
+    {
+        // another aura of the kind keeps the flag
+        if (target->HasAuraType(SPELL_AURA_MOD_NO_ACTIONS))
+            return;
+
+        target->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_NO_ACTIONS);
+    }
+}
+
+// 4.x: the player sees the aura's weather; the zone's weather returns when it goes (CPP)
+void AuraEffect::HandleAuraForceWeather(AuraApplication const* aurApp, uint8 mode, bool apply) const
+{
+    if (!(mode & AURA_EFFECT_HANDLE_REAL))
+        return;
+
+    Player* target = aurApp->GetTarget()->ToPlayer();
+    if (!target)
+        return;
+
+    if (apply)
+    {
+        WorldPackets::Misc::Weather weather(WeatherState(GetMiscValue()), 1.0f);
+        target->SendDirectMessage(weather.Write());
+    }
+    else if (Weather* weather = target->GetMap()->GetOrGenerateZoneDefaultWeather(target->GetZoneId()))
+        weather->SendWeatherUpdateToPlayer(target);
+    else
+        Weather::SendFineWeatherUpdateToPlayer(target);
+}
+
+// 4.x: category cooldown changes are sent to the client, which shows them on its cooldowns (CPP)
+void AuraEffect::HandleModSpellCategoryCooldown(AuraApplication const* aurApp, uint8 mode, bool /*apply*/) const
+{
+    if (!(mode & AURA_EFFECT_HANDLE_REAL))
+        return;
+
+    if (Player* player = aurApp->GetTarget()->ToPlayer())
+        player->SendSpellCategoryCooldowns();
+}
+
 void AuraEffect::HandleAuraModRangedHaste(AuraApplication const* aurApp, uint8 mode, bool apply) const
 {
     if (!(mode & (AURA_EFFECT_HANDLE_CHANGE_AMOUNT_MASK | AURA_EFFECT_HANDLE_STAT)))
@@ -6317,13 +6376,6 @@ void AuraEffect::HandlePeriodicTriggerSpellAuraTick(Unit* target, Unit* caster) 
                     return;
                 }
                 break;
-            // Beacon of Light
-            case 53563:
-                {
-                    // area aura owner casts the spell
-                    GetBase()->GetUnitOwner()->CastSpell(target, triggeredSpellInfo, true, 0, this, GetBase()->GetUnitOwner()->GetGUID());
-                    return;
-                }
             // Trial of the Crusader, Jaraxxus, Spinning Pain Spike
             case 66283:
                 {

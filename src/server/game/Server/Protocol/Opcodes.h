@@ -937,6 +937,7 @@ enum OpcodeServer : uint16
     SMSG_LEARNED_SPELL                              = 0x58A2,
     SMSG_SUPERCEDED_SPELL                           = 0x35B0,
     SMSG_CAST_FAILED                                = 0x4D16,
+    SMSG_CATEGORY_COOLDOWN                          = 0x71B6,
     SMSG_SPELL_START                                = 0x6415,
     SMSG_SPELL_GO                                   = 0x6E16,
     SMSG_SPELL_FAILURE                              = 0x4535,

@@ -1030,6 +1030,7 @@ public:                                                 // opcodes handlers
     void HandleOpenItemOpcode(WorldPacket& recvPacket);
     void HandleCastSpellOpcode(WorldPacket& recvPacket);
     void HandleCancelCastOpcode(WorldPacket& recvPacket);
+    void HandleRequestCategoryCooldowns(WorldPacket& recvPacket);
     void HandleCancelAuraOpcode(WorldPacket& recvPacket);
     void HandleCancelGrowthAuraOpcode(WorldPacket& recvPacket);
     void HandleCancelAutoRepeatSpellOpcode(WorldPacket& recvPacket);

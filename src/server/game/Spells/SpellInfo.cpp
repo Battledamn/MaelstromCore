@@ -367,7 +367,10 @@ SpellEffectInfo::SpellEffectInfo(SpellEffectEntry const* effect, SpellInfo const
     ItemType = effect->EffectItemType;
     TriggerSpell = effect->EffectTriggerSpell;
     SpellClassMask = effect->EffectSpellClassMask;
-    RadiusEntry = effect->EffectRadiusIndex ? sSpellRadiusStore.LookupEntry(effect->EffectRadiusIndex) : nullptr;
+    // 4.3.4 has a radius per target (TargetA, TargetB); an effect whose area is its TargetB only fills the
+    // second one (Consecration's damage, 81297), so it stands in when the first is empty
+    uint32 const radiusIndex = effect->EffectRadiusIndex ? effect->EffectRadiusIndex : effect->EffectRadiusMaxIndex;
+    RadiusEntry = radiusIndex ? sSpellRadiusStore.LookupEntry(radiusIndex) : nullptr;
 }
 
 bool SpellEffectInfo::IsEffect() const
@@ -628,7 +631,11 @@ float SpellEffectInfo::CalcRadius(WorldObject* caster, Spell* spell) const
     if (!HasRadius())
         return 0.0f;
 
+    // the client uses RadiusMax when RadiusMin is 0 (CPP)
     float radius = RadiusEntry->RadiusMin;
+    if (radius == 0.0f)
+        radius = RadiusEntry->RadiusMax;
+
     if (caster)
     {
         if (Unit* unitCaster = caster->ToUnit())
@@ -2315,9 +2322,11 @@ SpellSpecificType SpellInfo::LoadSpellSpecific() const
             }
         case SPELLFAMILY_PALADIN:
             {
-                // Collection of all the seal family flags. No other paladin spell has any of those.
-                if (SpellFamilyFlags[1] & 0x26000C00
-                        || SpellFamilyFlags[0] & 0x0A000000)
+                // 4.3.4 seals (Righteousness, Justice, Insight, Truth): the auras with one of these flags and no
+                // other family flag. Their damage spells share the flags but are no auras, Censure also has a
+                // first-word flag, and Seals of Command and Protector of the Innocent (WotLK's 0x0A000000) are
+                // no seals
+                if ((SpellFamilyFlags[1] & 0xA2000800) && !SpellFamilyFlags[0] && !SpellFamilyFlags[2] && HasAnyAura())
                     return SPELL_SPECIFIC_SEAL;
 
                 if (SpellFamilyFlags[0] & 0x00002190)

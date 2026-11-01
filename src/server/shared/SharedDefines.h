@@ -1667,7 +1667,9 @@ enum SpellPreventionType
 {
     SPELL_PREVENTION_TYPE_NONE      = 0,
     SPELL_PREVENTION_TYPE_SILENCE   = 1,
-    SPELL_PREVENTION_TYPE_PACIFY    = 2
+    SPELL_PREVENTION_TYPE_PACIFY    = 2,
+    SPELL_PREVENTION_TYPE_UNK       = 3,                    // 4.x: a few spells, mostly interruptible
+    SPELL_PREVENTION_TYPE_NO_ACTIONS = 4                    // 4.x: blocked by SPELL_AURA_MOD_NO_ACTIONS
 };
 
 enum GameobjectTypes
