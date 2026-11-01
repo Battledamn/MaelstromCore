@@ -133,6 +133,9 @@ __pycache__/
 #
 # ==================
 
+# MaelstromCore's own modules live in this repository
+!modules/mod-maelstrom-testkit
+
 # Live-stack e2e private / local tooling (scratch tests stay uncommitted)
 e2e/local/**
 !e2e/local/README.md
