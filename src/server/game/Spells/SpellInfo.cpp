@@ -957,8 +957,11 @@ SpellInfo::SpellInfo(SpellEntry const* spellEntry, std::array<SpellEffectEntry c
 
     SpellEquippedItemsEntry const* equippedItems = sSpellEquippedItemsStore.LookupEntry(spellEntry->EquippedItemsID);
     EquippedItemClass = equippedItems ? equippedItems->EquippedItemClass : -1;
-    EquippedItemSubClassMask = equippedItems ? equippedItems->EquippedItemSubclass : -1;
-    EquippedItemInventoryTypeMask = equippedItems ? equippedItems->EquippedItemInvTypes : -1;
+    // No item requirement: 0 masks, as the 3.3.5a data had and AzerothCore's checks expect ("0 == any");
+    // -1 made every spell a ranged weapon spell (ranged attack power for its bonus) and hid the flat
+    // spell damage auras from spell power.
+    EquippedItemSubClassMask = equippedItems ? equippedItems->EquippedItemSubclass : 0;
+    EquippedItemInventoryTypeMask = equippedItems ? equippedItems->EquippedItemInvTypes : 0;
 
     SpellInterruptsEntry const* interrupts = sSpellInterruptsStore.LookupEntry(spellEntry->InterruptsID);
     InterruptFlags = interrupts ? interrupts->InterruptFlags : 0;

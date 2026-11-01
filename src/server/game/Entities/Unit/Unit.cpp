@@ -8889,6 +8889,10 @@ int32 Unit::SpellBaseDamageBonusDone(SpellSchoolMask schoolMask, bool withSpellP
         DoneAdvertisedBenefit += ToPlayer()->GetBaseSpellPowerBonus();
         DoneAdvertisedBenefit += ToPlayer()->GetBaseSpellDamageBonus();
 
+        // 4.x: spell power from Intellect, for every class that uses mana (CPP)
+        if (GetPowerIndex(POWER_MANA) != MAX_POWERS)
+            DoneAdvertisedBenefit += std::max(0, int32(GetStat(STAT_INTELLECT)) - 10);
+
         // Damage bonus from stats
         AuraEffectList const& mDamageDoneOfStatPercent = GetAuraEffectsByType(SPELL_AURA_MOD_SPELL_DAMAGE_OF_STAT_PERCENT);
         for (AuraEffectList::const_iterator i = mDamageDoneOfStatPercent.begin(); i != mDamageDoneOfStatPercent.end(); ++i)
@@ -9672,6 +9676,10 @@ int32 Unit::SpellBaseHealingBonusDone(SpellSchoolMask schoolMask, bool withSpell
         // Base value
         AdvertisedBenefit += ToPlayer()->GetBaseSpellPowerBonus();
         AdvertisedBenefit += ToPlayer()->GetBaseSpellHealingBonus();
+
+        // 4.x: spell power from Intellect, for every class that uses mana (CPP)
+        if (GetPowerIndex(POWER_MANA) != MAX_POWERS)
+            AdvertisedBenefit += std::max(0, int32(GetStat(STAT_INTELLECT)) - 10);
 
         // Healing bonus from stats
         AuraEffectList const& mHealingDoneOfStatPercent = GetAuraEffectsByType(SPELL_AURA_MOD_SPELL_HEALING_OF_STAT_PERCENT);

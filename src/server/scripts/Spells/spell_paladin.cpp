@@ -1368,7 +1368,9 @@ class spell_pal_lights_beacon : public AuraScript
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
-        return eventInfo.GetHealInfo() != nullptr;
+        // Light's Beacon is cast by the beacon target, which carries it too: a heal on the beacon target
+        // itself is not copied to it (own; CPP copied it)
+        return eventInfo.GetHealInfo() != nullptr && GetTarget() != GetCaster();
     }
 
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
