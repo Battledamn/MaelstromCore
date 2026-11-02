@@ -1556,36 +1556,8 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                     }
                 }
                 break;
-            case SPELLFAMILY_PRIEST:
-                if (!caster)
-                    break;
-                // Devouring Plague
-                if (GetSpellInfo()->SpellFamilyFlags[0] & 0x02000000 && GetEffect(0))
-                {
-                    // Improved Devouring Plague
-                    if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PRIEST, 3790, 1))
-                    {
-                        uint32 damage = GetEffect(0)->GetAmount();
-                        damage = target->SpellDamageBonusTaken(caster, GetSpellInfo(), damage, DOT);
-                        int32 basepoints0 = aurEff->GetAmount() * GetEffect(0)->GetTotalTicks() * int32(damage) / 100;
-                        int32 heal = int32(CalculatePct(basepoints0, 15));
-
-                        caster->CastCustomSpell(target, 63675, &basepoints0, nullptr, nullptr, true, nullptr, GetEffect(0));
-                        caster->CastCustomSpell(caster, 75999, &heal, nullptr, nullptr, true, nullptr, GetEffect(0));
-                    }
-                }
-                // Power Word: Shield
-                else if (m_spellInfo->SpellFamilyFlags[0] & 0x1 && m_spellInfo->SpellFamilyFlags[2] & 0x400 && GetEffect(0))
-                {
-                    // Glyph of Power Word: Shield
-                    if (AuraEffect* glyph = caster->GetAuraEffect(55672, 0))
-                    {
-                        // instantly heal m_amount% of the absorb-value
-                        int32 heal = glyph->GetAmount() * GetEffect(0)->GetAmount() / 100;
-                        caster->CastCustomSpell(GetUnitOwner(), 56160, &heal, nullptr, nullptr, true, 0, GetEffect(0));
-                    }
-                }
-                break;
+            // SPELLFAMILY_PRIEST: Improved Devouring Plague and the Glyph of Power Word: Shield heal are spell_pri_devouring_plague
+            // and spell_pri_power_word_shield_aura (4.3.4, CPP)
             case SPELLFAMILY_ROGUE:
                 // Sprint (skip non player casted spells by category)
                 if (GetSpellInfo()->SpellFamilyFlags[0] & 0x40 && GetSpellInfo()->GetCategory() == 44)
@@ -1788,113 +1760,30 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
             case SPELLFAMILY_PRIEST:
                 if (!caster)
                     break;
-                // Shadow word: Pain // Vampiric Touch
-                if (removeMode == AURA_REMOVE_BY_ENEMY_SPELL && (GetSpellInfo()->SpellFamilyFlags[0] & 0x00008000 || GetSpellInfo()->SpellFamilyFlags[1] & 0x00000400))
+                // Power Word: Shield broken or dispelled: Rapture gives the priest $s1% of maximum mana, once every 12 s
+                // (4.3.4, CPP: the rank's own amount; WotLK's rank tweaks, the mana for the shielded target and Shadow
+                // Affinity are gone)
+                if (removeMode == AURA_REMOVE_BY_ENEMY_SPELL && GetSpellInfo()->SpellFamilyFlags[0] & 0x00000001)
                 {
-                    // Shadow Affinity
-                    if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_PRIEST, 178, 1))
-                    {
-                        int32 basepoints0 = aurEff->GetAmount() * caster->GetCreateMana() / 100;
-                        caster->CastCustomSpell(caster, 64103, &basepoints0, nullptr, nullptr, true, nullptr, GetEffect(0));
-                    }
-                }
-                // Power word: shield
-                else if (removeMode == AURA_REMOVE_BY_ENEMY_SPELL && GetSpellInfo()->SpellFamilyFlags[0] & 0x00000001)
-                {
-                    // Rapture
                     if (Aura const* aura = caster->GetAuraOfRankedSpell(47535))
                     {
-                        // check cooldown
-                        if (caster->IsPlayer())
+                        if (Player* player = caster->ToPlayer())
                         {
-                            if (caster->ToPlayer()->HasSpellCooldown(aura->GetId()))
+                            if (player->HasSpellCooldown(aura->GetId()))
                             {
-                                // This additional check is needed to add a minimal delay before cooldown in in effect
-                                // to allow all bubbles broken by a single damage source proc mana return
-                                if (caster->ToPlayer()->GetSpellCooldownDelay(aura->GetId()) <= 11500)
+                                // a short grace so every bubble broken by one hit gives its mana
+                                if (player->GetSpellCooldownDelay(aura->GetId()) <= 11500)
                                     break;
                             }
-                            else    // and add if needed
-                                caster->ToPlayer()->AddSpellCooldown(aura->GetId(), 0, 12 * IN_MILLISECONDS);
+                            else
+                                player->AddSpellCooldown(aura->GetId(), 0, 12 * IN_MILLISECONDS);
                         }
 
-                        // effect on caster
-                        if (AuraEffect const* aurEff = aura->GetEffect(0))
+                        if (AuraEffect const* aurEff = aura->GetEffect(EFFECT_0))
                         {
-                            float multiplier = (float)aurEff->GetAmount();
-                            if (aurEff->GetId() == 47535)
-                                multiplier -= 0.5f;
-                            else if (aurEff->GetId() == 47537)
-                                multiplier += 0.5f;
-
-                            int32 basepoints0 = int32(CalculatePct(caster->GetMaxPower(POWER_MANA), multiplier));
+                            int32 basepoints0 = int32(CalculatePct(caster->GetMaxPower(POWER_MANA), aurEff->GetAmount()));
                             caster->CastCustomSpell(caster, 47755, &basepoints0, nullptr, nullptr, true);
                         }
-                        // effect on aura target
-                        if (AuraEffect const* aurEff = aura->GetEffect(1))
-                        {
-                            if (!roll_chance_i(aurEff->GetAmount()))
-                                break;
-
-                            int32 triggeredSpellId = 0;
-                            switch (target->getPowerType())
-                            {
-                                case POWER_MANA:
-                                    {
-                                        int32 basepoints0 = int32(CalculatePct(target->GetMaxPower(POWER_MANA), 2));
-                                        caster->CastCustomSpell(target, 63654, &basepoints0, nullptr, nullptr, true);
-                                        break;
-                                    }
-                                case POWER_RAGE:
-                                    triggeredSpellId = 63653;
-                                    break;
-                                case POWER_ENERGY:
-                                    triggeredSpellId = (!target->HasAura(70405) ? 63655 : 0);
-                                    break;
-                                case POWER_RUNIC_POWER:
-                                    triggeredSpellId = 63652;
-                                    break;
-                                default:
-                                    break;
-                            }
-                            if (triggeredSpellId)
-                                caster->CastSpell(target, triggeredSpellId, true);
-                        }
-                    }
-                }
-                switch (GetId())
-                {
-                    case 47788: // Guardian Spirit
-                    {
-                        if (removeMode != AURA_REMOVE_BY_EXPIRE)
-                            break;
-                        if (!caster->IsPlayer())
-                            break;
-
-                        Player* player = caster->ToPlayer();
-                        // Glyph of Guardian Spirit
-                        if (AuraEffect* aurEff = player->GetAuraEffect(63231, 0))
-                        {
-                            if (!player->HasSpellCooldown(47788))
-                                break;
-
-                            player->AddSpellCooldown(GetSpellInfo()->Id, 0, aurEff->GetAmount()*IN_MILLISECONDS);
-
-                            WorldPacket data(SMSG_MODIFY_COOLDOWN, 4 + 8 + 4);
-                            data << uint32(GetId());                  // Spell ID
-                            data << player->GetGUID();                // Player GUID
-                            data << int32(-110000);                   // Cooldown mod in milliseconds
-                            player->SendDirectMessage(&data);
-                        }
-                        break;
-                    }
-                    case 47585: // Dispersion (fixed bug invisible as a Shadow Priest)
-                    {
-                        if (target->IsMounted())
-                        {
-                            target->CastSpell(target, 53444, true);
-                        }
-                        break;
                     }
                 }
                 break;
