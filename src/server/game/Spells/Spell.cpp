@@ -752,6 +752,10 @@ Spell::~Spell()
         if (modOwner->m_spellModTakingSpell == this)
             modOwner->SetSpellModTakingSpell(this, false);
 
+    // a finishing move that never finished spends nothing; the points held meanwhile are added
+    if (Unit* unitCaster = (m_caster && m_caster->FindMap()) ? m_caster->ToUnit() : nullptr)
+        unitCaster->EndComboPointSpend(this, false);
+
     // unload scripts
     while (!m_loadedScripts.empty())
     {
@@ -4091,6 +4095,10 @@ void Spell::_cast(bool skipCheck)
         TakePower();
         TakeReagents();                                         // we must remove reagents before HandleEffects to allow place crafted item in same slot
     }
+
+    // a finishing move: combo points gained from here on are added after it spends its own (_handle_finish_phase)
+    if (m_needComboPoints && unitCaster)
+        unitCaster->BeginComboPointSpend(this);
     else if (Item* targetItem = m_targets.GetItemTarget())
     {
         /// Not own traded item (in trader trade slot) req. reagents including triggered spell case
@@ -4433,11 +4441,9 @@ void Spell::_handle_finish_phase()
     // reach the finish procs below through m_originalCaster (Entrapment, Lock and Load)
     if (Unit* unitCaster = m_caster->ToUnit())
     {
-        // Take for real after all targets are processed
-        if (m_needComboPoints)
-        {
-            unitCaster->ClearComboPoints();
-        }
+        // Take for real after all targets are processed; then the points gained meanwhile (Ruthlessness, Improved
+        // Expose Armor) are added. A miss on the main target keeps the points (m_needComboPoints false).
+        unitCaster->EndComboPointSpend(this, m_needComboPoints);
 
         // Real add combo points from effects
         if (m_comboTarget && m_comboPointGain)

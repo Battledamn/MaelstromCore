@@ -13013,10 +13013,49 @@ void Unit::RestoreDisplayId()
     SetDisplayId(GetNativeDisplayId());
 }
 
+void Unit::BeginComboPointSpend(Spell const* spell)
+{
+    m_comboPointSpender = spell;
+    m_heldComboTarget.Clear();
+    m_heldComboPoints = 0;
+}
+
+void Unit::EndComboPointSpend(Spell const* spell, bool spend)
+{
+    if (!spell || m_comboPointSpender != spell)
+        return;
+
+    m_comboPointSpender = nullptr;
+    if (spend)
+        ClearComboPoints();
+
+    if (m_heldComboPoints > 0)
+    {
+        int8 const held = m_heldComboPoints;
+        m_heldComboPoints = 0;
+        if (Unit* target = ObjectAccessor::GetUnit(*this, m_heldComboTarget))
+            AddComboPoints(target, held);
+    }
+    m_heldComboTarget.Clear();
+}
+
 void Unit::AddComboPoints(Unit* target, int8 count)
 {
     if (!count)
     {
+        return;
+    }
+
+    // gained while a finishing move is still spending: added once it has (EndComboPointSpend)
+    if (m_comboPointSpender && count > 0)
+    {
+        ObjectGuid const targetGUID = target ? target->GetGUID() : GetComboTargetGUID();
+        if (targetGUID != m_heldComboTarget)
+        {
+            m_heldComboTarget = targetGUID;
+            m_heldComboPoints = 0;
+        }
+        m_heldComboPoints = std::min<int8>(m_heldComboPoints + count, 5);
         return;
     }
 

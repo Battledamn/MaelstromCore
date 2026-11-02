@@ -3678,18 +3678,7 @@ void SpellMgr::LoadSpellInfoCustomAttributes()
 
         switch (spellInfo->Id)
         {
-            // Xinef: NOT CUSTOM, cant add in DBC CORRECTION because i need to swap effects, too much work to do there
-            // Envenom
-            case 32645:
-            case 32684:
-            case 57992:
-            case 57993:
-                {
-                    SpellEffectInfo info = spellInfo->Effects[EFFECT_0];
-                    spellInfo->Effects[EFFECT_0] = spellInfo->Effects[EFFECT_2];
-                    spellInfo->Effects[EFFECT_2] = info;
-                    break;
-                }
+            // Envenom: 3.3.5a swapped its effects 0 and 2; 4.3.4's damage is effect 0 itself (spell_rog_envenom, CPP)
 
             // Xinef: Cooldown overwrites
             // Burst of Speed

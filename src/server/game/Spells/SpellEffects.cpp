@@ -502,77 +502,7 @@ void Spell::EffectSchoolDMG(SpellEffIndex effIndex)
                     }
                     break;
                 }
-            case SPELLFAMILY_ROGUE:
-                {
-                    if (!unitCaster)
-                        break;
-
-                    // Envenom
-                    if (m_spellInfo->SpellFamilyFlags[1] & 0x00000008)
-                    {
-                        if (Player* player = unitCaster->ToPlayer())
-                        {
-                            // consume from stack dozes not more that have combo-points
-                            if (uint32 combo = player->GetComboPoints())
-                            {
-                                // Lookup for Deadly poison (only attacker applied)
-                                if (AuraEffect const* aurEff = unitTarget->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_ROGUE, 0x00010000, 0, 0, unitCaster->GetGUID()))
-                                {
-                                    // count consumed deadly poison doses at target
-                                    bool needConsume = true;
-                                    uint32 spellId = aurEff->GetId();
-
-                                    uint32 doses = aurEff->GetBase()->GetStackAmount();
-                                    if (doses > combo)
-                                        doses = combo;
-
-                                    // Master Poisoner
-                                    Unit::AuraEffectList const& auraList = player->GetAuraEffectsByType(SPELL_AURA_MOD_AURA_DURATION_BY_DISPEL_NOT_STACK);
-                                    for (Unit::AuraEffectList::const_iterator iter = auraList.begin(); iter != auraList.end(); ++iter)
-                                    {
-                                        if ((*iter)->GetSpellInfo()->SpellFamilyName == SPELLFAMILY_ROGUE && (*iter)->GetSpellInfo()->SpellIconID == 1960)
-                                        {
-                                            uint32 chance = (*iter)->GetSpellInfo()->Effects[EFFECT_2].CalcValue(unitCaster);
-
-                                            if (chance && roll_chance_i(chance))
-                                                needConsume = false;
-
-                                            break;
-                                        }
-                                    }
-
-                                    if (needConsume)
-                                        for (uint32 i = 0; i < doses; ++i)
-                                            unitTarget->RemoveAuraFromStack(spellId, unitCaster->GetGUID());
-
-                                    damage *= doses;
-                                    damage += int32(player->GetTotalAttackPowerValue(BASE_ATTACK) * 0.09f * combo);
-                                }
-
-                                // Eviscerate and Envenom Bonus Damage (item set effect)
-                                if (unitCaster->HasAura(37169))
-                                    damage += combo * 40;
-                            }
-                        }
-                    }
-                    // Eviscerate
-                    else if (m_spellInfo->SpellFamilyFlags[0] & 0x00020000)
-                    {
-                        if (unitCaster->IsPlayer())
-                        {
-                            if (uint32 combo = unitCaster->ToPlayer()->GetComboPoints())
-                            {
-                                float ap = unitCaster->GetTotalAttackPowerValue(BASE_ATTACK);
-                                damage += int32(ap * combo * 0.07f);
-
-                                // Eviscerate and Envenom Bonus Damage (item set effect)
-                                if (unitCaster->HasAura(37169))
-                                    damage += combo * 40;
-                            }
-                        }
-                    }
-                    break;
-                }
+            // SPELLFAMILY_ROGUE: Envenom and Eviscerate are spell_rog_envenom and spell_rog_eviscerate (4.3.4, CPP)
             case SPELLFAMILY_HUNTER:
                 {
                     if (!unitCaster)
@@ -711,14 +641,6 @@ void Spell::EffectDummy(SpellEffIndex effIndex)
 
                             return;
                         }
-                }
-                break;
-            case SPELLFAMILY_ROGUE:
-                // Hunger for Blood
-                if (m_spellInfo->Id == 51662)
-                {
-                    unitCaster->CastSpell(unitCaster, 63848, true);
-                    return;
                 }
                 break;
         }
@@ -3596,45 +3518,10 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
             }
         case SPELLFAMILY_ROGUE:
             {
-                // Fan of Knives, Hemorrhage, Ghostly Strike
-                if ((m_spellInfo->SpellFamilyFlags[1] & 0x40000)
-                        || (m_spellInfo->SpellFamilyFlags[0] & 0x6000000))
-                {
-                    // Hemorrhage
-                    if (m_spellInfo->SpellFamilyFlags[0] & 0x2000000)
-                    {
-                        AddComboPointGain(unitTarget, 1);
-                    }
-                    // 50% more damage with daggers
-                    if (unitCaster->IsPlayer())
-                        if (Item* item = unitCaster->ToPlayer()->GetWeaponForAttack(m_attackType, true))
-                            if (item->GetTemplate()->SubClass == ITEM_SUBCLASS_WEAPON_DAGGER)
-                                AddPct(totalDamagePercentMod, 50.0f);
-                }
-                // Mutilate (for each hand)
-                else if (m_spellInfo->SpellFamilyFlags[1] & 0x6)
-                {
-                    bool found = false;
-                    // fast check
-                    if (unitTarget->HasAuraState(AURA_STATE_DEADLY_POISON, m_spellInfo, unitCaster))
-                        found = true;
-                    // full aura scan
-                    else
-                    {
-                        Unit::AuraApplicationMap const& auras = unitTarget->GetAppliedAuras();
-                        for (Unit::AuraApplicationMap::const_iterator itr = auras.begin(); itr != auras.end(); ++itr)
-                        {
-                            if (itr->second->GetBase()->GetSpellInfo()->Dispel == DISPEL_POISON)
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (found)
-                        AddPct(totalDamagePercentMod, 20.0f);          // 120% if poisoned
-                }
+                // Hemorrhage: "Awards 1 combo point" (4.3.4 tooltip; the data has no combo point effect). Its dagger
+                // bonus is spell_rog_hemorrhage's 45%; 4.3.4 has no Fan of Knives dagger or poisoned Mutilate bonus.
+                if (m_spellInfo->SpellFamilyFlags[0] & 0x2000000)
+                    AddComboPointGain(unitTarget, 1);
                 break;
             }
         case SPELLFAMILY_PALADIN:
@@ -4165,43 +4052,6 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
                                 unitCaster->CastSpell(unitCaster, 61267, true);
                                 unitCaster->CastSpell(unitCaster, 61268, true);
                                 return;
-                            }
-                    }
-                    break;
-                }
-            case SPELLFAMILY_ROGUE:
-                {
-                    switch (m_spellInfo->Id)
-                    {
-                        // Master of Subtlety
-                        case 31666:
-                            {
-                                if (!unitTarget)
-                                    return;
-
-                                Aura* mos = unitTarget->GetAura(31665);
-                                if (mos)
-                                {
-                                    mos->SetMaxDuration(6000);
-                                    mos->SetDuration(6000, true);
-                                }
-
-                                break;
-                            }
-                        // Overkill
-                        case 58428:
-                            {
-                                if (!unitTarget)
-                                    return;
-
-                                Aura* overkill = unitTarget->GetAura(58427);
-                                if (overkill)
-                                {
-                                    overkill->SetMaxDuration(20000);
-                                    overkill->SetDuration(20000, true);
-                                }
-
-                                break;
                             }
                     }
                     break;

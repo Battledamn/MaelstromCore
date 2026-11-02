@@ -1047,6 +1047,10 @@ public:
     void AddComboPoints(Unit* target, int8 count);
     void AddComboPoints(int8 count) { AddComboPoints(nullptr, count); }
     void ClearComboPoints();
+    // A finishing move in progress spends its combo points only when it finishes; points gained meanwhile
+    // (Ruthlessness, Improved Expose Armor) are held and added after that, so the spending does not wipe them
+    void BeginComboPointSpend(Spell const* spell);
+    void EndComboPointSpend(Spell const* spell, bool spend);
 
     void AddComboPointHolder(Unit* unit) { m_ComboPointHolders.insert(unit); }
     void RemoveComboPointHolder(Unit* unit) { m_ComboPointHolders.erase(unit); }
@@ -2302,6 +2306,9 @@ private:
     std::unordered_set<AbstractFollower*> m_followingMe;
 
     Unit* m_comboTarget;
+    Spell const* m_comboPointSpender = nullptr;
+    ObjectGuid m_heldComboTarget;
+    int8 m_heldComboPoints = 0;
     int8 m_comboPoints;
     std::unordered_set<Unit*> m_ComboPointHolders;
 

@@ -1955,39 +1955,7 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
     // mods at aura apply or remove
     switch (GetSpellInfo()->SpellFamilyName)
     {
-        case SPELLFAMILY_ROGUE:
-            // Stealth
-            if (GetSpellInfo()->SpellFamilyFlags[0] & 0x00400000)
-            {
-                // Master of Subtlety
-                if (AuraEffect const* aurEff = target->GetAuraEffectOfRankedSpell(31221, 0))
-                {
-                    if (!apply)
-                        target->CastSpell(target, 31666, true);
-                    else
-                    {
-                        // Remove counter aura
-                        target->RemoveAurasDueToSpell(31666);
-
-                        int32 amount = aurEff->GetAmount();
-                        target->CastCustomSpell(target, 31665, &amount, nullptr, nullptr, true);
-                    }
-                }
-                // Overkill
-                if (target->HasAura(58426))
-                {
-                    if (!apply)
-                        target->CastSpell(target, 58428, true);
-                    else
-                    {
-                        // Remove counter aura
-                        target->RemoveAurasDueToSpell(58428);
-
-                        target->CastSpell(target, 58427, true);
-                    }
-                }
-            }
-            break;
+        // SPELLFAMILY_ROGUE: Stealth's Master of Subtlety and Overkill are spell_rog_stealth (4.3.4, CPP)
         case SPELLFAMILY_HUNTER:
             switch (GetId())
             {
