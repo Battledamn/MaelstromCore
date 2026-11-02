@@ -13951,7 +13951,9 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
     bool spiritOfRedemption = false;
     if (victim->IsPlayer() && victim->IsClass(CLASS_PRIEST, CLASS_CONTEXT_ABILITY) && !victim->ToPlayer()->HasPlayerFlag(PLAYER_FLAGS_IS_OUT_OF_BOUNDS))
     {
-        if (AuraEffect* aurEff = victim->GetAuraEffectDummy(20711))
+        // 4.3.4's talent is a school absorb (its script takes the killing blow); a death without one (a GM kill, an
+        // instakill) still gets the form here
+        if (AuraEffect* aurEff = victim->GetAuraEffect(20711, EFFECT_0))
         {
             // Xinef: aura_spirit_of_redemption is triggered by 27827 shapeshift
             if (victim->HasSpiritOfRedemptionAura() || victim->HasAura(27827))

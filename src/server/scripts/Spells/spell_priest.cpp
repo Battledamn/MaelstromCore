@@ -15,6 +15,7 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "DBCStores.h"
 #include "DynamicObject.h"
 #include "GridNotifiers.h"
 #include "ObjectAccessor.h"
@@ -66,6 +67,9 @@ enum PriestSpells
     SPELL_PRIEST_GLYPH_OF_DISPEL_MAGIC              = 55677,
     SPELL_PRIEST_GLYPH_OF_DISPEL_MAGIC_HEAL         = 56131,
     SPELL_PRIEST_GLYPH_OF_LIGHTWELL                 = 55673,
+    SPELL_PRIEST_BLESSED_RESILIENCE_R1              = 33142,
+    SPELL_PRIEST_FOCUSED_WILL_R1                    = 45234,
+    SPELL_PRIEST_LIGHTWELL                          = 724,
     SPELL_PRIEST_GLYPH_OF_POWER_WORD_SHIELD         = 55672,
     SPELL_PRIEST_GLYPH_OF_POWER_WORD_SHIELD_HEAL    = 56160,
     SPELL_PRIEST_GLYPH_OF_PRAYER_OF_HEALING_HEAL    = 56161,
@@ -139,7 +143,11 @@ enum Mics
     PRIEST_LIGHTWELL_NPC_3                          = 31895,
     PRIEST_LIGHTWELL_NPC_4                          = 31894,
     PRIEST_LIGHTWELL_NPC_5                          = 31893,
-    PRIEST_LIGHTWELL_NPC_6                          = 31883
+    PRIEST_LIGHTWELL_NPC_6                          = 31883,
+
+    NPC_PRIEST_SHADOWY_APPARITION                   = 46954,
+    SUMMON_PROPERTIES_SHADOWY_APPARITION            = 3062,   // Shadowy Apparition's summon (87426), a guardian
+    MAX_SHADOWY_APPARITIONS                         = 4
 };
 
 // only units with the given power type
@@ -603,7 +611,9 @@ class spell_pri_divine_aegis : public AuraScript
     {
         PreventDefaultAction();
         Unit* target = eventInfo.GetProcTarget();
-        int32 absorb = CalculatePct(int32(eventInfo.GetHealInfo()->GetEffectiveHeal()), aurEff->GetAmount());
+        // 4.3.4: the whole heal before absorbs, overhealing included (3.1.0, hotfix 2011-12-06); CPP's effective heal is not
+        HealInfo const* healInfo = eventInfo.GetHealInfo();
+        int32 absorb = CalculatePct(int32(healInfo->GetHeal() + healInfo->GetAbsorb()), aurEff->GetAmount());
 
         // the shields add up
         if (AuraEffect const* aegis = target->GetAuraEffect(SPELL_PRIEST_DIVINE_AEGIS, EFFECT_0))
@@ -1010,6 +1020,11 @@ class spell_pri_lightwell_renew : public AuraScript
 {
     PrepareAuraScript(spell_pri_lightwell_renew);
 
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PRIEST_LIGHTWELL });
+    }
+
     void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
     {
         if (Unit* caster = GetCaster())
@@ -1017,10 +1032,26 @@ class spell_pri_lightwell_renew : public AuraScript
                 AddPct(amount, glyph->GetAmount());
     }
 
+    // Its single charge goes only once the attacks add up to Lightwell's share of the health (724 effect 1, 30%)
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+        if (!damageInfo)
+            return false;
+
+        _damageTaken += damageInfo->GetDamage() + damageInfo->GetAbsorb();
+        int32 pct = sSpellMgr->AssertSpellInfo(SPELL_PRIEST_LIGHTWELL)->Effects[EFFECT_1].CalcValue();
+        return _damageTaken >= CalculatePct(GetTarget()->GetMaxHealth(), pct);
+    }
+
     void Register() override
     {
         DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pri_lightwell_renew::CalculateAmount, EFFECT_0, SPELL_AURA_PERIODIC_HEAL);
+        DoCheckProc += AuraCheckProcFn(spell_pri_lightwell_renew::CheckProc);
     }
+
+private:
+    uint32 _damageTaken = 0;
 };
 
 // 28305 - Mana Leech (Passive) (Priest Pet Aura)
@@ -1053,6 +1084,63 @@ class spell_pri_mana_leech : public AuraScript
 };
 
 // -88994 - Masochism: Shadow Word: Death on yourself, or a hit for $s2% of your health
+// Blessed Resilience and Focused Will: a hit for more than rank 1's $s2% of the health (rank 2 has no effect 1), or
+// a critical one (their proc flags take no periodic damage); TDB's rows took crits only
+static bool IsBigHitOrCrit(ProcEventInfo& eventInfo, Unit* victim, uint32 rankOneSpellId)
+{
+    DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+    if (!damageInfo || !damageInfo->GetDamage())
+        return false;
+
+    if (eventInfo.GetHitMask() & PROC_HIT_CRITICAL)
+        return true;
+
+    int32 pct = sSpellMgr->AssertSpellInfo(rankOneSpellId)->Effects[EFFECT_1].CalcValue();
+    return damageInfo->GetDamage() > CalculatePct(victim->GetMaxHealth(), pct);
+}
+
+// -33142 - Blessed Resilience
+class spell_pri_blessed_resilience : public AuraScript
+{
+    PrepareAuraScript(spell_pri_blessed_resilience);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PRIEST_BLESSED_RESILIENCE_R1 });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        return IsBigHitOrCrit(eventInfo, GetTarget(), SPELL_PRIEST_BLESSED_RESILIENCE_R1);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pri_blessed_resilience::CheckProc);
+    }
+};
+
+// -45234 - Focused Will
+class spell_pri_focused_will : public AuraScript
+{
+    PrepareAuraScript(spell_pri_focused_will);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PRIEST_FOCUSED_WILL_R1 });
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        return IsBigHitOrCrit(eventInfo, GetTarget(), SPELL_PRIEST_FOCUSED_WILL_R1);
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pri_focused_will::CheckProc);
+    }
+};
+
 class spell_pri_masochism : public AuraScript
 {
     PrepareAuraScript(spell_pri_masochism);
@@ -1501,6 +1589,54 @@ class spell_pri_shadow_orbs : public AuraScript
     {
         DoCheckProc += AuraCheckProcFn(spell_pri_shadow_orbs::CheckProc);
         OnEffectProc += AuraEffectProcFn(spell_pri_shadow_orbs::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// -78202 - Shadowy Apparition (ours; neither CPP nor TrinityCore 4.3.4 has it): a Shadow Word: Pain tick has the
+// rank's $s1% chance, five times that while the priest moves, to send an apparition to the target. At most four at a
+// time (patch 4.0.6; the tooltip's $78202s3 has no effect behind it). The apparition's AI is npc_pet_pri_shadowy_apparition.
+class spell_pri_shadowy_apparition : public AuraScript
+{
+    PrepareAuraScript(spell_pri_shadowy_apparition);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return sSummonPropertiesStore.LookupEntry(SUMMON_PROPERTIES_SHADOWY_APPARITION) != nullptr;
+    }
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        Unit* target = eventInfo.GetProcTarget();
+        if (!target || !target->IsAlive())
+            return false;
+
+        Unit* priest = GetTarget();
+        int32 chance = GetEffect(EFFECT_0)->GetAmount();
+        if (priest->isMoving())
+            chance *= 5;
+        if (!roll_chance_i(chance))
+            return false;
+
+        std::list<Creature*> apparitions;
+        priest->GetAllMinionsByEntry(apparitions, NPC_PRIEST_SHADOWY_APPARITION);
+        return apparitions.size() < MAX_SHADOWY_APPARITIONS;
+    }
+
+    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+        Unit* priest = GetTarget();
+        SummonPropertiesEntry const* properties = sSummonPropertiesStore.LookupEntry(SUMMON_PROPERTIES_SHADOWY_APPARITION);
+        if (TempSummon* apparition = priest->SummonCreature(NPC_PRIEST_SHADOWY_APPARITION, priest->GetPosition(),
+            TEMPSUMMON_TIMED_DESPAWN, 15 * IN_MILLISECONDS, 0, properties))
+            if (apparition->AI())
+                apparition->AI()->SetGUID(eventInfo.GetProcTarget()->GetGUID());
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_pri_shadowy_apparition::CheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_pri_shadowy_apparition::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -2116,7 +2252,10 @@ void AddSC_priest_spell_scripts()
     RegisterSpellScript(spell_pri_leap_of_faith_effect_trigger);
     RegisterSpellScript(spell_pri_lightwell_renew);
     RegisterSpellScript(spell_pri_mana_leech);
+    RegisterSpellScript(spell_pri_blessed_resilience);
+    RegisterSpellScript(spell_pri_focused_will);
     RegisterSpellScript(spell_pri_masochism);
+    RegisterSpellScript(spell_pri_shadowy_apparition);
     RegisterSpellScript(spell_pri_mind_blast);
     RegisterSpellScript(spell_pri_mind_spike);
     RegisterSpellScript(spell_pri_pain_and_suffering_proc);

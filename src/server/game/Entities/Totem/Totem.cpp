@@ -68,8 +68,10 @@ void Totem::InitStats(uint32 duration)
             data.SpellID = GetUInt32Value(UNIT_CREATED_BY_SPELL);
             owner->ToPlayer()->SendDirectMessage(data.Write());
 
-            // set display id depending on caster's race
-            SetDisplayId(sObjectMgr->GetModelForTotem(SummonSlot(slot), Races(owner->getRace())));
+            // set display id depending on caster's race; a totem slot summon without a race model (4.3.4's Lightwell
+            // is in the fire slot) keeps its own (TC)
+            if (uint32 totemDisplayId = sObjectMgr->GetModelForTotem(SummonSlot(slot), Races(owner->getRace())))
+                SetDisplayId(totemDisplayId);
         }
 
         SetLevel(owner->GetLevel());
