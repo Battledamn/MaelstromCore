@@ -11318,8 +11318,8 @@ bool Unit::CanHaveThreatList(bool skipAliveCheck) const
 
 void Unit::AddThreat(Unit* victim, float fThreat, SpellSchoolMask /*schoolMask*/, SpellInfo const* threatSpell)
 {
-    // Only mobs can manage threat lists
-    if (CanHaveThreatList() && !HasUnitState(UNIT_STATE_EVADE))
+    // Only mobs can manage threat lists; scripts may pass a target they did not find (ICC's geist alarm did)
+    if (victim && CanHaveThreatList() && !HasUnitState(UNIT_STATE_EVADE))
     {
         m_threatManager.AddThreat(victim, fThreat, threatSpell);
     }

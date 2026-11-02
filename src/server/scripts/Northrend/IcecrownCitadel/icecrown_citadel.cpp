@@ -2792,8 +2792,12 @@ class spell_icc_geist_alarm : public SpellScript
                     l->GetMotionMaster()->MoveJump(l->GetPositionX(), l->GetPositionY() + 55.0f, l->GetPositionZ(), 20.0f, 6.0f);
                 }
                 l->AI()->Talk(0);
-                l->AI()->AttackStart(target);
-                l->AddThreat(target, 1.0f);
+                // no attackable player within 120 yards (e.g. only a GM): no threat on nobody (it crashed here)
+                if (target)
+                {
+                    l->AI()->AttackStart(target);
+                    l->AddThreat(target, 1.0f);
+                }
                 for (uint8 i = 0; i < 5; ++i)
                 {
                     float dist = 2.0f + rand_norm() * 4.0f;
@@ -2802,8 +2806,11 @@ class spell_icc_geist_alarm : public SpellScript
                     l->MovePosition(pos, dist, angle);
                     if (Creature* c = l->SummonCreature(NPC_VENGEFUL_FLESHREAPER, pos, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30 * MINUTE * IN_MILLISECONDS))
                     {
-                        c->AI()->AttackStart(l->GetVictim());
-                        c->AddThreat(l->GetVictim(), 1.0f);
+                        if (Unit* victim = l->GetVictim())
+                        {
+                            c->AI()->AttackStart(victim);
+                            c->AddThreat(victim, 1.0f);
+                        }
                         if (!hasTarget)
                             c->GetMotionMaster()->MoveJump(c->GetPositionX(), c->GetPositionY() + 55.0f, c->GetPositionZ(), 20.0f, 6.0f);
                     }
