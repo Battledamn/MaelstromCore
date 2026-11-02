@@ -958,8 +958,9 @@ void Player::UpdatePowerRegen(Powers power)
     float const peaceBase = GetBasePowerRegen(power, false);
     float const combatBase = GetBasePowerRegen(power, true);
 
-    // Butchery and the like: flat runic power only in combat
-    float const peace = peaceBase * pct - peaceBase + (power == POWER_RUNIC_POWER ? 0.0f : flat);
+    // Butchery, Anger Management and the like: flat runic power and rage only in combat ("while in combat");
+    // out of combat these bars only drain
+    float const peace = peaceBase * pct - peaceBase + (power == POWER_RUNIC_POWER || power == POWER_RAGE ? 0.0f : flat);
     float const combat = combatBase * pct - combatBase + flat;
 
     // SetFloatValue, not SetStatFloatValue: an offset below the base rate (e.g. -20% focus) is negative,
