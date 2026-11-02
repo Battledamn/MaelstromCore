@@ -114,6 +114,7 @@ enum DruidSpells
     SPELL_DRUID_TREE_OF_LIFE_PASSIVE_1      = 5420,
     SPELL_DRUID_TREE_OF_LIFE_PASSIVE_2      = 81097,
     SPELL_DRUID_TREE_OF_LIFE_PASSIVE_3      = 81098,
+    SPELL_DRUID_VENGEANCE                   = 76691,
     SPELL_DRUID_WILD_MUSHROOM               = 88747,
     SPELL_DRUID_WILD_MUSHROOM_DAMAGE        = 78777,
     SPELL_DRUID_WILD_MUSHROOM_SUICIDE       = 92853,
@@ -257,6 +258,28 @@ class spell_dru_feral_swiftness : public AuraScript
     {
         AfterEffectApply += AuraEffectApplyFn(spell_dru_feral_swiftness::AfterApply, EFFECT_0, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
         AfterEffectRemove += AuraEffectRemoveFn(spell_dru_feral_swiftness::AfterRemove, EFFECT_0, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 768 - Cat Form
+// "Entering Cat Form will cancel this effect" (the druid's Vengeance passive, 84840)
+class spell_dru_cat_form : public AuraScript
+{
+    PrepareAuraScript(spell_dru_cat_form);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_VENGEANCE });
+    }
+
+    void AfterApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->RemoveAurasDueToSpell(SPELL_DRUID_VENGEANCE);
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_cat_form::AfterApply, EFFECT_0, SPELL_AURA_MOD_SHAPESHIFT, AURA_EFFECT_HANDLE_REAL);
     }
 };
 
@@ -3145,6 +3168,7 @@ void AddSC_druid_spell_scripts()
     RegisterSpellScript(spell_dru_t10_balance_4p_bonus);
     RegisterSpellScript(spell_dru_nurturing_instinct);
     RegisterSpellScript(spell_dru_feral_swiftness);
+    RegisterSpellScript(spell_dru_cat_form);
     RegisterSpellScript(spell_dru_omen_of_clarity);
     RegisterSpellScript(spell_dru_barkskin);
     RegisterSpellScript(spell_dru_glyph_of_barkskin);

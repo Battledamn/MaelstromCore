@@ -4031,15 +4031,25 @@ class spell_gen_increase_stats_buff : public SpellScript
 
 enum Vengeance
 {
-    SPELL_VENGEANCE_TRIGGERED = 76691
+    SPELL_VENGEANCE_TRIGGERED = 76691,
+    SPELL_VENGEANCE_DRUID     = 84840
 };
 
-// The attack power of Vengeance (4.3.4): 33% of the damage taken from creatures in the last 2 seconds, at
-// most 10% of base health plus Stamina. Ported from The Cataclysm Preservation Project.
+// Vengeance (4.3.4), from the 4.3.0 patch notes and the Cataclysm tank analyses; CPP had only the 33% floor
+// and removed the buff on the first tick without damage:
+// - the first hit from a creature gives 33% of its damage as attack power;
+// - every hit after that adds 5% of its damage (the passive's $s1);
+// - every 2 s tick it is at least 33% of the damage of the last 2 seconds;
+// - a tick without damage takes off 10% of the highest value it reached, and at 0 the buff ends;
+// - never more than 10% of base health plus Stamina (CPP).
+static int32 VengeanceCap(Unit* target)
+{
+    return int32(CalculatePct(target->GetCreateHealth(), 10) + uint32(target->GetStat(STAT_STAMINA)));
+}
+
 static int32 VengeanceAmount(Unit* target, uint32 damage)
 {
-    uint32 const healthCap = CalculatePct(target->GetCreateHealth(), 10) + uint32(target->GetStat(STAT_STAMINA));
-    return int32(std::min<uint32>(CalculatePct(damage, 33), healthCap));
+    return std::min<int32>(int32(CalculatePct(damage, 33)), VengeanceCap(target));
 }
 
 static void CastVengeance(Unit* target, int32 amount)
@@ -4059,6 +4069,10 @@ class spell_gen_vengeance : public AuraScript
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
+        // the druid's: "Each time you take damage while in Bear Form"
+        if (GetId() == SPELL_VENGEANCE_DRUID && GetTarget()->GetShapeshiftForm() != FORM_BEAR)
+            return false;
+
         DamageInfo* damageInfo = eventInfo.GetDamageInfo();
         return damageInfo && damageInfo->GetAttacker() && !damageInfo->GetAttacker()->IsPlayer();
     }
@@ -4068,7 +4082,7 @@ class spell_gen_vengeance : public AuraScript
         PreventDefaultAction();
         Unit* target = GetTarget();
 
-        // the first hit starts the buff; from then on it follows the last two seconds by itself
+        // the first hit starts the buff; later hits are counted by the buff itself
         if (!target->GetAura(SPELL_VENGEANCE_TRIGGERED, target->GetGUID()))
             if (int32 amount = VengeanceAmount(target, eventInfo.GetDamageInfo()->GetDamage()))
                 CastVengeance(target, amount);
@@ -4081,10 +4095,13 @@ class spell_gen_vengeance : public AuraScript
     }
 };
 
-// 76691 - Vengeance (the attack power buff): renewed every tick from the damage of the last two seconds
+// 76691 - Vengeance (the attack power buff; infinite in the client data, with a 2 s periodic dummy)
 class spell_gen_vengeance_triggered : public AuraScript
 {
     PrepareAuraScript(spell_gen_vengeance_triggered);
+
+    static constexpr int32 PCT_PER_HIT = 5;     // the passives' $s1
+    static constexpr int32 DECAY_PCT = 10;      // of the highest value, per tick without damage
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
@@ -4094,8 +4111,28 @@ class spell_gen_vengeance_triggered : public AuraScript
 
     void HandleEffectProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
     {
-        if (uint32 damage = eventInfo.GetDamageInfo()->GetDamage())
-            _damageTaken.push_back({ GameTime::GetGameTimeMS().count(), damage });
+        AddDamage(eventInfo.GetDamageInfo()->GetDamage());
+    }
+
+public:
+    void AddDamage(uint32 damage)
+    {
+        if (!damage)
+            return;
+
+        _damageTaken.push_back({ GameTime::GetGameTimeMS().count(), damage });
+        if (AuraEffect const* attackPower = GetEffect(EFFECT_0))
+            SetValue(attackPower->GetAmount() + int32(CalculatePct(damage, PCT_PER_HIT)));
+    }
+
+private:
+    void SetValue(int32 value)
+    {
+        value = std::clamp(value, 0, VengeanceCap(GetTarget()));
+        _highest = std::max(_highest, value);
+        for (uint8 i = EFFECT_0; i <= EFFECT_2; ++i)
+            if (AuraEffect* effect = GetEffect(i))
+                effect->ChangeAmount(value);
     }
 
     void HandleEffectPeriodic(AuraEffect const* /*aurEff*/)
@@ -4108,10 +4145,21 @@ class spell_gen_vengeance_triggered : public AuraScript
         for (auto const& [time, damage] : _damageTaken)
             damageLastTwoSeconds += damage;
 
-        if (int32 amount = VengeanceAmount(target, damageLastTwoSeconds))
-            CastVengeance(target, amount);
-        else
+        AuraEffect const* attackPower = GetEffect(EFFECT_0);
+        int32 const current = attackPower ? attackPower->GetAmount() : 0;
+        _highest = std::max(_highest, current);
+
+        if (damageLastTwoSeconds)
+        {
+            SetValue(std::max(current, VengeanceAmount(target, damageLastTwoSeconds)));
+            return;
+        }
+
+        int32 const decayed = current - std::max(1, int32(CalculatePct(_highest, DECAY_PCT)));
+        if (decayed <= 0)
             Remove();
+        else
+            SetValue(decayed);
     }
 
     void Register() override
@@ -4121,9 +4169,24 @@ class spell_gen_vengeance_triggered : public AuraScript
         OnEffectPeriodic += AuraEffectPeriodicFn(spell_gen_vengeance_triggered::HandleEffectPeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DUMMY);
     }
 
-private:
     std::vector<std::pair<uint32, uint32>> _damageTaken;    // time (ms), damage
+    int32 _highest = 0;
 };
+
+// Vengeance for the tank as if it had taken this damage itself (the warrior's Vigilance, spell_warrior.cpp)
+void AddVengeanceDamage(Unit* tank, uint32 damage)
+{
+    Aura* vengeance = tank->GetAura(SPELL_VENGEANCE_TRIGGERED, tank->GetGUID());
+    if (!vengeance)
+    {
+        if (int32 amount = VengeanceAmount(tank, damage))
+            CastVengeance(tank, amount);
+        return;
+    }
+
+    if (auto* script = vengeance->GetScript<spell_gen_vengeance_triggered>("spell_gen_vengeance_triggered"))
+        script->AddDamage(damage);
+}
 
 /* 19891 - Resistance Aura, 79106, 79107 - Shadow Protection, 8185 - Elemental Resistance (spell_gen_resistance_buff)
    79060, 79061 - Mark of the Wild, 79062, 79063 - Blessing of Kings (spell_gen_resistance_buff_half) */

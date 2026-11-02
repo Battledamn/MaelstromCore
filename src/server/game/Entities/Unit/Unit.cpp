@@ -1874,7 +1874,11 @@ void Unit::CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, Weapon
             // 4.x: a share of the hit, doubled if the block is critical (CPP)
             uint32 blockPct = damageInfo->target->GetBlockPercent();
             if (damageInfo->target->isBlockCritical())
+            {
                 blockPct *= 2;
+                // the client shows it as a critical block (the warrior's Critical Block mastery)
+                damageInfo->HitInfo |= HITINFO_CRITICAL_BLOCK;
+            }
             uint32 hitDamage = 0;
             for (uint8 i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
                 hitDamage += damageInfo->damages[i].damage;
@@ -9175,16 +9179,7 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                         break;
                     }
                     break;
-                case SPELLFAMILY_WARRIOR:
-                    // Victory Rush
-                    if (spellProto->SpellFamilyFlags[1] & 0x100)
-                    {
-                        // Glyph of Victory Rush
-                        if (AuraEffect const* aurEff = caster->GetAuraEffect(58382, 0))
-                            crit_chance += aurEff->GetAmount();
-                        break;
-                    }
-                    break;
+                // 4.3.4: Glyph of Victory Rush (58382) raises the heal, a spell modifier; no crit chance
                 }
             }
 

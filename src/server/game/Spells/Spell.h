@@ -274,6 +274,7 @@ struct TargetInfo
     bool   alive:1;
     bool   crit:1;
     bool   scaleAura:1;
+    bool   interrupted:1;                                   // the spell interrupted a cast of this target (PROC_HIT_INTERRUPT)
     int32  damage;
     int32  damageBeforeTakenMods;
 };

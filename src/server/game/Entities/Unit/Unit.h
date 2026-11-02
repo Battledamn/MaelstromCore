@@ -1210,8 +1210,8 @@ public:
     [[nodiscard]] bool CanApplyResilience() const { return m_applyResilience; }
 
     // Skills values
-    // 3.3.5a block value; in 4.x only the WotLK class spells still read it (Shield Slam, Shield of
-    // Righteousness in SpellEffects.cpp) until the class script port
+    // 3.3.5a block value; nothing reads it in 4.x (Shield Slam and Shield of the Righteous lost it in the
+    // Warrior round), kept for modules
     [[nodiscard]] virtual uint32 GetShieldBlockValue() const = 0;
     // 4.x: a block stops a share of the hit (doubled by a critical block) (CPP)
     [[nodiscard]] virtual uint32 GetBlockPercent() const { return BASE_BLOCK_PERCENT; }

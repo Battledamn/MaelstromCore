@@ -266,7 +266,7 @@ enum ProcFlagsHit
     PROC_HIT_DEFLECT             = 0x0000200,
     PROC_HIT_ABSORB              = 0x0000400, // partial or full absorb
     PROC_HIT_REFLECT             = 0x0000800,
-    PROC_HIT_INTERRUPT           = 0x0001000, // (not used atm)
+    PROC_HIT_INTERRUPT           = 0x0001000, // the spell interrupted a cast (set by Spell::EffectInterruptCast)
     PROC_HIT_FULL_BLOCK          = 0x0002000,
     PROC_HIT_MASK_ALL            = 0x0002FFF,
 };

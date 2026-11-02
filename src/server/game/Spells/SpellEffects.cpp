@@ -372,34 +372,8 @@ void Spell::EffectSchoolDMG(SpellEffIndex effIndex)
                     }
                     break;
                 }
-            case SPELLFAMILY_WARRIOR:
-                {
-                    if (!unitCaster)
-                        break;
-
-                    // Shield Slam
-                    if (m_spellInfo->SpellFamilyFlags[1] & 0x200 && m_spellInfo->GetCategory() == 1209)
-                    {
-                        uint8 level = unitCaster->GetLevel();
-                        // xinef: shield block should increase the limit
-                        float limit = unitCaster->HasAura(2565) ? 2.0f : 1.0f;
-                        uint32 block_value = unitCaster->GetShieldBlockValue(uint32(float(level) * 24.5f * limit), uint32(float(level) * 34.5f * limit));
-
-                        damage += int32(unitCaster->ApplyEffectModifiers(m_spellInfo, effIndex, float(block_value)));
-                    }
-                    // Victory Rush
-                    else if (m_spellInfo->SpellFamilyFlags[1] & 0x100)
-                        ApplyPct(damage, unitCaster->GetTotalAttackPowerValue(BASE_ATTACK));
-                    // Shockwave
-                    else if (m_spellInfo->Id == 46968)
-                    {
-                        int32 pct = unitCaster->CalculateSpellDamage(unitTarget, m_spellInfo, 2);
-                        if (pct > 0)
-                            damage += int32(CalculatePct(unitCaster->GetTotalAttackPowerValue(BASE_ATTACK), pct));
-                        break;
-                    }
-                    break;
-                }
+            // 4.3.4: no warrior case. Shield Slam's damage is its attack power coefficient (no block value in
+            // 4.x); Victory Rush and Shockwave compute their tooltip formulas in spell_warrior.cpp.
             case SPELLFAMILY_WARLOCK:
                 {
                     if (!unitCaster)
@@ -680,16 +654,8 @@ void Spell::EffectSchoolDMG(SpellEffIndex effIndex)
                         }
                         break;
                     }
-                    // Shield of Righteousness
-                    if (m_spellInfo->SpellFamilyFlags[EFFECT_1] & 0x100000)
-                    {
-                        uint8 level = unitCaster->GetLevel();
-                        uint32 block_value = unitCaster->GetShieldBlockValue(uint32(float(level) * 29.5f), uint32(float(level) * 34.5f));
-                        if (unitCaster->GetAuraEffect(64882, EFFECT_0))
-                            block_value += 225;
-                        damage += CalculatePct(block_value, m_spellInfo->Effects[EFFECT_1].CalcValue());
-                        break;
-                    }
+                    // 4.3.4: Shield of the Righteous (same family flag as WotLK's Shield of Righteousness) gets no
+                    // block value; its holy power multiplier is in spell_paladin.cpp
                     break;
                 }
         }
@@ -3662,20 +3628,11 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
             }
         case SPELLFAMILY_WARRIOR:
             {
-                // Devastate (player ones)
+                // Devastate: its second effect's damage once more for each of the warrior's Sunder Armor stacks
+                // on the target (4.3.4 tooltip). spell_warr_devastate applies the new Sunder Armor on hit.
                 if (m_spellInfo->SpellFamilyFlags[1] & 0x40)
-                {
-                    unitCaster->CastSpell(unitTarget, 58567, true);
-
-                    if (Aura* aur = unitTarget->GetAura(58567))
-                    {
-                        // 58388 - Glyph of Devastate dummy aura.
-                        if (unitCaster->HasAura(58388))
-                            aur->ModStackAmount(1);
-
-                        spell_bonus += (aur->GetStackAmount() - 1) * CalculateSpellDamage(2, unitTarget);
-                    }
-                }
+                    if (Aura const* sunder = unitTarget->GetAura(58567, unitCaster->GetGUID()))
+                        spell_bonus += sunder->GetStackAmount() * CalculateSpellDamage(EFFECT_1, unitTarget);
                 break;
             }
         case SPELLFAMILY_ROGUE:
@@ -4032,6 +3989,13 @@ void Spell::EffectInterruptCast(SpellEffIndex effIndex)
                     int32 duration = m_originalCaster->ModSpellDuration(m_spellInfo, unitTarget, m_originalCaster->CalcSpellDuration(m_spellInfo), false, 1 << effIndex);
                     unitTarget->ProhibitSpellSchool(curSpellInfo->GetSchoolMask(), duration/*spellInfo->GetDuration()*/);
                 }
+
+                // procs that need a successful interrupt (Rude Interruption, Invocation); CPP's
+                // Spell::EffectInterruptCast
+                for (TargetInfo& targetInfo : m_UniqueTargetInfo)
+                    if (targetInfo.targetGUID == unitTarget->GetGUID())
+                        targetInfo.interrupted = true;
+
                 ExecuteLogEffectInterruptCast(effIndex, unitTarget, curSpellInfo->Id);
                 unitTarget->InterruptSpell(CurrentSpellTypes(i), false);
             }
