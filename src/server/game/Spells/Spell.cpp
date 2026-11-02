@@ -2872,8 +2872,6 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
 
             int32 gain = caster->HealBySpell(healInfo, crit);
             float threat = float(gain) * 0.5f;
-            if (caster->IsClass(CLASS_PALADIN))
-                threat *= 0.5f;
             unitTarget->GetThreatMgr().ForwardThreatForAssistingMe(caster, threat, m_spellInfo);
             m_healing = gain;
 

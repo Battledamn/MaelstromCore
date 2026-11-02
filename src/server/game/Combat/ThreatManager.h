@@ -186,11 +186,12 @@ public:
     void UpdateVictimForTesting() { UpdateVictim(); }
 
     ///== REDIRECT SYSTEM ==
-    void RegisterRedirectThreat(uint32 spellId, ObjectGuid const& victim, uint32 pct);
+    // fadeMs: the redirected threat leaves the recipient again after this time (Misdirection, Tricks of the Trade)
+    void RegisterRedirectThreat(uint32 spellId, ObjectGuid const& victim, uint32 pct, uint32 fadeMs = 0);
     void UnregisterRedirectThreat(uint32 spellId);
     void UnregisterRedirectThreat(uint32 spellId, ObjectGuid const& victim);
     bool HasRedirects() const { return !_redirectRegistry.empty(); }
-    void ResetAllRedirects() { _redirectRegistry.clear(); UpdateRedirectInfo(); }
+    void ResetAllRedirects() { _redirectRegistry.clear(); _redirectFadeMs.clear(); UpdateRedirectInfo(); }
 
 private:
     Unit* const _owner;
@@ -229,9 +230,26 @@ private:
     std::array<float, MAX_SPELL_SCHOOL> _singleSchoolModifiers;
     mutable std::unordered_map<std::underlying_type<SpellSchoolMask>::type, float> _multiSchoolModifiers;
 
+    struct RedirectEntry
+    {
+        ObjectGuid first;   // the recipient
+        uint32 second;      // percent of the threat
+        uint32 fadeMs;      // 0: the redirected threat stays
+    };
     void UpdateRedirectInfo();
-    std::vector<std::pair<ObjectGuid, uint32>> _redirectInfo;
+    std::vector<RedirectEntry> _redirectInfo;
     std::unordered_map<uint32, std::unordered_map<ObjectGuid, uint32>> _redirectRegistry;
+    std::unordered_map<uint32, uint32> _redirectFadeMs;   // spell id -> fade time
+
+    // threat this unit got from a redirect with a fade time, taken off the recipient again when it runs out
+    struct FadingThreat
+    {
+        ObjectGuid victim;
+        float amount;
+        uint32 remainingMs;
+    };
+    std::vector<FadingThreat> _fadingThreat;
+    void UpdateFadingThreat(uint32 tdiff);
 
 public:
     ThreatManager(ThreatManager const&) = delete;

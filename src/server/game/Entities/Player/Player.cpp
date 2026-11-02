@@ -9606,8 +9606,8 @@ Pet* Player::CreatePet(Creature* creatureTarget, uint32 spellID /*= 0*/)
     // "kill" original creature
     creatureTarget->DespawnOrUnsummon();
 
-    // calculate proper level
-    uint8 level = (creatureTarget->GetLevel() < (GetLevel() - 5)) ? (GetLevel() - 5) : GetLevel();
+    // Cataclysm: a tamed pet always has its hunter's level
+    uint8 level = GetLevel();
 
     // prepare visual effect for levelup
     pet->SetUInt32Value(UNIT_FIELD_LEVEL, level - 1);
@@ -13193,6 +13193,43 @@ OutdoorPvP* Player::GetOutdoorPvP() const
     return sOutdoorPvPMgr->GetOutdoorPvPToZoneId(GetZoneId());
 }
 
+bool Player::HasAllItemsToFitToSpellRequirements(SpellInfo const* spellInfo) const
+{
+    // head to hands: eight armor slots besides the neck and the shirt
+    uint8 count = 0;
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot <= EQUIPMENT_SLOT_HANDS; ++slot)
+        if (Item* item = GetUseableItemByPos(INVENTORY_SLOT_BAG_0, slot))
+            if (item->IsFitToSpellRequirements(spellInfo))
+                ++count;
+
+    return count >= 8;
+}
+
+// The class's armor specialization passive (Leather, Mail or Plate Specialization, 86524-86531) is a dummy whose
+// script (spell_gen_armor_specialization) applies the specialization's +5% primary stat aura when the armor fits;
+// the aura is rebuilt whenever the armor, the specialization or a druid's form changes (CPP).
+static constexpr std::array<uint32, 7> ArmorSpecializationIds = { 86530, 86531, 86529, 86528, 86525, 86524, 86526 };
+
+void Player::UpdateArmorSpecialization()
+{
+    for (AuraApplicationMap::iterator itr = m_appliedAuras.begin(); itr != m_appliedAuras.end();)
+    {
+        if (itr->second->GetBase()->GetSpellInfo()->HasAttribute(SPELL_ATTR8_REQUIRES_EQUIPPED_INV_TYPES))
+            RemoveAura(itr);
+        else
+            ++itr;
+    }
+
+    for (uint32 spellId : ArmorSpecializationIds)
+    {
+        if (HasSpell(spellId))
+        {
+            CastSpell(this, spellId, true);
+            break;
+        }
+    }
+}
+
 bool Player::HasItemFitToSpellRequirements(SpellInfo const* spellInfo, Item const* ignoreItem) const
 {
     if (spellInfo->EquippedItemClass < 0)
@@ -16141,6 +16178,9 @@ void Player::ActivateSpec(uint8 spec)
     m_usedTalentCount = spentTalents;
     InitTalentForLevel();
 
+    // the new specialization's armor specialization aura
+    UpdateArmorSpecialization();
+
     // load them asynchronously
     {
         CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHARACTER_ACTIONS_SPEC);
@@ -16272,6 +16312,7 @@ void Player::SetPrimaryTalentTree(uint8 spec, uint32 talentTabId)
 {
     if (spec < MAX_TALENT_SPECS)
         m_primaryTalentTree[spec] = talentTabId;
+    UpdateArmorSpecialization();
 }
 
 void Player::_LoadPrimaryTalentTrees(std::string_view talentTrees)

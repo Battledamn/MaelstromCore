@@ -2024,7 +2024,16 @@ SpellCastResult SpellInfo::CheckExplicitTarget(WorldObject const* caster, WorldO
         {
             if (neededTargets & TARGET_FLAG_UNIT_ENEMY)
                 if (caster->IsValidAttackTarget(unitTarget, this))
+                {
+                    // SPELL_AURA_INTERFERE_TARGETTING (4.3.4: Camouflage, Smoke Bomb): an enemy cannot pick the
+                    // unit as a target from range; from melee range it can, and so can one standing in the same
+                    // effect (Smoke Bomb's cloud). Area spells still reach it.
+                    if (unitCaster && !unitCaster->IsWithinMeleeRange(unitTarget))
+                        for (AuraEffect const* interfere : unitTarget->GetAuraEffectsByType(SPELL_AURA_INTERFERE_TARGETTING))
+                            if (!unitCaster->HasAura(interfere->GetId(), interfere->GetCasterGUID()))
+                                return SPELL_FAILED_BAD_TARGETS;
                     return SPELL_CAST_OK;
+                }
             if (neededTargets & TARGET_FLAG_UNIT_ALLY
                     || (neededTargets & TARGET_FLAG_UNIT_PARTY && unitCaster && unitCaster->IsInPartyWith(unitTarget))
                     || (neededTargets & TARGET_FLAG_UNIT_RAID && unitCaster && unitCaster->IsInRaidWith(unitTarget)))

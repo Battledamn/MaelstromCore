@@ -235,7 +235,11 @@ void ThreatManager::Initialize()
 void ThreatManager::Update(uint32 tdiff)
 {
     if (!CanHaveThreatList() || IsThreatListEmpty(true))
+    {
+        _fadingThreat.clear();
         return;
+    }
+    UpdateFadingThreat(tdiff);
     if (_updateTimer <= tdiff)
     {
         UpdateVictim();
@@ -458,6 +462,9 @@ void ThreatManager::AddThreat(Unit* target, float amount, SpellInfo const* spell
                     float amountRedirected = CalculatePct(origAmount, pair.second);
                     AddThreat(redirTarget, amountRedirected, spell, true, true);
                     amount -= amountRedirected;
+                    // "Transferred threat is not permanent, and will fade after 30 sec." (4.3.4)
+                    if (pair.fadeMs && amountRedirected > 0.0f)
+                        _fadingThreat.push_back({ redirTarget->GetGUID(), amountRedirected, pair.fadeMs });
                 }
             }
         }
@@ -840,10 +847,33 @@ void ThreatManager::UpdateMySpellSchoolModifiers()
     _multiSchoolModifiers.clear();
 }
 
-void ThreatManager::RegisterRedirectThreat(uint32 spellId, ObjectGuid const& victim, uint32 pct)
+void ThreatManager::RegisterRedirectThreat(uint32 spellId, ObjectGuid const& victim, uint32 pct, uint32 fadeMs)
 {
     _redirectRegistry[spellId][victim] = pct;
+    if (fadeMs)
+        _redirectFadeMs[spellId] = fadeMs;
+    else
+        _redirectFadeMs.erase(spellId);
     UpdateRedirectInfo();
+}
+
+void ThreatManager::UpdateFadingThreat(uint32 tdiff)
+{
+    for (auto it = _fadingThreat.begin(); it != _fadingThreat.end();)
+    {
+        if (it->remainingMs > tdiff)
+        {
+            it->remainingMs -= tdiff;
+            ++it;
+            continue;
+        }
+
+        // the recipient's threat never drops below zero (ThreatReference::AddThreat)
+        auto ref = _myThreatListEntries.find(it->victim);
+        if (ref != _myThreatListEntries.end())
+            ref->second->AddThreat(-it->amount);
+        it = _fadingThreat.erase(it);
+    }
 }
 
 void ThreatManager::UnregisterRedirectThreat(uint32 spellId)
@@ -852,6 +882,7 @@ void ThreatManager::UnregisterRedirectThreat(uint32 spellId)
     if (it == _redirectRegistry.end())
         return;
     _redirectRegistry.erase(it);
+    _redirectFadeMs.erase(spellId);
     UpdateRedirectInfo();
 }
 
@@ -866,7 +897,10 @@ void ThreatManager::UnregisterRedirectThreat(uint32 spellId, ObjectGuid const& v
         return;
     victimMap.erase(it2);
     if (victimMap.empty())
+    {
         _redirectRegistry.erase(it);
+        _redirectFadeMs.erase(spellId);
+    }
     UpdateRedirectInfo();
 }
 
@@ -954,7 +988,8 @@ void ThreatManager::UpdateRedirectInfo()
             uint32 thisPct = std::min<uint32>(100 - totalPct, victimPair.second);
             if (thisPct > 0)
             {
-                _redirectInfo.push_back({ victimPair.first, thisPct });
+                auto fade = _redirectFadeMs.find(pair.first);
+                _redirectInfo.push_back({ victimPair.first, thisPct, fade != _redirectFadeMs.end() ? fade->second : 0 });
                 totalPct += thisPct;
                 ASSERT(totalPct <= 100);
                 if (totalPct == 100)

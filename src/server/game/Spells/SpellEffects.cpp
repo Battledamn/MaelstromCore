@@ -584,47 +584,8 @@ void Spell::EffectSchoolDMG(SpellEffIndex effIndex)
                         if (unitCaster->HasAura(57627))           // Charge 6 sec post-affect
                             damage *= 2;
                     }
-                    // Steady Shot
-                    else if (m_spellInfo->SpellFamilyFlags[1] & 0x1)
-                    {
-                        bool found = false;
-                        // check dazed affect
-                        Unit::AuraEffectList const& decSpeedList = unitTarget->GetAuraEffectsByType(SPELL_AURA_MOD_DECREASE_SPEED);
-                        for (Unit::AuraEffectList::const_iterator iter = decSpeedList.begin(); iter != decSpeedList.end(); ++iter)
-                        {
-                            if ((*iter)->GetSpellInfo()->SpellIconID == 15 && (*iter)->GetSpellInfo()->Dispel == 0)
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-
-                        /// @todo: should this be put on taken but not done?
-                        if (found)
-                            damage += m_spellInfo->Effects[EFFECT_1].CalcValue();
-
-                        if (Player* caster = unitCaster->ToPlayer())
-                        {
-                            // Add Ammo and Weapon damage plus RAP * 0.1
-                            float dmg_min = 0.f;
-                            float dmg_max = 0.f;
-                            for (uint8 i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
-                            {
-                                dmg_min += caster->GetWeaponDamageRange(RANGED_ATTACK, MINDAMAGE, i);
-                                dmg_max += caster->GetWeaponDamageRange(RANGED_ATTACK, MAXDAMAGE, i);
-                            }
-
-                            if (dmg_max == 0.0f && dmg_min > dmg_max)
-                            {
-                                damage += int32(dmg_min);
-                            }
-                            else
-                            {
-                                damage += irand(int32(dmg_min), int32(dmg_max));
-                            }
-                            damage += int32(caster->GetAmmoDPS() * caster->GetAttackTime(RANGED_ATTACK) * 0.001f);
-                        }
-                    }
+                    // 4.3.4: Steady Shot is a weapon damage spell (Spell::EffectWeaponDmg); WotLK's ammo and
+                    // daze branch for it is gone
                     break;
                 }
             case SPELLFAMILY_PALADIN:
@@ -3342,7 +3303,8 @@ void Spell::EffectTameCreature(SpellEffIndex /*effIndex*/)
     // "kill" original creature
     creatureTarget->DespawnOrUnsummon();
 
-    uint8 level = (creatureTarget->GetLevel() < (unitCaster->GetLevel() - 5)) ? (unitCaster->GetLevel() - 5) : creatureTarget->GetLevel();
+    // Cataclysm: a tamed pet always has its hunter's level
+    uint8 level = unitCaster->GetLevel();
 
     // prepare visual effect for levelup
     pet->SetUInt32Value(UNIT_FIELD_LEVEL, level - 1);
@@ -3556,10 +3518,6 @@ void Spell::EffectTaunt(SpellEffIndex /*effIndex*/)
     if (!unitTarget)
         return;
 
-    // xinef: Hand of Reckoning, cast before checking canhavethreatlist. fixes damage against pets
-    if (m_spellInfo->Id == 62124 && unitTarget->GetVictim() != unitCaster)
-        unitCaster->CastSpell(unitTarget, 67485, true);
-
     if (!unitTarget->CanHaveThreatList())
     {
         SendCastResult(SPELL_FAILED_DONT_REPORT);
@@ -3609,6 +3567,7 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
     float totalDamagePercentMod  = 100.0f;                  // applied to final bonus+weapon damage
     int32 spell_bonus = 0;                                  // bonus specific for spell
     bool normalized = false;
+    bool flatAfterWeaponPct = false;                        // the effects' flat damage is not multiplied by the weapon percentage
 
     switch (m_spellInfo->SpellFamilyName)
     {
@@ -3722,11 +3681,13 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
             }
         case SPELLFAMILY_HUNTER:
             {
-                // Kill Shot
-                if (m_spellInfo->SpellFamilyFlags[1] & 0x800000)
-                {
-                    spell_bonus += int32(unitCaster->GetTotalAttackPowerValue(RANGED_ATTACK) * 0.4f);
-                }
+                // 4.3.4 shots: "$m2% weapon damage plus $<damage>": the weapon percentage applies to the weapon
+                // damage only; the flat part and the attack power share (spell_bonus_data, TDB 434; CPP computed
+                // them in its scripts) come on top
+                flatAfterWeaponPct = true;
+                if (SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(m_spellInfo->Id))
+                    if (bonus->ap_bonus > 0.0f)
+                        spell_bonus += int32(bonus->ap_bonus * unitCaster->GetTotalAttackPowerValue(m_attackType));
                 break;
             }
         case SPELLFAMILY_DEATHKNIGHT:
@@ -3879,7 +3840,10 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
             case SPELL_EFFECT_WEAPON_DAMAGE:
             case SPELL_EFFECT_WEAPON_DAMAGE_NOSCHOOL:
             case SPELL_EFFECT_NORMALIZED_WEAPON_DMG:
-                weaponDamage += fixed_bonus;
+                if (flatAfterWeaponPct)
+                    spell_bonus += fixed_bonus;
+                else
+                    weaponDamage += fixed_bonus;
                 break;
             case SPELL_EFFECT_WEAPON_PERCENT_DAMAGE:
                 ApplyPct(weaponDamage, weaponDamagePercentMod);
@@ -6348,7 +6312,7 @@ void Spell::EffectTitanGrip(SpellEffIndex /*effIndex*/)
     }
 }
 
-void Spell::EffectRedirectThreat(SpellEffIndex /*effIndex*/)
+void Spell::EffectRedirectThreat(SpellEffIndex effIndex)
 {
     Unit* unitCaster = GetUnitCasterForEffectHandlers();
     if (!unitCaster)
@@ -6358,7 +6322,9 @@ void Spell::EffectRedirectThreat(SpellEffIndex /*effIndex*/)
         return;
 
     if (unitTarget)
-        unitCaster->GetThreatMgr().RegisterRedirectThreat(m_spellInfo->Id, unitTarget->GetGUID(), uint32(damage));
+        // misc value: how long the moved threat stays on the target (Misdirection, Tricks of the Trade: 30 s)
+        unitCaster->GetThreatMgr().RegisterRedirectThreat(m_spellInfo->Id, unitTarget->GetGUID(), uint32(damage),
+            uint32(std::max(0, m_spellInfo->Effects[effIndex].MiscValue)));
 }
 
 void Spell::EffectGameObjectDamage(SpellEffIndex /*effIndex*/)

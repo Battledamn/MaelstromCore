@@ -480,6 +480,25 @@ class spell_warr_heroic_leap : public SpellScript
     }
 };
 
+// 845 - Cleave
+// ${6+$ap*0.45}: the client data's base points are 1; the attack power share is TDB's spell_bonus_data row.
+class spell_warr_cleave : public SpellScript
+{
+    PrepareSpellScript(spell_warr_cleave);
+
+    static constexpr int32 CLEAVE_BASE_DAMAGE = 6;
+
+    void CalculateDamage(SpellEffIndex /*effIndex*/)
+    {
+        SetEffectValue(CLEAVE_BASE_DAMAGE);
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_warr_cleave::CalculateDamage, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+    }
+};
+
 // 78 - Heroic Strike
 class spell_warr_heroic_strike : public SpellScript
 {
@@ -1297,6 +1316,7 @@ void AddSC_warrior_spell_scripts()
     RegisterSpellScript(spell_warr_bloodthirst);
     RegisterSpellScript(spell_warr_bloodthirst_heal);
     RegisterSpellScript(spell_warr_charge);
+    RegisterSpellScript(spell_warr_cleave);
     RegisterSpellScript(spell_warr_colossus_smash);
     RegisterSpellScript(spell_warr_concussion_blow);
     RegisterSpellScript(spell_warr_deep_wounds);

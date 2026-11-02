@@ -18,6 +18,7 @@
 #include "Containers.h"
 #include "DynamicObject.h"
 #include "GridNotifiers.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
 #include "Spell.h"
 #include "SpellAuraEffects.h"
@@ -25,6 +26,7 @@
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
 #include "TemporarySummon.h"
+#include <mutex>
 /*
  * Scripts for spells with SPELLFAMILY_DRUID and SPELLFAMILY_GENERIC spells used by druid players.
  * Ordered alphabetically using scriptname.
@@ -3064,25 +3066,68 @@ class spell_dru_tree_of_life : public AuraScript
     }
 };
 
-// Wild Mushrooms are summoned as plain allied summons (SummonProperties 3069), which AzerothCore does
-// not register as the caster's minions, so they are found around the caster by entry and summoner.
-static constexpr float WILD_MUSHROOM_SEARCH_RANGE = 100.0f;
+// Wild Mushrooms are summoned as plain allied summons (SummonProperties 3069: no slot, no minion title), which
+// neither AzerothCore nor CPP registers on the caster (CPP's GetAllMinionsByEntry never finds them). Each druid's
+// mushrooms are kept by guid here, at any distance on the druid's map; a new one is picked up right after the
+// cast, where it stands next to its target spot.
+static constexpr float WILD_MUSHROOM_PICKUP_RANGE = 100.0f;
+static std::unordered_map<ObjectGuid, std::vector<ObjectGuid>> sWildMushrooms;
+static std::mutex sWildMushroomsLock;   // maps update on several threads
 
 static std::list<TempSummon*> GetWildMushrooms(Unit* caster)
 {
     std::list<TempSummon*> mushrooms;
-    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_DRUID_WILD_MUSHROOM);
-    if (!spellInfo)
+    std::lock_guard<std::mutex> guard(sWildMushroomsLock);
+    auto it = sWildMushrooms.find(caster->GetGUID());
+    if (it == sWildMushrooms.end())
         return mushrooms;
 
+    // drop the ones that despawned, died, were detonated or are on another map
+    std::vector<ObjectGuid>& guids = it->second;
+    for (auto guid = guids.begin(); guid != guids.end();)
+    {
+        Creature* creature = ObjectAccessor::GetCreature(*caster, *guid);
+        TempSummon* summon = creature ? creature->ToTempSummon() : nullptr;
+        if (summon && summon->IsAlive() && summon->GetSummonerGUID() == caster->GetGUID())
+        {
+            mushrooms.push_back(summon);
+            ++guid;
+        }
+        else
+            guid = guids.erase(guid);
+    }
+
+    if (guids.empty())
+        sWildMushrooms.erase(it);
+    return mushrooms;
+}
+
+static void ForgetWildMushroom(Unit* caster, ObjectGuid const& mushroom)
+{
+    std::lock_guard<std::mutex> guard(sWildMushroomsLock);
+    auto it = sWildMushrooms.find(caster->GetGUID());
+    if (it == sWildMushrooms.end())
+        return;
+    std::erase(it->second, mushroom);
+    if (it->second.empty())
+        sWildMushrooms.erase(it);
+}
+
+static void PickUpNewWildMushrooms(Unit* caster)
+{
+    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_DRUID_WILD_MUSHROOM);
+    if (!spellInfo)
+        return;
+
     std::list<Creature*> creatures;
-    caster->GetCreatureListWithEntryInGrid(creatures, uint32(spellInfo->Effects[EFFECT_0].MiscValue), WILD_MUSHROOM_SEARCH_RANGE);
+    caster->GetCreatureListWithEntryInGrid(creatures, uint32(spellInfo->Effects[EFFECT_0].MiscValue), WILD_MUSHROOM_PICKUP_RANGE);
+    std::lock_guard<std::mutex> guard(sWildMushroomsLock);
+    std::vector<ObjectGuid>& guids = sWildMushrooms[caster->GetGUID()];
     for (Creature* creature : creatures)
         if (TempSummon* summon = creature->ToTempSummon())
-            if (summon->IsAlive() && summon->GetSummonerGUID() == caster->GetGUID())
-                mushrooms.push_back(summon);
-
-    return mushrooms;
+            if (summon->IsAlive() && summon->GetSummonerGUID() == caster->GetGUID() &&
+                std::find(guids.begin(), guids.end(), summon->GetGUID()) == guids.end())
+                guids.push_back(summon->GetGUID());
 }
 
 // 88747 - Wild Mushroom
@@ -3094,6 +3139,7 @@ class spell_dru_wild_mushroom : public SpellScript
 
     void HandleSummon()
     {
+        PickUpNewWildMushrooms(GetCaster());
         std::list<TempSummon*> mushrooms = GetWildMushrooms(GetCaster());
         if (mushrooms.size() <= uint32(std::max<int32>(GetSpellInfo()->Effects[EFFECT_0].BasePoints, 0)))
             return;
@@ -3104,7 +3150,10 @@ class spell_dru_wild_mushroom : public SpellScript
                 oldestMushroom = mushroom;
 
         if (oldestMushroom)
+        {
+            ForgetWildMushroom(GetCaster(), oldestMushroom->GetGUID());
             oldestMushroom->UnSummon();
+        }
     }
 
     void Register() override
@@ -3153,6 +3202,8 @@ class spell_dru_wild_mushroom_detonate : public SpellScript
             caster->CastSpell(x, y, z, SPELL_DRUID_WILD_MUSHROOM_DAMAGE, true);
             mushroom->CastSpell(mushroom, SPELL_DRUID_WILD_MUSHROOM_VISUAL, true);
             mushroom->CastSpell(mushroom, SPELL_DRUID_WILD_MUSHROOM_SUICIDE, true);
+            // it stays for its visual; a second Detonate must not find it again
+            ForgetWildMushroom(caster, mushroom->GetGUID());
             mushroom->UnSummon(1500ms);
         }
     }

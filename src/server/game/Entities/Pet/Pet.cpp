@@ -491,20 +491,19 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
         if (fullMana)
             curMana = GetMaxPower(POWER_MANA);
 
-        if (getPetType() == SUMMON_PET && !current) //all (?) summon pets come with full health when called, but not when they are current
+        if (getPetType() == HUNTER_PET && !curHealth)
+            setDeathState(DeathState::JustDied);
+        // 4.3.4: a called pet (hunter pets too, CPP) comes with full health, after its scaling auras; a current
+        // pet (relog, teleport) and one revived with a share of its health keep theirs
+        else if (!current && (getPetType() == SUMMON_PET || (getPetType() == HUNTER_PET && !healthPct)))
         {
             SetPower(POWER_MANA, GetMaxPower(POWER_MANA));
             SetFullHealth();
         }
         else
         {
-            if (!curHealth && getPetType() == HUNTER_PET)
-                setDeathState(DeathState::JustDied);
-            else
-            {
-                SetHealth(curHealth > GetMaxHealth() ? GetMaxHealth() : curHealth);
-                SetPower(POWER_MANA, curMana > GetMaxPower(POWER_MANA) ? GetMaxPower(POWER_MANA) : curMana);
-            }
+            SetHealth(curHealth > GetMaxHealth() ? GetMaxHealth() : curHealth);
+            SetPower(POWER_MANA, curMana > GetMaxPower(POWER_MANA) ? GetMaxPower(POWER_MANA) : curMana);
         }
 
         // must be after SetMinion (owner guid check)
@@ -2415,16 +2414,10 @@ void Pet::SynchronizeLevelWithOwner()
 
     switch (getPetType())
     {
-        // always same level
+        // always same level; in Cataclysm hunter pets too (they no longer earn experience)
         case SUMMON_PET:
-            GivePetLevel(owner->GetLevel());
-            break;
-        // can't be greater owner level
         case HUNTER_PET:
-            if (GetLevel() > owner->GetLevel())
-                GivePetLevel(owner->GetLevel());
-            else if (GetLevel() + 5 < owner->GetLevel())
-                GivePetLevel(owner->GetLevel() - 5);
+            GivePetLevel(owner->GetLevel());
             break;
         default:
             break;

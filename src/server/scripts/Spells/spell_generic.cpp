@@ -6457,6 +6457,97 @@ class spell_gen_submerge_visual : public AuraScript
     }
 };
 
+// 86524, 86525, 86526 Plate, 86528, 86529 Mail, 86530, 86531 Leather Specialization
+// Ported from The Cataclysm Preservation Project (spell_generic.cpp at b061f46): the passive is a dummy; it gives
+// the specialization's +5% primary stat aura when all eight armor slots hold the class's armor type
+// (Player::UpdateArmorSpecialization casts it again when the armor, the specialization or a druid's form changes).
+enum ArmorSpecializationSpells
+{
+    SPELL_ARMOR_SPEC_WAR_ARMS           = 86110,
+    SPELL_ARMOR_SPEC_WAR_FURY           = 86101,
+    SPELL_ARMOR_SPEC_WAR_PROTECTION     = 86535,
+    SPELL_ARMOR_SPEC_PAL_HOLY           = 86103,
+    SPELL_ARMOR_SPEC_PAL_PROTECTION     = 86102,
+    SPELL_ARMOR_SPEC_PAL_RETRIBUTION    = 86539,
+    SPELL_ARMOR_SPEC_HUN                = 86538,
+    SPELL_ARMOR_SPEC_ROG                = 86092,
+    SPELL_ARMOR_SPEC_DK_BLOOD           = 86537,
+    SPELL_ARMOR_SPEC_DK_FROST           = 86536,
+    SPELL_ARMOR_SPEC_DK_UNHOLY          = 86113,
+    SPELL_ARMOR_SPEC_SHA_ELEMENTAL      = 86100,
+    SPELL_ARMOR_SPEC_SHA_ENHANCEMENT    = 86099,
+    SPELL_ARMOR_SPEC_SHA_RESTORATION    = 86108,
+    SPELL_ARMOR_SPEC_DRU_BALANCE        = 86093,
+    SPELL_ARMOR_SPEC_DRU_FERAL_BEAR     = 86096,
+    SPELL_ARMOR_SPEC_DRU_FERAL          = 86097,
+    SPELL_ARMOR_SPEC_DRU_RESTORATION    = 86104
+};
+
+class spell_gen_armor_specialization : public SpellScript
+{
+    PrepareSpellScript(spell_gen_armor_specialization);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_ARMOR_SPEC_WAR_ARMS, SPELL_ARMOR_SPEC_WAR_FURY, SPELL_ARMOR_SPEC_WAR_PROTECTION,
+                SPELL_ARMOR_SPEC_PAL_HOLY, SPELL_ARMOR_SPEC_PAL_PROTECTION, SPELL_ARMOR_SPEC_PAL_RETRIBUTION,
+                SPELL_ARMOR_SPEC_HUN, SPELL_ARMOR_SPEC_ROG,
+                SPELL_ARMOR_SPEC_DK_BLOOD, SPELL_ARMOR_SPEC_DK_FROST, SPELL_ARMOR_SPEC_DK_UNHOLY,
+                SPELL_ARMOR_SPEC_SHA_ELEMENTAL, SPELL_ARMOR_SPEC_SHA_ENHANCEMENT, SPELL_ARMOR_SPEC_SHA_RESTORATION,
+                SPELL_ARMOR_SPEC_DRU_BALANCE, SPELL_ARMOR_SPEC_DRU_FERAL_BEAR, SPELL_ARMOR_SPEC_DRU_FERAL,
+                SPELL_ARMOR_SPEC_DRU_RESTORATION
+            });
+    }
+
+    void HandleDummy(SpellEffIndex /*effIndex*/)
+    {
+        Player* player = GetHitPlayer();
+        if (!player)
+            return;
+
+        uint32 spellId = 0;
+        switch (player->GetPrimaryTalentTree(player->GetActiveSpec()))
+        {
+            case TALENT_TREE_WARRIOR_ARMS:          spellId = SPELL_ARMOR_SPEC_WAR_ARMS; break;
+            case TALENT_TREE_WARRIOR_FURY:          spellId = SPELL_ARMOR_SPEC_WAR_FURY; break;
+            case TALENT_TREE_WARRIOR_PROTECTION:    spellId = SPELL_ARMOR_SPEC_WAR_PROTECTION; break;
+            case TALENT_TREE_PALADIN_HOLY:          spellId = SPELL_ARMOR_SPEC_PAL_HOLY; break;
+            case TALENT_TREE_PALADIN_PROTECTION:    spellId = SPELL_ARMOR_SPEC_PAL_PROTECTION; break;
+            case TALENT_TREE_PALADIN_RETRIBUTION:   spellId = SPELL_ARMOR_SPEC_PAL_RETRIBUTION; break;
+            case TALENT_TREE_HUNTER_BEAST_MASTERY:
+            case TALENT_TREE_HUNTER_MARKSMANSHIP:
+            case TALENT_TREE_HUNTER_SURVIVAL:       spellId = SPELL_ARMOR_SPEC_HUN; break;
+            case TALENT_TREE_ROGUE_ASSASSINATION:
+            case TALENT_TREE_ROGUE_COMBAT:
+            case TALENT_TREE_ROGUE_SUBTLETY:        spellId = SPELL_ARMOR_SPEC_ROG; break;
+            case TALENT_TREE_DEATH_KNIGHT_BLOOD:    spellId = SPELL_ARMOR_SPEC_DK_BLOOD; break;
+            case TALENT_TREE_DEATH_KNIGHT_FROST:    spellId = SPELL_ARMOR_SPEC_DK_FROST; break;
+            case TALENT_TREE_DEATH_KNIGHT_UNHOLY:   spellId = SPELL_ARMOR_SPEC_DK_UNHOLY; break;
+            case TALENT_TREE_SHAMAN_ELEMENTAL:      spellId = SPELL_ARMOR_SPEC_SHA_ELEMENTAL; break;
+            case TALENT_TREE_SHAMAN_ENHANCEMENT:    spellId = SPELL_ARMOR_SPEC_SHA_ENHANCEMENT; break;
+            case TALENT_TREE_SHAMAN_RESTORATION:    spellId = SPELL_ARMOR_SPEC_SHA_RESTORATION; break;
+            case TALENT_TREE_DRUID_BALANCE:         spellId = SPELL_ARMOR_SPEC_DRU_BALANCE; break;
+            case TALENT_TREE_DRUID_FERAL_COMBAT:
+                spellId = player->GetShapeshiftForm() == FORM_BEAR ? SPELL_ARMOR_SPEC_DRU_FERAL_BEAR : SPELL_ARMOR_SPEC_DRU_FERAL;
+                break;
+            case TALENT_TREE_DRUID_RESTORATION:     spellId = SPELL_ARMOR_SPEC_DRU_RESTORATION; break;
+            default:
+                return;
+        }
+
+        if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId))
+            if (player->HasAllItemsToFitToSpellRequirements(spellInfo))
+                player->CastSpell(player, spellId, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_gen_armor_specialization::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
 void AddSC_generic_spell_scripts()
 {
     RegisterSpellScript(spell_silithyst);
@@ -6658,4 +6749,5 @@ void AddSC_generic_spell_scripts()
     RegisterSpellScript(spell_gen_black_bow_of_the_betrayer);
     RegisterSpellScript(spell_gen_filter_party_level_80);
     RegisterSpellScript(spell_gen_submerge_visual);
+    RegisterSpellScript(spell_gen_armor_specialization);
 }

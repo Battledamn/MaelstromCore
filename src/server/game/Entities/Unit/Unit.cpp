@@ -8685,6 +8685,9 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
 
     // Done fixed damage bonus auras
     DoneAdvertisedBenefit += SpellBaseDamageBonusDone(spellProto->GetSchoolMask(), true);
+    // 4.3.4 (CPP): the target's flat damage taken auras (Amplify/Dampen Magic) count as spell power, with the
+    // spell's own coefficient; 3.3.5a added them on the taken side with a cast time coefficient
+    DoneAdvertisedBenefit += victim->SpellBaseDamageBonusTaken(spellProto->GetSchoolMask(), damagetype == DOT);
 
     // 4.3.4: the client's own coefficients (CPP): spell power per effect (SpellEffect.dbc), attack power
     // per spell (Spell.dbc). A spell_bonus_data row overrides both, e.g. with 0 for a spell whose script
@@ -8785,28 +8788,7 @@ uint32 Unit::SpellDamageBonusTaken(Unit* caster, SpellInfo const* spellProto, ui
         AddPct(TakenTotalMod, modifierMin);
     }
 
-    int32 TakenAdvertisedBenefit = SpellBaseDamageBonusTaken(spellProto->GetSchoolMask(), damagetype == DOT);
-
-    // Check for table values
-    float coeff = 0;
-    SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(spellProto->Id);
-    if (bonus)
-        coeff = (damagetype == DOT) ? bonus->dot_damage : bonus->direct_damage;
-
-    // Default calculation
-    if (TakenAdvertisedBenefit)
-    {
-        if (coeff <= 0.0f)
-        {
-            if (caster)
-                coeff = caster->CalculateDefaultCoefficient(spellProto, damagetype) * int32(stack);
-            else
-                coeff = CalculateDefaultCoefficient(spellProto, damagetype) * int32(stack);
-        }
-
-        float factorMod = CalculateLevelPenalty(spellProto) * stack;
-        TakenTotal += int32(TakenAdvertisedBenefit * coeff * factorMod);
-    }
+    // the flat damage taken auras count as the caster's spell power (SpellDamageBonusDone, CPP)
 
     // No positive taken bonus, custom attr
     if (spellProto->HasAttribute(SPELL_ATTR0_CU_NO_POSITIVE_TAKEN_BONUS) && TakenTotalMod > 1.0f)
@@ -9178,6 +9160,15 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                             crit_chance += rendAndTear->GetAmount();
                         break;
                     }
+                    // Predatory Strikes (4.3.4): Ravage and Ravage! crit more on targets at or above effect 1's health
+                    if (spellProto->SpellFamilyFlags[0] & 0x00010000)
+                    {
+                        if (AuraEffect const* predatoryStrikes = caster->GetDummyAuraEffect(SPELLFAMILY_DRUID, 1563, EFFECT_0))
+                            if (AuraEffect const* healthLimit = predatoryStrikes->GetBase()->GetEffect(EFFECT_1))
+                                if (GetHealthPct() >= float(healthLimit->GetAmount()))
+                                    crit_chance += predatoryStrikes->GetAmount();
+                        break;
+                    }
                     break;
                 // 4.3.4: Glyph of Victory Rush (58382) raises the heal, a spell modifier; no crit chance
                 }
@@ -9463,6 +9454,9 @@ uint32 Unit::SpellHealingBonusDone(Unit* victim, SpellInfo const* spellProto, ui
 
     // Done fixed damage bonus auras
     DoneAdvertisedBenefit += SpellBaseHealingBonusDone(spellProto->GetSchoolMask(), true);
+    // 4.3.4 (CPP): the target's flat healing taken auras count as spell power, with the spell's own coefficient
+    if (victim)
+        DoneAdvertisedBenefit += victim->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_HEALING, spellProto->GetSchoolMask());
 
     // 4.3.4: the client's own coefficients, overridden by a spell_bonus_data row (see SpellDamageBonusDone)
     float coeff = spellProto->Effects[effIndex].BonusMultiplier * spellProto->GetSpellScalingMultiplier(GetLevel(), false);
@@ -9541,9 +9535,6 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
     // Healing Done
     int32 TakenTotal = 0;
 
-    // Taken fixed damage bonus auras
-    int32 TakenAdvertisedBenefit = GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_HEALING, spellProto->GetSchoolMask());
-
     // Nourish cast - 20% bonus if target has Rejuvenation, Regrowth, Lifebloom, or Wild Growth from caster
     // Glyph of Nourish is handled by spell_dru_nourish script
     if (spellProto->SpellFamilyName == SPELLFAMILY_DRUID && spellProto->SpellFamilyFlags[1] & 0x2000000 && caster)
@@ -9576,39 +9567,14 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
             AddPct(TakenTotalMod, maxval_hot);
     }
 
-    // Check for table values
-    SpellBonusEntry const* bonus = sSpellMgr->GetSpellBonusData(spellProto->Id);
-    float coeff = 0;
-    float factorMod = 1.0f;
-    if (bonus)
-        coeff = (damagetype == DOT) ? bonus->dot_damage : bonus->direct_damage;
-    else
+    // No bonus healing for SPELL_DAMAGE_CLASS_NONE class spells by default
+    if (!sSpellMgr->GetSpellBonusData(spellProto->Id) && spellProto->DmgClass == SPELL_DAMAGE_CLASS_NONE)
     {
-        // No bonus healing for SPELL_DAMAGE_CLASS_NONE class spells by default
-        if (spellProto->DmgClass == SPELL_DAMAGE_CLASS_NONE)
-        {
-            healamount = uint32(std::max((float(healamount) * TakenTotalMod), 0.0f));
-            return healamount;
-        }
+        healamount = uint32(std::max((float(healamount) * TakenTotalMod), 0.0f));
+        return healamount;
     }
 
-    // Default calculation
-    if (TakenAdvertisedBenefit)
-    {
-        float TakenCoeff = 0.0f;
-        if (coeff <= 0)
-            coeff = CalculateDefaultCoefficient(spellProto, damagetype) * int32(stack) * 1.88f;  // As wowwiki says: C = (Cast Time / 3.5) * 1.88 (for healing spells)
-
-        factorMod *= CalculateLevelPenalty(spellProto) * int32(stack);
-        if (Player* modOwner = GetSpellModOwner())
-        {
-            coeff *= 100.0f;
-            modOwner->ApplySpellMod(spellProto->Id, SPELLMOD_BONUS_MULTIPLIER, coeff);
-            coeff /= 100.0f;
-        }
-
-        TakenTotal += int32(TakenAdvertisedBenefit * (coeff > 0 ? coeff : TakenCoeff) * factorMod);
-    }
+    // the flat healing taken auras count as the healer's spell power (SpellHealingBonusDone, CPP)
 
     if (caster)
     {
@@ -13629,7 +13595,8 @@ Pet* Unit::CreateTamedPetFrom(Creature* creatureTarget, uint32 spell_id)
         return nullptr;
     }
 
-    uint8 level = creatureTarget->GetLevel() + 5 < GetLevel() ? (GetLevel() - 5) : creatureTarget->GetLevel();
+    // Cataclysm: a tamed pet always has its hunter's level (as in The Cataclysm Preservation Project)
+    uint8 level = GetLevel();
 
     if (!InitTamedPet(pet, level, spell_id))
     {

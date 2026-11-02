@@ -386,7 +386,7 @@ pAuraEffectHandler AuraEffectHandler[TOTAL_AURAS] =
     &AuraEffect::HandleModMeleeSpeedPct,                          //319 SPELL_AURA_MOD_MELEE_HASTE_3
     &AuraEffect::HandleAuraModRangedHaste,                        //320 SPELL_AURA_MOD_RANGED_HASTE_2
     &AuraEffect::HandleAuraModNoActions,                      //321 SPELL_AURA_MOD_NO_ACTIONS
-    &AuraEffect::HandleNULL,                                      //322 SPELL_AURA_INTERFERE_TARGETTING
+    &AuraEffect::HandleNoImmediateEffect,                         //322 SPELL_AURA_INTERFERE_TARGETTING implemented in SpellInfo::CheckExplicitTarget
     &AuraEffect::HandleUnused,                                    //323 unused (4.3.4)
     &AuraEffect::HandleNULL,                                      //324 SPELL_AURA_324
     &AuraEffect::HandleUnused,                                    //325 unused (4.3.4)
@@ -417,7 +417,7 @@ pAuraEffectHandler AuraEffectHandler[TOTAL_AURAS] =
     &AuraEffect::HandleNULL,                                      //350 SPELL_AURA_MOD_GATHERING_ITEMS_GAINED_PERCENT
     &AuraEffect::HandleNULL,                                      //351 SPELL_AURA_MOD_CURRENCY_CATEGORY_GAIN_PCT needs Cataclysm currencies
     &AuraEffect::HandleNULL,                                      //352 SPELL_AURA_ENABLE_ALTERED_FORM
-    &AuraEffect::HandleNULL,                                      //353 SPELL_AURA_MOD_CAMOUFLAGE
+    &AuraEffect::HandleNoImmediateEffect,                         //353 SPELL_AURA_MOD_CAMOUFLAGE client side (the camouflaged look)
     &AuraEffect::HandleNoImmediateEffect,                         //354 SPELL_AURA_MOD_HEALING_DONE_PCT_VERSUS_TARGET_HEALTH implemented in Unit::SpellHealingBonusDone
     &AuraEffect::HandleUnused,                                    //355 unused (4.3.4)
     &AuraEffect::HandleNoImmediateEffect,                         //356 SPELL_AURA_MOD_DAMAGE_FROM_MANA implemented in Unit::SpellDamageBonusDone
@@ -1448,9 +1448,7 @@ void AuraEffect::HandleShapeshiftBoosts(Unit* target, bool apply) const
             spellId = 3025;
             HotWSpellId = 24900;
             break;
-        case FORM_TREE:
-            spellId = 34123;
-            break;
+        // FORM_TREE: its WotLK passive (34123) is gone in 4.3.4; Tree of Life's bonuses are in its own effects
         case FORM_TRAVEL:
             spellId = 5419;
             break;
@@ -2315,7 +2313,11 @@ void AuraEffect::HandleAuraModShapeshift(AuraApplication const* aurApp, uint8 mo
     HandleShapeshiftBoosts(target, apply);
 
     if (target->IsPlayer())
+    {
         target->ToPlayer()->InitDataForForm();
+        // a feral druid's armor specialization differs in Bear Form (CPP)
+        target->ToPlayer()->UpdateArmorSpecialization();
+    }
 
     if (target->IsClass(CLASS_DRUID, CLASS_CONTEXT_ABILITY))
     {
@@ -6743,8 +6745,6 @@ void AuraEffect::HandlePeriodicHealthLeechAuraTick(Unit* target, Unit* caster) c
 
     HealInfo healInfo(caster, caster, heal, GetSpellInfo(), GetSpellInfo()->GetSchoolMask());
     float threat = float(caster->HealBySpell(healInfo)) * 0.5f;
-    if (caster->IsClass(CLASS_PALADIN))
-        threat *= 0.5f;
     caster->GetThreatMgr().ForwardThreatForAssistingMe(caster, threat, GetSpellInfo());
 }
 
@@ -6882,8 +6882,6 @@ void AuraEffect::HandlePeriodicHealAurasTick(Unit* target, Unit* caster) const
     if (caster)
     {
         float threat = float(gain) * 0.5f;
-        if (caster->IsClass(CLASS_PALADIN))
-            threat *= 0.5f;
         target->GetThreatMgr().ForwardThreatForAssistingMe(caster, threat, GetSpellInfo());
     }
 
@@ -6967,7 +6965,9 @@ void AuraEffect::HandlePeriodicManaLeechAuraTick(Unit* target, Unit* caster) con
     if (gainAmount)
     {
         gainedAmount = caster->ModifyPower(PowerType, gainAmount);
-        target->AddThreat(caster, float(gainedAmount) * 0.5f, GetSpellInfo()->GetSchoolMask(), GetSpellInfo());
+        // CPP: the drained power's threat as it is, no threat modifiers on top
+        if (!GetSpellInfo()->HasAttribute(SPELL_ATTR4_NO_HELPFUL_THREAT))
+            target->GetThreatMgr().AddThreat(caster, float(gainedAmount) * 0.5f, GetSpellInfo(), true);
     }
 
     // remove CC auras

@@ -670,6 +670,7 @@ enum SpellAttr7 : uint32
 // Cataclysm AttributesEx8; only the flags the core uses so far
 enum SpellAttr8 : uint32
 {
+    SPELL_ATTR8_REQUIRES_EQUIPPED_INV_TYPES                   = 0x00100000, // needs an item of its kind in every slot of its inventory types (armor specialization)
     SPELL_ATTR8_MASTERY_AFFECTS_POINTS                        = 0x20000000  // a specialization's mastery spell: its amount grows with mastery
 };
 

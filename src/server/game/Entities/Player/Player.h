@@ -1300,6 +1300,9 @@ public:
     void SetBankBagSlotCount(uint8 count) { SetByteValue(PLAYER_BYTES_2, 2, count); }
     [[nodiscard]] bool HasItemCount(uint32 item, uint32 count = 1, bool inBankAlso = false) const;
     bool HasItemFitToSpellRequirements(SpellInfo const* spellInfo, Item const* ignoreItem = nullptr) const;
+    // Cataclysm armor specialization (CPP): all eight armor slots hold the spell's armor type
+    [[nodiscard]] bool HasAllItemsToFitToSpellRequirements(SpellInfo const* spellInfo) const;
+    void UpdateArmorSpecialization();
     bool CanNoReagentCast(SpellInfo const* spellInfo) const;
     [[nodiscard]] bool HasItemOrGemWithIdEquipped(uint32 item, uint32 count, uint8 except_slot = NULL_SLOT) const;
     [[nodiscard]] bool HasItemOrGemWithLimitCategoryEquipped(uint32 limitCategory, uint32 count, uint8 except_slot = NULL_SLOT) const;

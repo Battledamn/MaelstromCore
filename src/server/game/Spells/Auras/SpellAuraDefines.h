@@ -382,7 +382,7 @@ enum AuraType
     SPELL_AURA_MOD_MELEE_HASTE_3                            = 319,
     SPELL_AURA_MOD_RANGED_HASTE_2                           = 320,
     SPELL_AURA_MOD_NO_ACTIONS                               = 321,
-    SPELL_AURA_INTERFERE_TARGETTING                         = 322,  // NYI
+    SPELL_AURA_INTERFERE_TARGETTING                         = 322,  // SpellInfo::CheckExplicitTarget
     SPELL_AURA_323                                          = 323,  // Not used in 4.3.4
     SPELL_AURA_324                                          = 324,  // spell critical chance (probably by school mask)
     SPELL_AURA_325                                          = 325,  // Not used in 4.3.4
@@ -413,7 +413,7 @@ enum AuraType
     SPELL_AURA_MOD_GATHERING_ITEMS_GAINED_PERCENT           = 350,  // NYI
     SPELL_AURA_MOD_CURRENCY_CATEGORY_GAIN_PCT               = 351,
     SPELL_AURA_ENABLE_ALTERED_FORM                          = 352,
-    SPELL_AURA_MOD_CAMOUFLAGE                               = 353,  // NYI
+    SPELL_AURA_MOD_CAMOUFLAGE                               = 353,  // client side
     SPELL_AURA_MOD_HEALING_DONE_PCT_VERSUS_TARGET_HEALTH    = 354,  // Restoration Shaman mastery - mod healing based on target's health (less = more healing)
     SPELL_AURA_355                                          = 355,
     SPELL_AURA_MOD_DAMAGE_FROM_MANA                         = 356,  // Arcane Mage mastery - mod damage based on current mana

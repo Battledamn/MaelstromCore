@@ -2900,6 +2900,8 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
         else if (slot == EQUIPMENT_SLOT_OFFHAND)
             UpdateExpertise(OFF_ATTACK);
 
+        UpdateArmorSpecialization();
+
         switch (slot)
         {
             case EQUIPMENT_SLOT_MAINHAND:
@@ -3080,6 +3082,8 @@ void Player::RemoveItem(uint8 bag, uint8 slot, bool update)
         pItem->SetGuidValue(ITEM_FIELD_CONTAINED, ObjectGuid::Empty);
         // pItem->SetGuidValue(ITEM_FIELD_OWNER, ObjectGuid::Empty); not clear owner at remove (it will be set at store). This used in mail and auction code
         pItem->SetSlot(NULL_SLOT);
+        if (bag == INVENTORY_SLOT_BAG_0 && slot < EQUIPMENT_SLOT_END)
+            UpdateArmorSpecialization();
         if (IsInWorld() && update)
             pItem->SendUpdateToPlayer(this);
     }
@@ -3225,6 +3229,8 @@ void Player::DestroyItem(uint8 bag, uint8 slot, bool update)
         pItem->SetGuidValue(ITEM_FIELD_CONTAINED, ObjectGuid::Empty);
         pItem->SetSlot(NULL_SLOT);
         pItem->SetState(ITEM_REMOVED, this);
+        if (bag == INVENTORY_SLOT_BAG_0 && slot < EQUIPMENT_SLOT_END)
+            UpdateArmorSpecialization();
     }
 }
 
@@ -5598,6 +5604,9 @@ bool Player::LoadFromDB(ObjectGuid playerGuid, CharacterDatabaseQueryHolder cons
     _LoadMail(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_MAILS), holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_MAIL_ITEMS));
 
     _LoadInventory(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_INVENTORY), time_diff);
+
+    // armor specialization needs the specialization (talents) and the armor; CPP does it here too
+    UpdateArmorSpecialization();
 
     // update items with duration and realtime
     UpdateItemDuration(time_diff, true);
