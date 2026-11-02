@@ -39,6 +39,7 @@ enum RogueSpells
 {
     SPELL_ROGUE_ADRENALINE_RUSH                     = 13750,
     SPELL_ROGUE_BANDITS_GUILE                       = 84748,
+    SPELL_ROGUE_BANDITS_GUILE_TALENT_R1             = 84652,
     SPELL_ROGUE_BLADE_FLURRY                        = 13877,
     SPELL_ROGUE_BLADE_FLURRY_EXTRA_ATTACK           = 22482,
     SPELL_ROGUE_CHEAT_DEATH_COOLDOWN                = 31231,
@@ -172,6 +173,30 @@ class spell_rog_bandits_guile : public AuraScript
     {
         DoCheckProc += AuraCheckProcFn(spell_rog_bandits_guile::CheckProc);
         OnEffectProc += AuraEffectProcFn(spell_rog_bandits_guile::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+
+public:
+    // Redirect: "as well as any insight gained from Bandit's Guile" - the target's debuff and the progress move
+    void TransferInsight(Unit* newTarget)
+    {
+        // called from Redirect's script, outside this aura's hooks: GetTarget() is only valid inside them
+        Unit* rogue = GetUnitOwner();
+        if (!newTarget || _recentTargetGUID == newTarget->GetGUID())
+            return;
+
+        if (Unit* oldTarget = ObjectAccessor::GetUnit(*rogue, _recentTargetGUID))
+            if (Aura* debuff = oldTarget->GetAura(SPELL_ROGUE_BANDITS_GUILE, rogue->GetGUID()))
+            {
+                int32 bp0 = debuff->GetEffect(EFFECT_0) ? debuff->GetEffect(EFFECT_0)->GetAmount() : 0;
+                int32 bp1 = debuff->GetEffect(EFFECT_1) ? debuff->GetEffect(EFFECT_1)->GetAmount() : bp0;
+                int32 const duration = debuff->GetDuration();
+                debuff->Remove();
+                rogue->CastCustomSpell(newTarget, SPELL_ROGUE_BANDITS_GUILE, &bp0, &bp1, nullptr, true);
+                if (Aura* moved = newTarget->GetAura(SPELL_ROGUE_BANDITS_GUILE, rogue->GetGUID()))
+                    moved->SetDuration(duration);
+            }
+
+        _recentTargetGUID = newTarget->GetGUID();
     }
 
 private:
@@ -790,6 +815,20 @@ class spell_rog_honor_among_thieves : public AuraScript
         return ValidateSpellInfo({ SPELL_ROGUE_HONOR_AMONG_THIEVES_TRIGGERED });
     }
 
+    // "This effect cannot occur more than once every 4/3/2 seconds": the rogue's, not each group member's (every
+    // member carries their own copy of the area aura, each with its own proc cooldown); kept on the rogue's copy
+    Aura* GetRoguesAura() const
+    {
+        Unit* caster = GetCaster();
+        return caster ? caster->GetAura(GetId(), caster->GetGUID()) : nullptr;
+    }
+
+    bool CheckProc(ProcEventInfo& /*eventInfo*/)
+    {
+        Aura* roguesAura = GetRoguesAura();
+        return !roguesAura || !roguesAura->IsProcOnCooldown(std::chrono::steady_clock::now());
+    }
+
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
     {
         PreventDefaultAction();
@@ -801,10 +840,15 @@ class spell_rog_honor_among_thieves : public AuraScript
         if (Player* player = caster->ToPlayer())
             if (Unit* target = ObjectAccessor::GetUnit(*player, player->GetTarget()))
                 caster->CastSpell(target, SPELL_ROGUE_HONOR_AMONG_THIEVES_TRIGGERED, true, nullptr, aurEff);
+
+        if (Aura* roguesAura = GetRoguesAura())
+            if (SpellProcEntry const* procEntry = sSpellMgr->GetSpellProcEntry(GetId()))
+                roguesAura->AddProcCooldown(std::chrono::steady_clock::now() + procEntry->Cooldown);
     }
 
     void Register() override
     {
+        DoCheckProc += AuraCheckProcFn(spell_rog_honor_among_thieves::CheckProc);
         OnEffectProc += AuraEffectProcFn(spell_rog_honor_among_thieves::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
@@ -1372,6 +1416,49 @@ class spell_rog_ruthlessness : public AuraScript
     }
 };
 
+// 73981 - Redirect
+// "Transfers any existing combo points to the current enemy target, as well as any insight gained from Bandit's
+// Guile" (with the talent). Its data is an add-combo-points effect of 0, which does nothing (CPP neither).
+class spell_rog_redirect : public SpellScript
+{
+    PrepareSpellScript(spell_rog_redirect);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_ROGUE_BANDITS_GUILE_TALENT_R1 });
+    }
+
+    SpellCastResult CheckCast()
+    {
+        // "Requires active combo points"
+        if (!GetCaster()->GetComboPoints())
+            return SPELL_FAILED_NO_COMBO_POINTS;
+        return SPELL_CAST_OK;
+    }
+
+    void HandleTransfer(SpellEffIndex effIndex)
+    {
+        PreventHitDefaultEffect(effIndex);
+        Unit* rogue = GetCaster();
+        Unit* target = GetHitUnit();
+        if (!target)
+            return;
+
+        if (uint8 const points = rogue->GetComboPoints(); points && rogue->GetComboTarget() != target)
+            rogue->AddComboPoints(target, int8(points));     // a new target takes the count over
+
+        if (Aura* guile = rogue->GetAuraOfRankedSpell(SPELL_ROGUE_BANDITS_GUILE_TALENT_R1))
+            if (spell_rog_bandits_guile* script = guile->GetScript<spell_rog_bandits_guile>("spell_rog_bandits_guile"))
+                script->TransferInsight(target);
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_rog_redirect::CheckCast);
+        OnEffectHitTarget += SpellEffectFn(spell_rog_redirect::HandleTransfer, EFFECT_0, SPELL_EFFECT_ADD_COMBO_POINTS);
+    }
+};
+
 // 1943 - Rupture
 // Attack power per combo point (4.3.4 tooltip), Revealing Strike's bonus; Venomous Wounds gives back energy
 // for the time left when the target dies with it.
@@ -1877,6 +1964,7 @@ void AddSC_rogue_spell_scripts()
     RegisterSpellScript(spell_rog_preparation);
     RegisterSpellScript(spell_rog_prey_on_the_weak);
     RegisterSpellScript(spell_rog_recuperate);
+    RegisterSpellScript(spell_rog_redirect);
     RegisterSpellScript(spell_rog_relentless_strikes);
     RegisterSpellScript(spell_rog_remorseless_attacks);
     RegisterSpellScript(spell_rog_restless_blades);
