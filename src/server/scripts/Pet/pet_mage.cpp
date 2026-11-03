@@ -327,6 +327,17 @@ struct npc_mage_orb : public ScriptedAI
             MoveForward();
     }
 
+    // the orbs fly at their template's hover height (2 yards) instead of hovering (world DB): lifted here, before the
+    // client first sees them, they start at the height they travel at
+    void InitializeAI() override
+    {
+        ScriptedAI::InitializeAI();
+        me->SetDisableGravity(true);
+        float ground = me->GetMapHeight(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ() + 5.0f);
+        if (ground > INVALID_HEIGHT)
+            me->Relocate(me->GetPositionX(), me->GetPositionY(), ground + me->GetFloatValue(UNIT_FIELD_HOVERHEIGHT), me->GetOrientation());
+    }
+
     void IsSummonedBy(WorldObject* summoner) override
     {
         _pos = summoner->GetPosition();
@@ -362,7 +373,7 @@ struct npc_mage_orb : public ScriptedAI
     }
 
 private:
-    // straight on to the end point, the ground's height every 3 yards plus the hover height
+    // straight on to the end point, the ground's height every 3 yards plus the template's hover height
     void MoveForward()
     {
         float hover = me->GetFloatValue(UNIT_FIELD_HOVERHEIGHT);

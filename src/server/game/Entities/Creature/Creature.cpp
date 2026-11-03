@@ -1235,11 +1235,14 @@ bool Creature::Create(ObjectGuid::LowType guidlow, Map* map, uint32 phaseMask, u
         SetNativeDisplayId(display.CreatureDisplayID);
     }
 
+    float const zBeforeAddon = m_positionZ;
     LoadCreaturesAddon();
     LoadSparringPct();
 
     //! Need to be called after LoadCreaturesAddon - MOVEMENTFLAG_HOVER is set there
-    m_positionZ += GetHoverHeight();
+    //! Unit::SetHover there may have lifted it already (summons on the ground, e.g. the mage's orbs 4 yards up)
+    if (m_positionZ == zBeforeAddon)
+        m_positionZ += GetHoverHeight();
 
     LastUsedScriptID = GetScriptId();
 
