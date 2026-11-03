@@ -4638,7 +4638,12 @@ class spell_gen_replenishment : public SpellScript
             }
         }
 
-        targets.remove_if(Acore::PowerCheck(POWER_MANA, false));
+        // everyone with a mana pool, a druid in a form too (AzerothCore and CPP took the power type shown)
+        targets.remove_if([](WorldObject const* object)
+        {
+            Unit const* unit = object->ToUnit();
+            return !unit || !unit->GetMaxPower(POWER_MANA);
+        });
 
         uint8 const maxTargets = 10;
 
@@ -4668,11 +4673,10 @@ class spell_gen_replenishment_aura : public AuraScript
     {
         switch (GetSpellInfo()->Id)
         {
+            // 4.3.4: 1% of maximum mana per 10 sec, ticking every second (CPP); WotLK's was 1% per 5 sec
             case SPELL_REPLENISHMENT:
-                amount = GetUnitOwner()->GetMaxPower(POWER_MANA) * 0.002f;
-                break;
             case SPELL_INFINITE_REPLENISHMENT:
-                amount = GetUnitOwner()->GetMaxPower(POWER_MANA) * 0.0025f;
+                amount = CalculatePct(GetUnitOwner()->GetMaxPower(POWER_MANA), 0.1f);
                 break;
             default:
                 break;
