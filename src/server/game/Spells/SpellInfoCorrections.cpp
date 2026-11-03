@@ -173,12 +173,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].TriggerSpell = 36325; // They Must Burn Bomb Drop (DND)
     });
 
-    // Mana Shield (rank 2)
-    ApplySpellFix({ 8494 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->ProcChance = 0; // because of bug in dbc
-    });
-
     ApplySpellFix({
         63320,  // Glyph of Life Tap
         20335,  // Heart of the Crusader
@@ -262,7 +256,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         17941,  // Shadow Trance
         22008,  // Netherwind Focus
         31834,  // Light's Grace
-        34754,  // Clearcasting
         34936,  // Backlash
         48108,  // Hot Streak
         51124,  // Killing Machine
@@ -600,8 +593,8 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].MiscValue = 0;
     });
 
-    // Arcane Missiles
-    ApplySpellFix({ 5143, 5144, 5145, 8416, 8417, 10211, 10212, 25345, 27075, 38699, 38704, 42843, 42846 }, [](SpellInfo* spellInfo)
+    // Arcane Missiles (4.3.4 has one rank)
+    ApplySpellFix({ 5143 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
     });
@@ -1062,20 +1055,14 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_MOD_CHARM;
     });
 
-    // Combustion, make this passive
-    ApplySpellFix({ 11129 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Dispel = DISPEL_NONE;
-    });
-
     // Magic Absorption
     ApplySpellFix({ 29441, 29444 }, [](SpellInfo* spellInfo)
     {
         spellInfo->SpellLevel = 0;
     });
 
-    // Living Bomb
-    ApplySpellFix({ 44461, 55361, 55362 }, [](SpellInfo* spellInfo)
+    // Living Bomb (the explosion; 4.3.4 has one rank)
+    ApplySpellFix({ 44461 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
         spellInfo->AttributesEx4 |= SPELL_ATTR4_DAMAGE_DOESNT_BREAK_AURAS;
@@ -1101,17 +1088,17 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].TriggerSpell = 31643;
     });
 
-    // Summon Water Elemental (permanent)
-    ApplySpellFix({ 70908 }, [](SpellInfo* spellInfo)
+    // Glyph of Mirror Image: a dummy aura the Mirror Image script looks for (CPP; its data has a dummy effect)
+    ApplySpellFix({ 63093 }, [](SpellInfo* spellInfo)
     {
-        // treat it as pet
-        spellInfo->Effects[EFFECT_0].Effect = SPELL_EFFECT_SUMMON_PET;
+        spellInfo->Effects[EFFECT_0].Effect = SPELL_EFFECT_APPLY_AURA;
+        spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_DUMMY;
     });
 
-    // // Burnout, trigger
-    ApplySpellFix({ 44450 }, [](SpellInfo* spellInfo)
+    // Flame Orb, Frostfire Orb: the orb's damage every second, as the tooltips (CPP)
+    ApplySpellFix({ 82690, 84717 }, [](SpellInfo* spellInfo)
     {
-        spellInfo->Effects[EFFECT_0].Effect = SPELL_EFFECT_POWER_BURN;
+        spellInfo->Effects[EFFECT_0].Amplitude = 1000;
     });
 
     // Mirror Image - Summon Spells
@@ -1139,27 +1126,17 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->PreventionType = SPELL_PREVENTION_TYPE_NONE;
     });
 
-    // Mirror Image Frostbolt
+    // Mirror Image Frostbolt (4.3.4: its own family; its damage is half the mage's, Spell::EffectSchoolDMG)
     ApplySpellFix({ 59638 }, [](SpellInfo* spellInfo)
     {
         spellInfo->DmgClass = SPELL_DAMAGE_CLASS_MAGIC;
-        spellInfo->SpellFamilyName = SPELLFAMILY_MAGE;
-        spellInfo->SpellFamilyFlags = flag96(0x20, 0x0, 0x0);
     });
 
-    // Fingers of Frost
+    // Fingers of Frost (4.3.4's class mask is its own: Deep Freeze; Ice Lance is in Unit.cpp)
     ApplySpellFix({ 44544 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Dispel = DISPEL_NONE;
         spellInfo->AttributesEx4 |= SPELL_ATTR4_CANNOT_BE_STOLEN;
-        spellInfo->Effects[EFFECT_0].SpellClassMask = flag96(685904631, 1151040, 32);
-    });
-
-    // Fingers of Frost visual buff
-    ApplySpellFix({ 74396 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->ProcCharges = 2;
-        spellInfo->StackAmount = 0;
     });
 
     // Glyph of blocking
@@ -4852,13 +4829,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         {
             spellInfo->MaxAffectedTargets = 1;
         });
-
-    // Missile Barrage
-    ApplySpellFix({ 44401 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->ProcCharges = 1;
-        spellInfo->SpellPriority = 100;
-    });
 
     // Item - Mage T8 4P Bonus
     ApplySpellFix({ 64869 }, [](SpellInfo* spellInfo)

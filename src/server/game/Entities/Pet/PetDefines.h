@@ -198,10 +198,6 @@ enum PetScalingSpells
     SPELL_TREANT_SCALING_04             = 35672,
 
     // Mage
-    SPELL_MAGE_PET_SCALING_01           = 35657,
-    SPELL_MAGE_PET_SCALING_02           = 35658,
-    SPELL_MAGE_PET_SCALING_03           = 35659,
-    SPELL_MAGE_PET_SCALING_04           = 35660,
 
     // Death Knight
     SPELL_ORC_RACIAL_COMMAND_DK         = 65221,

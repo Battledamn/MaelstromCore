@@ -8306,21 +8306,16 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
         if (!spellProto->ValidateAttribute6SpellDamageMods(this, *i, damagetype == DOT))
             continue;
 
-        // xinef: Molten Fury should work on all spells
-        switch ((*i)->GetMiscValue())
-        {
-            case 4920: // Molten Fury
-            case 4919:
-                if (victim->HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, spellProto, this))
-                    AddPct(DoneTotalMod, (*i)->GetAmount());
-                break;
-        }
-
         if (!(*i)->IsAffectedOnSpell(spellProto))
             continue;
 
         switch ((*i)->GetMiscValue())
         {
+            case 4920: // Molten Fury: the spells its 4.3.4 class mask names (CPP)
+            case 4919:
+                if (victim->HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, spellProto, this))
+                    AddPct(DoneTotalMod, (*i)->GetAmount());
+                break;
             case 6917: // Death's Embrace
             case 6926:
             case 6928:
@@ -8428,24 +8423,31 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
     switch (spellProto->SpellFamilyName)
     {
         case SPELLFAMILY_MAGE:
-            // Ice Lance
-            if (spellProto->SpellIconID == 186)
-            {
-                if (victim->HasAuraState(AURA_STATE_FROZEN, spellProto, this))
-                {
-                    // Glyph of Ice Lance
-                    if (owner->HasAura(56377) && victim->GetLevel() > owner->GetLevel())
-                        DoneTotalMod *= 4.0f;
-                    else
-                        DoneTotalMod *= 3.0f;
-                }
-            }
+            // 4.3.4 (CPP). Mastery: Frostburn on frozen targets
+            if (AuraEffect* aurEff = GetAuraEffect(76613, EFFECT_0))
+                if (victim->HasAuraState(AURA_STATE_FROZEN) && aurEff->IsAffectedOnSpell(spellProto))
+                    AddPct(DoneTotalMod, aurEff->GetAmount());
 
-            // Torment the weak
-            if (spellProto->SpellFamilyFlags[0] & 0x20600021 || spellProto->SpellFamilyFlags[1] & 0x9000)
+            // Ice Lance: double on frozen targets or with Fingers of Frost (the Glyph of Ice Lance is a modifier)
+            if (spellProto->SpellIconID == 186)
+                if (victim->HasAuraState(AURA_STATE_FROZEN, spellProto, this)
+                    || GetAuraEffect(SPELL_AURA_ABILITY_IGNORE_AURASTATE, SPELLFAMILY_MAGE, 0, 0, 0x0000000A, GetGUID()))
+                    DoneTotalMod *= 2.0f;
+
+            // Fingers of Frost: Ice Lance 25% more
+            if (spellProto->SpellFamilyFlags[0] & 0x00020000)
+                if (GetAuraEffect(SPELL_AURA_ABILITY_IGNORE_AURASTATE, SPELLFAMILY_MAGE, 0, 0, 0x0000000A, GetGUID()))
+                    AddPct(DoneTotalMod, 25.0f);
+
+            // Torment the Weak: arcane spells on snared or slowed targets
+            if (spellProto->GetSchoolMask() & SPELL_SCHOOL_MASK_ARCANE)
                 if (victim->HasAuraWithMechanic((1ULL << MECHANIC_SNARE) | (1ULL << MECHANIC_SLOW_ATTACK)))
-                    if (AuraEffect* aurEff = GetAuraEffect(SPELL_AURA_DUMMY, SPELLFAMILY_GENERIC, 3263, EFFECT_0))
-                        AddPct(DoneTotalMod, aurEff->GetAmount());
+                    for (AuraEffect const* aurEff : GetAuraEffectsByType(SPELL_AURA_DUMMY))
+                        if (aurEff->GetSpellInfo()->SpellIconID == 2215)
+                        {
+                            AddPct(DoneTotalMod, aurEff->GetAmount());
+                            break;
+                        }
             break;
         case SPELLFAMILY_PRIEST:
             // Smite: Glyph of Smite with Holy Fire on the target (4.3.4, CPP). The WotLK Mind Flay bonuses (Glyph of
@@ -8649,6 +8651,11 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
             }
             break;
         }
+        case SPELLFAMILY_MAGE:
+            // the Water Elemental inherits 40% of its owner's spell power (4.3.4, CPP)
+            if (HasUnitTypeMask(UNIT_MASK_MINION) && GetOwner())
+                DoneAdvertisedBenefit = owner->SpellBaseDamageBonusDone(spellProto->GetSchoolMask(), true) * 0.4f;
+            break;
         default:
             break;
     }
@@ -9005,21 +9012,15 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                     {
                         if (!((*i)->IsAffectedOnSpell(spellProto)))
                             continue;
-                        int32 modChance = 0;
                         switch ((*i)->GetMiscValue())
                         {
-                            // Shatter
+                            // Shatter (4.3.4, CPP): the crit chance times 2 or 3 on frozen targets, or for Ice Lance and
+                            // Deep Freeze with the mage's Fingers of Frost
                             case 911:
-                                modChance += 16;
-                                [[fallthrough]];
-                            case 910:
-                                modChance += 17;
-                                [[fallthrough]];
-                            case 849:
-                                modChance += 17;
-                                if (!HasAuraState(AURA_STATE_FROZEN, spellProto, caster))
-                                    break;
-                                crit_chance += modChance;
+                                if (HasAuraState(AURA_STATE_FROZEN, spellProto, caster)
+                                    || ((spellProto->SpellFamilyFlags[0] & 0x00020000 || spellProto->SpellFamilyFlags[1] & 0x00100000)
+                                        && caster->GetAuraEffect(SPELL_AURA_ABILITY_IGNORE_AURASTATE, SPELLFAMILY_MAGE, 0, 0, 0x0000000A, caster->GetGUID())))
+                                    crit_chance *= (*i)->GetSpellInfo()->GetRank() + 1;
                                 break;
                             case 7917: // Glyph of Shadowburn
                                 if (HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, spellProto, caster))

@@ -1390,7 +1390,8 @@ bool SpellInfo::IsPassiveStackableWithRanks() const
 
 bool SpellInfo::IsMultiSlotAura() const
 {
-    return IsPassive() || Id == 40075; // No other way to make 40075 have more than 1 copy of aura
+    // No other way to make 40075 have more than 1 copy of aura; Incanter's Absorption stacks its copies (CPP)
+    return IsPassive() || Id == 40075 || Id == 44413;
 }
 
 bool SpellInfo::IsCooldownStartedOnEvent() const

@@ -137,11 +137,10 @@ DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellInfo const* spellproto,
             return DIMINISHING_NONE;
         case SPELLFAMILY_MAGE:
             {
-                // Frostbite
-                if (spellproto->Id == 12494)
+                // Frostbite and Shattered Barrier (4.3.4, CPP: both ranks' freezes share the visual)
+                if (spellproto->SpellFamilyFlags[1] & 0x80000000)
                     return DIMINISHING_ROOT;
-                // Shattered Barrier
-                else if (spellproto->Id == 55080)
+                else if (spellproto->SpellVisual[0] == 12297)
                     return DIMINISHING_ROOT;
                 // Deep Freeze
                 else if (spellproto->SpellIconID == 2939 && spellproto->SpellVisual[0] == 9963)

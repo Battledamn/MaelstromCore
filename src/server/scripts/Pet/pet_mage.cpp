@@ -22,23 +22,46 @@
 
 #include "CombatAI.h"
 #include "CreatureScript.h"
+#include "MoveSplineInit.h"
 #include "Pet.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "SpellAuras.h"
 #include "SpellMgr.h"
+#include "TemporarySummon.h"
 
 enum MageSpells
 {
     SPELL_MAGE_CLONE_ME                 = 45204,
     SPELL_MAGE_MASTERS_THREAT_LIST      = 58838,
     SPELL_PET_HIT_SCALING               = 61013,
+    // the three images' summons: frost (58832), arcane (88091) and fire (88092, both with the Glyph of Mirror Image)
     SPELL_SUMMON_MIRROR_IMAGE1          = 58831,
     SPELL_SUMMON_MIRROR_IMAGE2          = 58833,
     SPELL_SUMMON_MIRROR_IMAGE3          = 58834,
-    SPELL_SUMMON_MIRROR_IMAGE_GLYPH     = 65047,
+    SPELL_SUMMON_ARCANE_IMAGE1          = 88085,
+    SPELL_SUMMON_ARCANE_IMAGE2          = 88087,
+    SPELL_SUMMON_ARCANE_IMAGE3          = 88089,
+    SPELL_SUMMON_FIRE_IMAGE1            = 88086,
+    SPELL_SUMMON_FIRE_IMAGE2            = 88088,
+    SPELL_SUMMON_FIRE_IMAGE3            = 88090,
     SPELL_MAGE_MIRROR_IMAGE_FROSTBOLT   = 59638,
-    SPELL_MAGE_MIRROR_IMAGE_FIRE_BLAST  = 59637
+    SPELL_MAGE_MIRROR_IMAGE_FIREBALL    = 88082,
+    SPELL_MAGE_MIRROR_IMAGE_ARCANE_BLAST = 88084,
+
+    // Flame Orb, Frostfire Orb
+    SPELL_FLAME_ORB_AURA                = 82690,
+    SPELL_FROSTFIRE_ORB_AURA            = 84717,
+    SPELL_FIRE_POWER_EXPLOSION          = 83619,
+    SPELL_FIRE_POWER_R1                 = 18459
+};
+
+enum MageCreatures
+{
+    NPC_MIRROR_IMAGE_FROST              = 31216,
+    NPC_MIRROR_IMAGE_ARCANE             = 47243,
+    NPC_MIRROR_IMAGE_FIRE               = 47244,
+    NPC_FLAME_ORB                       = 44214
 };
 
 class DeathEvent : public BasicEvent
@@ -66,9 +89,26 @@ struct npc_pet_mage_mirror_image : CasterAI
     uint32 dist = urand(1, 5);
     bool _delayAttack;
 
+    // 4.3.4: each image casts its one spell (CPP); the templates list the WotLK Fire Blast or nothing
+    static uint32 ImageSpell(uint32 entry)
+    {
+        switch (entry)
+        {
+            case NPC_MIRROR_IMAGE_ARCANE: return SPELL_MAGE_MIRROR_IMAGE_ARCANE_BLAST;
+            case NPC_MIRROR_IMAGE_FIRE:   return SPELL_MAGE_MIRROR_IMAGE_FIREBALL;
+            default:                      return SPELL_MAGE_MIRROR_IMAGE_FROSTBOLT;
+        }
+    }
+
+    void AttackStart(Unit* who) override
+    {
+        AttackStartCaster(who, 20.0f);
+    }
+
     void InitializeAI() override
     {
         CasterAI::InitializeAI();
+        spells.assign(1, ImageSpell(me->GetEntry()));
 
         _delayAttack = true;
         me->m_Events.AddEventAtOffset([this]()
@@ -83,17 +123,22 @@ struct npc_pet_mage_mirror_image : CasterAI
         // Clone Me!
         owner->CastSpell(me, SPELL_MAGE_CLONE_ME, true);
 
-        // xinef: Glyph of Mirror Image (4th copy)
         float angle = 0.0f;
         switch (me->GetUInt32Value(UNIT_CREATED_BY_SPELL))
         {
             case SPELL_SUMMON_MIRROR_IMAGE1:
+            case SPELL_SUMMON_ARCANE_IMAGE1:
+            case SPELL_SUMMON_FIRE_IMAGE1:
                 angle = 0.5f * M_PI;
                 break;
             case SPELL_SUMMON_MIRROR_IMAGE2:
+            case SPELL_SUMMON_ARCANE_IMAGE2:
+            case SPELL_SUMMON_FIRE_IMAGE2:
                 angle = M_PI;
                 break;
             case SPELL_SUMMON_MIRROR_IMAGE3:
+            case SPELL_SUMMON_ARCANE_IMAGE3:
+            case SPELL_SUMMON_FIRE_IMAGE3:
                 angle = 1.5f * M_PI;
                 break;
         }
@@ -242,13 +287,116 @@ struct npc_pet_mage_mirror_image : CasterAI
 
         if (uint32 spellId = events.ExecuteEvent())
         {
-            events.RescheduleEvent(spellId, spellId == SPELL_MAGE_MIRROR_IMAGE_FIRE_BLAST ? 6500ms : 2500ms);
+            events.RescheduleEvent(spellId, 2500ms);
             me->CastSpell(me->GetVictim(), spellId, false);
         }
     }
 };
 
+enum MageOrbEvents
+{
+    EVENT_ORB_MOVE_FORWARD              = 1,
+    EVENT_ORB_APPLY_PERIODIC_EFFECT     = 2,
+    EVENT_ORB_EARLY_EXPLOSION           = 3,
+    EVENT_ORB_EXPLODE                   = 4
+};
+
+// 44214 - Flame Orb, 45322 - Frostfire Orb (CPP's npc_mage_orb): moves forward from the mage for 15 seconds, hovering
+// over the ground (its sniffed data: hover, 2 yards), hitting the closest enemy every second; Fire Power's explosion on
+// its chance, early when it found nothing to hit. CPP moves it to a point with the path generator; with pathfinding off
+// (STATUS.md) that was one straight line through the air to the point 100 yards ahead, so it follows the ground here.
+struct npc_mage_orb : public ScriptedAI
+{
+    npc_mage_orb(Creature* creature) : ScriptedAI(creature) { }
+
+    void AttackStart(Unit* /*target*/) override
+    {
+        // moving on again applies the self snare's speed change
+        if (me->isMoving())
+            MoveForward();
+    }
+
+    void IsSummonedBy(WorldObject* summoner) override
+    {
+        _pos = summoner->GetPosition();
+        summoner->MovePositionToFirstCollision(_pos, 100.0f, 0.0f);
+        _events.ScheduleEvent(EVENT_ORB_MOVE_FORWARD, 1ms);
+        _events.ScheduleEvent(EVENT_ORB_APPLY_PERIODIC_EFFECT, 400ms);
+        _events.ScheduleEvent(EVENT_ORB_EARLY_EXPLOSION, 5s);
+        _events.ScheduleEvent(EVENT_ORB_EXPLODE, 15s + 400ms);
+    }
+
+    void UpdateAI(uint32 diff) override
+    {
+        _events.Update(diff);
+
+        switch (_events.ExecuteEvent())
+        {
+            case EVENT_ORB_MOVE_FORWARD:
+                MoveForward();
+                break;
+            case EVENT_ORB_APPLY_PERIODIC_EFFECT:
+                DoCastSelf(me->GetEntry() == NPC_FLAME_ORB ? SPELL_FLAME_ORB_AURA : SPELL_FROSTFIRE_ORB_AURA, true);
+                break;
+            case EVENT_ORB_EARLY_EXPLOSION:
+                if (!me->IsInCombat())
+                    TryExplode();
+                break;
+            case EVENT_ORB_EXPLODE:
+                TryExplode();
+                break;
+            default:
+                break;
+        }
+    }
+
+private:
+    // straight on to the end point, the ground's height every 3 yards plus the hover height
+    void MoveForward()
+    {
+        float hover = me->GetFloatValue(UNIT_FIELD_HOVERHEIGHT);
+        float x = me->GetPositionX(), y = me->GetPositionY(), z = me->GetPositionZ() - hover;
+        float dist = me->GetExactDist2d(_pos.GetPositionX(), _pos.GetPositionY());
+        uint32 steps = std::max<uint32>(1, uint32(dist / 3.0f));
+
+        Movement::PointsArray path;
+        path.emplace_back(x, y, me->GetPositionZ());
+        for (uint32 i = 1; i <= steps; ++i)
+        {
+            float px = x + (_pos.GetPositionX() - x) * i / steps;
+            float py = y + (_pos.GetPositionY() - y) * i / steps;
+            float ground = me->GetMapHeight(px, py, z + 5.0f);
+            if (ground > INVALID_HEIGHT)
+                z = ground;
+            path.emplace_back(px, py, z + hover);
+        }
+
+        me->GetMotionMaster()->Clear();
+        me->GetMotionMaster()->MoveSplinePath(&path, FORCED_MOVEMENT_RUN);
+    }
+
+    void TryExplode()
+    {
+        TempSummon* orb = me->ToTempSummon();
+        Unit* summoner = orb ? orb->GetSummonerUnit() : nullptr;
+        if (!summoner)
+            return;
+
+        if (Aura* aura = summoner->GetAuraOfRankedSpell(SPELL_FIRE_POWER_R1))
+            if (roll_chance_i(aura->GetSpellInfo()->ProcChance))
+            {
+                float z = me->GetPositionZ() - me->GetFloatValue(UNIT_FIELD_HOVERHEIGHT);
+                summoner->CastSpell(me->GetPositionX(), me->GetPositionY(), z, SPELL_FIRE_POWER_EXPLOSION, true);
+                me->DespawnOrUnsummon();
+            }
+    }
+
+    EventMap _events;
+    Position _pos;
+};
+
 void AddSC_mage_pet_scripts()
 {
     RegisterCreatureAI(npc_pet_mage_mirror_image);
+    RegisterCreatureAI(npc_mage_orb);
 }

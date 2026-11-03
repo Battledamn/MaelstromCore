@@ -356,6 +356,13 @@ void Spell::EffectSchoolDMG(SpellEffIndex effIndex)
     if (unitTarget && unitTarget->IsAlive())
     {
         bool apply_direct_bonus = true;
+
+        // Mirror Image's Fireball, Frostbolt and Arcane Blast: half of the owner's damage with its spell power (CPP)
+        if (m_spellInfo->Id == 88082 || m_spellInfo->Id == 59638 || m_spellInfo->Id == 88084)
+            if (TempSummon* image = unitCaster ? unitCaster->ToTempSummon() : nullptr)
+                if (Unit* owner = image->GetSummonerUnit())
+                    damage = CalculatePct(owner->SpellDamageBonusDone(unitTarget, m_spellInfo, uint32(damage), SPELL_DIRECT_DAMAGE, effIndex), 50);
+
         switch (m_spellInfo->SpellFamilyName)
         {
             case SPELLFAMILY_GENERIC:
@@ -667,18 +674,6 @@ void Spell::EffectTriggerSpell(SpellEffIndex effIndex)
         // special cases
         switch (triggered_spell_id)
         {
-            // Mirror Image
-            case 58832:
-                {
-                    if (!unitCaster)
-                        break;
-
-                    // Glyph of Mirror Image
-                    if (unitCaster->HasAura(63093))
-                        unitCaster->CastSpell(unitCaster, 65047, true); // Mirror Image
-
-                    break;
-                }
             // Demonic Empowerment -- succubus
             case 54437:
                 {

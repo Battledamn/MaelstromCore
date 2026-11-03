@@ -11660,6 +11660,14 @@ void Player::ModifySpellCooldown(uint32 spellId, int32 cooldown)
 
 void Player::SendCooldownEvent(SpellInfo const* spellInfo, uint32 itemId /*= 0*/, Spell* spell /*= nullptr*/, bool setCooldown /*= true*/)
 {
+    // the cooldown cheat: a cooldown that starts when its effect ends (Presence of Mind) is cleared instead, as the
+    // cheat clears the others after the cast; the server kept it and refused the spell the client showed as ready
+    if (GetCommandStatus(CHEAT_COOLDOWN))
+    {
+        RemoveSpellCooldown(spellInfo->Id, true);
+        return;
+    }
+
     // start cooldowns at server side, if any
     if (setCooldown)
         AddSpellAndCategoryCooldowns(spellInfo, itemId, spell);
@@ -15095,12 +15103,6 @@ bool Player::CanResummonPet(uint32 spellid)
             return true;
         else if (spellid == 52150) // Raise Dead
             return false;
-    }
-
-    if (IsClass(CLASS_MAGE, CLASS_CONTEXT_PET))
-    {
-        if (HasSpell(31687) && HasAura(70937))  //Has [Summon Water Elemental] spell and [Glyph of Eternal Water].
-            return true;
     }
 
     if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))

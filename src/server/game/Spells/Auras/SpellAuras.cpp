@@ -1472,27 +1472,18 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
             case SPELLFAMILY_MAGE:
                 if (!caster)
                     break;
-                if (GetSpellInfo()->SpellFamilyFlags[0] & 0x00000001 && GetSpellInfo()->SpellFamilyFlags[2] & 0x00000008)
-                {
-                    // Glyph of Fireball
-                    if (caster->HasAura(56368))
-                        SetDuration(0);
-                }
-                else if (GetSpellInfo()->SpellFamilyFlags[0] & 0x00000020 && GetSpellInfo()->SpellVisual[0] == 13)
-                {
-                    // Glyph of Frostbolt
-                    if (caster->HasAura(56370))
-                        SetDuration(0);
-                }
+                // 4.3.4: the Glyphs of Fireball and Frostbolt are crit modifiers, Fingers of Frost (44544) is its own
+                // two-charge buff and Frostbite is gone (CPP has none of the WotLK handling here)
                 /// @todo: This should be moved to similar function in spell::hit
-                else if (GetSpellInfo()->SpellFamilyFlags[0] & 0x01000000)
+                if (GetSpellInfo()->SpellFamilyFlags[0] & 0x01000000)
                 {
-                    // Polymorph Sound - Sheep && Penguin
+                    // Polymorph Sound - Sheep, Penguin and Monkey (CPP)
                     if (GetSpellInfo()->SpellIconID == 82 && GetSpellInfo()->SpellVisual[0] == 12978)
                     {
-                        // Glyph of the Penguin
-                        if (caster->HasAura(52648))
+                        if (caster->HasAura(52648))      // Glyph of the Penguin
                             caster->CastSpell(target, 61635, true);
+                        else if (caster->HasAura(57927)) // Glyph of the Monkey
+                            caster->CastSpell(target, 89729, true);
                         else
                             caster->CastSpell(target, 61634, true);
                     }
@@ -1501,43 +1492,6 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                     {
                         creatureTarget->CallAssistance(caster);
                     }
-                }
-                switch (GetId())
-                {
-                    case 44544: // Fingers of Frost
-                        {
-                            // See if we already have the indicator aura. If not, create one.
-                            if (Aura* aur = target->GetAura(74396))
-                            {
-                                // Aura already there. Refresh duration and set original charges
-                                aur->SetCharges(2);
-                                aur->RefreshDuration();
-                            }
-                            else
-                                target->AddAura(74396, target);
-                        }
-                        break;
-                    case 12494: // Frostbite, synchronise with Fingers of Frost
-                    {
-                        // Find Fingers of Frost
-                        if (AuraEffect* aurEff = caster->GetAuraEffect(SPELL_AURA_PROC_TRIGGER_SPELL, SPELLFAMILY_MAGE, 2947, EFFECT_0))
-                        {
-                            if (SpellInfo const* triggeringSpellInfo = GetTriggeredByAuraSpellInfo())
-                            {
-                                uint8 fbRank = sSpellMgr->GetSpellRank(triggeringSpellInfo->Id);
-                                uint8 fofRank = sSpellMgr->GetSpellRank(aurEff->GetId());
-                                uint8 chance = uint8(std::ceil(fofRank * fbRank * 16.6f));
-
-                                if (roll_chance_i(chance))
-                                {
-                                    caster->CastSpell(caster, aurEff->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, true);
-                                }
-                            }
-                        }
-                        break;
-                    }
-                    default:
-                        break;
                 }
                 break;
             case SPELLFAMILY_DRUID:
@@ -1700,11 +1654,6 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                         target->CastSpell(target, 32612, true, nullptr, GetEffect(1));
                         target->CombatStop();
                         break;
-                    case 74396: // Fingers of Frost
-                        // Remove the IGNORE_AURASTATE aura
-                        target->RemoveAurasDueToSpell(44544);
-                        break;
-                    case 44401: // Missile Barrage
                     case 48108: // Hot Streak
                     case 57761: // Fireball!
                         if (removeMode != AURA_REMOVE_BY_EXPIRE || aurApp->GetBase()->IsExpired())
@@ -1715,18 +1664,7 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                     default:
                         break;
                 }
-                if (!caster)
-                    break;
-                // Ice barrier - dispel/absorb remove
-                if (removeMode == AURA_REMOVE_BY_ENEMY_SPELL && GetSpellInfo()->SpellFamilyFlags[1] & 0x1)
-                {
-                    // Shattered Barrier
-                    if (AuraEffect* absorb = GetEffect(EFFECT_0))
-                        if (absorb->GetAmount() <= 0) // removed by damage, not dispel
-                            if (AuraEffect* dummy = caster->GetDummyAuraEffect(SPELLFAMILY_MAGE, 2945, 0))
-                                if (roll_chance_i(dummy->GetSpellInfo()->ProcChance))
-                                    caster->CastSpell(target, 55080, true, nullptr, GetEffect(0));
-                }
+                // Shattered Barrier is spell_mage_ice_barrier (4.3.4: 55080 or 83073 by rank, CPP)
                 break;
             }
             case SPELLFAMILY_WARRIOR:
