@@ -123,27 +123,38 @@ struct npc_pet_mage_mirror_image : CasterAI
         // Clone Me!
         owner->CastSpell(me, SPELL_MAGE_CLONE_ME, true);
 
+        // the images keep the sides the client data summons them on: in front, on the right and on the left
+        // (CPP follows at the spawn angle); WotLK's left, behind and right hid one behind the mage
         float angle = 0.0f;
         switch (me->GetUInt32Value(UNIT_CREATED_BY_SPELL))
         {
             case SPELL_SUMMON_MIRROR_IMAGE1:
             case SPELL_SUMMON_ARCANE_IMAGE1:
             case SPELL_SUMMON_FIRE_IMAGE1:
-                angle = 0.5f * M_PI;
+                angle = 0.0f;
                 break;
             case SPELL_SUMMON_MIRROR_IMAGE2:
             case SPELL_SUMMON_ARCANE_IMAGE2:
             case SPELL_SUMMON_FIRE_IMAGE2:
-                angle = M_PI;
+                angle = 1.5f * M_PI;
                 break;
             case SPELL_SUMMON_MIRROR_IMAGE3:
             case SPELL_SUMMON_ARCANE_IMAGE3:
             case SPELL_SUMMON_FIRE_IMAGE3:
-                angle = 1.5f * M_PI;
+                angle = 0.5f * M_PI;
                 break;
         }
 
         ((Minion*)me)->SetFollowAngle(angle);
+        // Spell::SummonGuardian gives every summon after the first the angle to its spawn point, which is the mage's
+        // own spot here (0, so two images stood in one): keep this side once the summon is done
+        me->m_Events.AddEventAtOffset([this, angle]()
+        {
+            ((Minion*)me)->SetFollowAngle(angle);
+            if (Unit* imageOwner = me->GetOwner())
+                if (!me->IsInCombat() && !me->GetVictim())
+                    me->GetMotionMaster()->MoveFollow(imageOwner, PET_FOLLOW_DIST, angle, MOTION_SLOT_ACTIVE);
+        }, 1ms);
         if (owner->IsInCombat())
             me->NearTeleportTo(me->GetPositionX() + cos(angle)*dist, me->GetPositionY() + std::sin(angle)*dist, me->GetPositionZ(), me->GetOrientation(), false, false, false, false);
         else

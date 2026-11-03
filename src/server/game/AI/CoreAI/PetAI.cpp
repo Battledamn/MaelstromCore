@@ -136,7 +136,9 @@ bool PetAI::_canMeleeAttack()
                             break;
                     }
                 }
-                return false;
+                // the Imp never melees; the Water Elemental does when Waterbolt is off autocast or it lacks the mana
+                // (TrinityCore's and CPP's pets have no such rule)
+                return me->GetEntry() != ENTRY_IMP;
             }
         default:
             break;

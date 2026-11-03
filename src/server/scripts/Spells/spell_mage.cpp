@@ -146,6 +146,10 @@ enum MageMisc
     MAGE_SCRIPT_ICE_SHARDS_R2                    = 988,
     NPC_AUROSALIA                                = 18744,
 
+    // family flags of Ignite (12654, flags[0]) and Living Bomb (44457, flags[1])
+    SPELL_MAGE_IGNITE_FAMILY_FLAG0               = 0x08000000,
+    SPELL_MAGE_LIVING_BOMB_FAMILY_FLAG1          = 0x00020000,
+
     SPELL_HUNTER_INSANITY                        = 95809,
     SPELL_SHAMAN_EXHAUSTION                      = 57723,
     SPELL_SHAMAN_SATED                           = 57724
@@ -504,8 +508,10 @@ class spell_mage_combustion : public SpellScript
                 || aurEff->GetSpellInfo()->SpellFamilyName != SPELLFAMILY_MAGE)
                 continue;
 
-            // only the effects the script effect's class mask names
-            if (!aurEff->GetSpellInfo()->IsAffected(SPELLFAMILY_MAGE, GetSpellInfo()->Effects[effIndex].SpellClassMask))
+            // the script effect's class mask names Pyroblast, Flamestrike and Frostfire Bolt but neither Ignite nor
+            // Living Bomb, which 4.3.4's Combustion combines too
+            if (!aurEff->GetSpellInfo()->IsAffected(SPELLFAMILY_MAGE, GetSpellInfo()->Effects[effIndex].SpellClassMask
+                | flag96(SPELL_MAGE_IGNITE_FAMILY_FLAG0, SPELL_MAGE_LIVING_BOMB_FAMILY_FLAG1, 0)))
                 continue;
 
             basePoints += CalculatePct(aurEff->GetAmount(), scalingFactor);
@@ -961,6 +967,13 @@ class spell_mage_ignite_periodic : public AuraScript
 
     void HandlePeriodic(AuraEffect const* aurEff)
     {
+        // every crit is paid off: the tick a refresh rolled over has nothing left
+        if (_critDamageValues.empty())
+        {
+            PreventDefaultAction();
+            return;
+        }
+
         int32 newDotValue = 0;
         bool changed = false;
         for (auto itr = _critDamageValues.begin(); itr != _critDamageValues.end();)
@@ -1879,6 +1892,56 @@ private:
     bool _didHit = false;
 };
 
+// 89764 - Mage Pet Scaling 05 (ours; the Water Elemental learns it from its family's skill line, CPP had no script,
+// so its client amounts of 0 applied): the mage's frost spell crit and spell haste; the spell penetration effect
+// stays 0, pets already take their owner's in Unit::CalcAbsorbResist
+class spell_mage_pet_scaling_05 : public AuraScript
+{
+    PrepareAuraScript(spell_mage_pet_scaling_05);
+
+    Player* GetMageOwner() const
+    {
+        Unit* owner = GetUnitOwner()->GetOwner();
+        return owner ? owner->ToPlayer() : nullptr;
+    }
+
+    void CalculateCritAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& canBeRecalculated)
+    {
+        canBeRecalculated = true;
+        if (Player* owner = GetMageOwner())
+            amount = int32(owner->GetFloatValue(PLAYER_SPELL_CRIT_PERCENTAGE1 + SPELL_SCHOOL_FROST));
+    }
+
+    void CalculateHasteAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& canBeRecalculated)
+    {
+        canBeRecalculated = true;
+        if (Player* owner = GetMageOwner())
+            if (float castSpeed = owner->GetFloatValue(UNIT_MOD_CAST_SPEED))
+                amount = int32((1.0f / castSpeed - 1.0f) * 100.0f);
+    }
+
+    void CalcPeriodic(AuraEffect const* /*aurEff*/, bool& isPeriodic, int32& amplitude)
+    {
+        isPeriodic = true;
+        amplitude = 2 * IN_MILLISECONDS;
+    }
+
+    void HandlePeriodic(AuraEffect const* aurEff)
+    {
+        PreventDefaultAction();
+        if (AuraEffect* effect = aurEff->GetBase()->GetEffect(aurEff->GetEffIndex()))
+            effect->RecalculateAmount();
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_mage_pet_scaling_05::CalculateCritAmount, EFFECT_0, SPELL_AURA_MOD_CRIT_PCT);
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_mage_pet_scaling_05::CalculateHasteAmount, EFFECT_1, SPELL_AURA_MELEE_SLOW);
+        DoEffectCalcPeriodic += AuraEffectCalcPeriodicFn(spell_mage_pet_scaling_05::CalcPeriodic, EFFECT_ALL, SPELL_AURA_ANY);
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_mage_pet_scaling_05::HandlePeriodic, EFFECT_ALL, SPELL_AURA_ANY);
+    }
+};
+
 void AddSC_mage_spell_scripts()
 {
     RegisterSpellScript(spell_mage_arcane_blast);
@@ -1930,4 +1993,5 @@ void AddSC_mage_spell_scripts()
     RegisterSpellAndAuraScriptPair(spell_mage_ring_of_frost_freeze, spell_mage_ring_of_frost_freeze_aura);
     RegisterSpellScript(spell_mage_time_warp);
     RegisterSpellScript(spell_mage_water_elemental_freeze);
+    RegisterSpellScript(spell_mage_pet_scaling_05);
 }

@@ -1299,10 +1299,12 @@ static void UpdatePetScaling(AuraEffect const* aurEff)
         pet->SetHealth(std::min<uint32>(pet->GetMaxHealth(), health));
 }
 
+// the owning player of a pet or a guardian: Pet.cpp gives Hunter Pet Scaling 04 (hit, expertise) to guardians too,
+// Mirror Image, the elementals, treants and the Shadowfiend among them
 static Player* GetHunterPetOwner(Unit* unit)
 {
-    Pet* pet = unit->ToPet();
-    return pet ? pet->GetOwner() : nullptr;
+    Unit* owner = unit->GetOwner();
+    return owner ? owner->ToPlayer() : nullptr;
 }
 
 // 34902 - Hunter Pet Scaling 01: health from the hunter's Stamina by pet type, attack power and spell damage
