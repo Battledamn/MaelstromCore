@@ -1,22 +1,40 @@
 # MaelstromCore
 
 **MaelstromCore is [AzerothCore](https://www.azerothcore.org/) ported to World of Warcraft: Cataclysm
-4.3.4 (client build 15595).** It is AzerothCore itself, under a new name, not a separate core that
-borrows from it: the same code, structure, conventions, modules and tools, changed only where
-Cataclysm needs it.
+4.3.4 (client build 15595).** It is not a separate core that borrows from its parent: the code,
+structure, conventions, modules and tools are the same, renamed and changed only where Cataclysm needs it.
 
 > **Work in progress.** MaelstromCore is not fully playable yet. Large parts of 4.3.4 already work in
-> game; classes, zones and dungeons are being brought to 4.3.4 step by step.
+> game; classes, zones and dungeons are being brought over step by step.
 
 ## Goal
 
-Version 1.0 covers every race and class from level 1 to 85, the Cataclysm 5-man dungeons and the
-Dungeon Finder. Raids and PvP come after 1.0.
+A fully working Cataclysm 4.3.4: every race and class from level 1 to 85, the whole Cataclysm world with
+its quests and phasing, the dungeons and raids, PvP and the Dungeon Finder, playing the way patch 4.3.4
+did with the unmodified 4.3.4 client. Version 1.0 is that goal reached: everything works, and only small,
+minor or visual issues remain.
 
-What works today, among others: the 4.3.4 client connection and login, character creation, the
-Cataclysm stats, attack table and power regeneration, talents with specializations, mastery and
-dual spec, archaeology, currencies, achievements, professions and flights. The class spells are being
-brought to 4.3.4 one class at a time.
+## Where it stands
+
+Seen working in game with the 4.3.4 client:
+
+- Connection, login, the realm list, and creating every race and class.
+- Movement, swimming, flight paths, portals and riding.
+- The Cataclysm stats, attack table and power regeneration, and every class's resource.
+- Talents with specializations, mastery and dual spec, and glyphs.
+- Questing through the starting zones, except the Goblin, Worgen and death knight ones.
+- Chat, groups, trade, mail, guilds and friends.
+- All professions to 525, archaeology, currencies and achievements.
+
+In progress:
+
+- Class spells, one class at a time: paladin, druid, warrior, hunter, rogue, priest and mage are done and
+  tested; warlock and shaman are in testing; the death knight is next.
+- Phasing, which the Goblin, Worgen and death knight starting zones wait for.
+
+Not done yet: vehicles, pathfinding, the Guild Finder and the Dungeon Finder. The Outland, Northrend and
+older dungeons and raids still run Cataclysm data under scripts written for the WotLK versions, and do not
+work yet; the Cataclysm dungeons and raids have not been tested.
 
 ## Principles
 
