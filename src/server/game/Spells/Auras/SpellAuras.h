@@ -137,6 +137,10 @@ public:
     void RefreshDuration(bool withMods = false);
     void RefreshTimers(bool periodicReset = false);
     void RefreshTimersWithMods();
+    int32 CalcHastedDuration(int32 duration, Unit const* caster) const;
+    // time to the next tick that a refreshed damage or heal over time carried over (4.x), part of the max duration
+    int32 GetRolledOverDuration() const { return m_rolledOverDuration; }
+    void SetRolledOverDuration(int32 duration) { m_rolledOverDuration = duration; }
     bool IsExpired() const { return !GetDuration();}
     bool IsPermanent() const { return GetMaxDuration() == -1; }
 
@@ -265,6 +269,7 @@ protected:
     WorldObject* const m_owner;
 
     int32 m_maxDuration;                                // Max aura duration
+    int32 m_rolledOverDuration;                         // time to the next tick carried over by a refresh
     int32 m_duration;                                   // Current time
     int32 m_timeCla;                                    // Timer for power per sec calcultion
     int32 m_updateTargetMapInterval;                    // Timer for UpdateTargetMapOfEffect

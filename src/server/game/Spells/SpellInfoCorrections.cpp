@@ -1061,9 +1061,17 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->SpellLevel = 0;
     });
 
-    // Living Bomb (the explosion; 4.3.4 has one rank)
+    // Living Bomb: "Limit 3 targets" (CPP; the client data has no limit)
+    ApplySpellFix({ 44457 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->AttributesEx5 |= SPELL_ATTR5_LIMIT_N;
+        spellInfo->MaxAffectedTargets = 3;
+    });
+
+    // Living Bomb (the explosion; 4.3.4 has one rank): up to 3 enemies (CPP)
     ApplySpellFix({ 44461 }, [](SpellInfo* spellInfo)
     {
+        spellInfo->MaxAffectedTargets = 3;
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
         spellInfo->AttributesEx4 |= SPELL_ATTR4_DAMAGE_DOESNT_BREAK_AURAS;
         // Explosion is AoE triggered on aura expiry - cannot be reflected (retail: Spell Reflection only works on single-target spells)

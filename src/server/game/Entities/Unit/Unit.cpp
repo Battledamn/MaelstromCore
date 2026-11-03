@@ -4482,21 +4482,21 @@ void Unit::_AddAura(UnitAura* aura, Unit* caster)
          *        but may be created as a result of aura links (player mounts with passengers)
          */
 
+        // a limited aura keeps up to MaxAffectedTargets applications, the oldest removed first (CPP; Living Bomb's
+        // three); vehicle auras and spells without a count keep one
+        std::vector<Aura*> aurasSharingLimit;
+        for (Aura* scAura : caster->GetSingleCastAuras())
+            if (scAura != aura && scAura->IsSingleTargetWith(aura))
+                aurasSharingLimit.push_back(scAura);
+
         // register single target aura
         caster->GetSingleCastAuras().push_back(aura);
-        // remove other single target auras
-        Unit::AuraList& scAuras = caster->GetSingleCastAuras();
-        for (Unit::AuraList::iterator itr = scAuras.begin(); itr != scAuras.end();)
-        {
-            if ((*itr) != aura &&
-                    (*itr)->IsSingleTargetWith(aura))
-            {
-                (*itr)->Remove();
-                itr = scAuras.begin();
-            }
-            else
-                ++itr;
-        }
+
+        SpellInfo const* spellInfo = aura->GetSpellInfo();
+        std::size_t maxOtherAuras = spellInfo->HasAttribute(SPELL_ATTR5_LIMIT_N) && spellInfo->MaxAffectedTargets > 1 ?
+            spellInfo->MaxAffectedTargets - 1 : 0;
+        for (std::size_t i = 0; i + maxOtherAuras < aurasSharingLimit.size(); ++i)
+            aurasSharingLimit[i]->Remove();
     }
 }
 

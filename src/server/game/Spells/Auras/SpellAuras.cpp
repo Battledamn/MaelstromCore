@@ -394,7 +394,7 @@ Aura* Aura::Create(SpellInfo const* spellproto, uint8 effMask, WorldObject* owne
 Aura::Aura(SpellInfo const* spellproto, WorldObject* owner, Unit* caster, Item* castItem, ObjectGuid casterGUID, ObjectGuid itemGUID /*= ObjectGuid::Empty*/) :
     m_spellInfo(spellproto), m_casterGuid(casterGUID ? casterGUID : (caster ? caster->GetGUID() : ObjectGuid::Empty)),
     m_castItemGuid(itemGUID ? itemGUID : castItem ? castItem->GetGUID() : ObjectGuid::Empty), m_castItemEntry(castItem ? castItem->GetEntry() : 0), m_applyTime(GameTime::GetGameTime().count()),
-    m_refreshTime(GameTime::GetGameTimeMS()), m_owner(owner), m_timeCla(0), m_updateTargetMapInterval(0),
+    m_refreshTime(GameTime::GetGameTimeMS()), m_owner(owner), m_rolledOverDuration(0), m_timeCla(0), m_updateTargetMapInterval(0),
     m_casterLevel(caster ? caster->GetLevel() : m_spellInfo->SpellLevel), m_procCharges(0), m_stackAmount(1),
     m_isRemoved(false), m_isSingleTarget(false), m_isUsingCharges(false), m_triggeredByAuraSpellInfo(nullptr)
 {
@@ -970,10 +970,8 @@ void Aura::RefreshDuration(bool withMods)
 
     if (withMods && caster)
     {
-        int32 duration = m_spellInfo->GetMaxDuration();
-        // Calculate duration of periodics affected by haste.
-        if (caster->HasAuraTypeWithAffectMask(SPELL_AURA_PERIODIC_HASTE, m_spellInfo) || m_spellInfo->HasAttribute(SPELL_ATTR5_SPELL_HASTE_AFFECTS_PERIODIC))
-            duration = int32(duration * caster->GetFloatValue(UNIT_MOD_CAST_SPEED));
+        int32 duration = CalcHastedDuration(m_spellInfo->GetMaxDuration(), caster);
+        m_rolledOverDuration = 0;
         SetMaxDuration(duration);
 
         SetDuration(duration);
@@ -993,6 +991,8 @@ void Aura::RefreshDuration(bool withMods)
 void Aura::RefreshTimers(bool periodicReset /*= false*/)
 {
     m_maxDuration = CalcMaxDuration();
+    // the spell that refreshes the aura carries the time to the next tick over again (Spell::DoSpellHitOnUnit)
+    m_rolledOverDuration = 0;
     RefreshDuration();
     Unit* caster = GetCaster();
 
@@ -1015,15 +1015,8 @@ void Aura::RefreshTimers(bool periodicReset /*= false*/)
 void Aura::RefreshTimersWithMods()
 {
     Unit* caster = GetCaster();
-    m_maxDuration = CalcMaxDuration();
-    if ((caster && caster->HasAuraTypeWithAffectMask(SPELL_AURA_PERIODIC_HASTE, m_spellInfo)) || m_spellInfo->HasAttribute(SPELL_ATTR5_SPELL_HASTE_AFFECTS_PERIODIC))
-    {
-        m_maxDuration = int32(m_maxDuration * caster->GetFloatValue(UNIT_MOD_CAST_SPEED));
-    }
 
-    // xinef: we should take ModSpellDuration into account, but none of the spells using this function is affected by contents of ModSpellDuration
-    RefreshDuration();
-
+    // the hasted period first: the duration is rounded to its ticks
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
     {
         if (AuraEffect* aurEff = m_effects[i])
@@ -1031,6 +1024,44 @@ void Aura::RefreshTimersWithMods()
             aurEff->CalculatePeriodic(caster, false, false);
         }
     }
+
+    m_maxDuration = CalcHastedDuration(CalcMaxDuration(), caster);
+    m_rolledOverDuration = 0;
+
+    // xinef: we should take ModSpellDuration into account, but none of the spells using this function is affected by contents of ModSpellDuration
+    RefreshDuration();
+}
+
+// 4.x: haste shortens the period of a periodic aura and adds ticks, the duration is rounded to whole hasted
+// ticks (an extra tick from half a period on); only channels keep their ticks and get shorter (3.3.5a's rule)
+int32 Aura::CalcHastedDuration(int32 duration, Unit const* caster) const
+{
+    if (!caster || duration <= 0)
+        return duration;
+
+    if (!caster->HasAuraTypeWithAffectMask(SPELL_AURA_PERIODIC_HASTE, m_spellInfo) && !m_spellInfo->HasAttribute(SPELL_ATTR5_SPELL_HASTE_AFFECTS_PERIODIC))
+        return duration;
+
+    float castSpeed = caster->GetFloatValue(UNIT_MOD_CAST_SPEED);
+    if (m_spellInfo->IsChanneled())
+        return int32(duration * castSpeed);
+
+    if (castSpeed >= 1.0f)
+        return duration;
+
+    // the effect's period is already hasted (AuraEffect::CalculatePeriodic)
+    for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+        if (AuraEffect const* aurEff = m_effects[i])
+            if (aurEff->IsPeriodic() && aurEff->GetAmplitude() > 0)
+            {
+                int32 period = aurEff->GetAmplitude();
+                int32 basePeriod = std::max<int32>(1, int32(period / castSpeed + 0.5f));
+                int32 baseTicks = std::max<int32>(1, duration / basePeriod);
+                int32 ticks = std::max<int32>(1, int32(baseTicks * float(basePeriod) / period + 0.5f));
+                return ticks * period;
+            }
+
+    return duration;
 }
 
 void Aura::SetCharges(uint8 charges)

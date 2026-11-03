@@ -789,6 +789,8 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
     LOG_DEBUG("network", "WORLD: CMSG_GET_MIRRORIMAGE_DATA");
     ObjectGuid guid;
     recvData >> guid;
+    if (recvData.size() - recvData.rpos() >= sizeof(uint32))
+        recvData.read_skip<uint32>();                           // display id (4.3.4, CPP)
 
     // Get unit for which data is needed by client
     Unit* unit = ObjectAccessor::GetUnit(*_player, guid);
@@ -818,7 +820,9 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
         data << uint8(player->GetByteValue(PLAYER_BYTES, 2));   // hair
         data << uint8(player->GetByteValue(PLAYER_BYTES, 3));   // haircolor
         data << uint8(player->GetByteValue(PLAYER_BYTES_2, 0)); // facialhair
-        data << uint32(player->GetGuildId());                   // unk
+        // 4.3.4 reads the guild's full guid here; 3.3.5a's 32-bit id shifted every item one slot (CPP)
+        uint32 guildId = player->GetGuildId();
+        data << uint64(guildId ? ObjectGuid::Create<HighGuid::Guild>(guildId).GetRawValue() : 0);
 
         static EquipmentSlots const itemSlots[] =
         {

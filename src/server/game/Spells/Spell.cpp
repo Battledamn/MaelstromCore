@@ -3266,7 +3266,9 @@ SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleA
         WorldObject* caster = m_originalCaster ? m_originalCaster : m_caster;
 
         bool refresh = false;
-        bool refreshPeriodic = m_spellInfo->StackAmount < 2 && !HasTriggeredCastFlag(TRIGGERED_NO_PERIODIC_RESET);
+        // damage and heals over time keep their periodic timer and roll the time to the next tick over (4.x, CPP)
+        bool const rollsOver = aurSpellInfo->HasAura(SPELL_AURA_PERIODIC_DAMAGE) || aurSpellInfo->HasAura(SPELL_AURA_PERIODIC_HEAL);
+        bool refreshPeriodic = !rollsOver && m_spellInfo->StackAmount < 2 && !HasTriggeredCastFlag(TRIGGERED_NO_PERIODIC_RESET);
         m_spellAura = Aura::TryRefreshStackOrCreate(aurSpellInfo, effectMask, unit, m_originalCaster,
                       (aurSpellInfo == m_spellInfo) ? &m_spellValue->EffectBasePoints[0] : &basePoints[0], m_CastItem, caster->GetGUID(), &refresh, refreshPeriodic);
 
@@ -3322,9 +3324,24 @@ SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleA
 
                 duration = caster->ModSpellDuration(aurSpellInfo, unit, duration, positive, effectMask);
 
-                // xinef: haste affects duration of those spells twice
-                if (m_originalCaster && (m_originalCaster->HasAuraTypeWithAffectMask(SPELL_AURA_PERIODIC_HASTE, aurSpellInfo) || m_spellInfo->HasAttribute(SPELL_ATTR5_SPELL_HASTE_AFFECTS_PERIODIC)))
-                    duration = int32(duration * m_originalCaster->GetFloatValue(UNIT_MOD_CAST_SPEED));
+                // haste adds ticks to periodic auras (4.x), channels get shorter
+                if (m_originalCaster)
+                    duration = m_spellAura->CalcHastedDuration(duration, m_originalCaster);
+
+                // a refreshed damage or heal over time adds the time to its next tick
+                int32 rolledOverDuration = 0;
+                if (refresh && rollsOver && duration > 0)
+                {
+                    for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+                        if (AuraEffect const* aurEff = m_spellAura->GetEffect(i))
+                            if (aurEff->IsPeriodic() && aurEff->GetAmplitude() > 0)
+                            {
+                                rolledOverDuration = std::clamp(aurEff->GetPeriodicTimer(), 0, aurEff->GetAmplitude());
+                                break;
+                            }
+                    duration += rolledOverDuration;
+                }
+                m_spellAura->SetRolledOverDuration(m_spellValue->AuraDuration != 0 ? 0 : rolledOverDuration);
 
                 if (m_spellValue->AuraDuration != 0)
                 {

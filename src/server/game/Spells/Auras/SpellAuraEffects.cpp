@@ -728,11 +728,11 @@ void AuraEffect::CalculatePeriodic(Unit* caster, bool create, bool load)
     else // aura just created or reapplied
     {
         m_tickNumber = 0;
-        // reset periodic timer on aura create or on reapply when aura isn't dot
-        // possibly we should not reset periodic timers only when aura is triggered by proc
-        // or maybe there's a spell attribute somewhere
+        // reset periodic timer on aura create or on reapply when aura isn't a dot or a hot
+        // (4.x: a refreshed damage or heal over time keeps its timer, CPP)
         bool resetPeriodicTimer = create
-                                  || ((GetAuraType() != SPELL_AURA_PERIODIC_DAMAGE) && (GetAuraType() != SPELL_AURA_PERIODIC_DAMAGE_PERCENT));
+                                  || ((GetAuraType() != SPELL_AURA_PERIODIC_DAMAGE) && (GetAuraType() != SPELL_AURA_PERIODIC_DAMAGE_PERCENT)
+                                      && (GetAuraType() != SPELL_AURA_PERIODIC_HEAL));
 
         if (resetPeriodicTimer)
         {
@@ -1130,6 +1130,11 @@ float AuraEffect::CalcPeriodicCritChance(Unit const* caster, Unit const* target)
     {
         if (Player* modOwner = caster->GetSpellModOwner())
         {
+            // 4.3.4 (patch 4.0.1, CPP): damage and heals over time crit unless the spell cannot crit; Combustion's
+            // since 4.3.0 too
+            if (!GetSpellInfo()->HasAttribute(SPELL_ATTR2_CANT_CRIT))
+                critChance = modOwner->SpellDoneCritChance(nullptr, GetSpellInfo(), GetSpellInfo()->GetSchoolMask(), (GetSpellInfo()->DmgClass == SPELL_DAMAGE_CLASS_RANGED ? RANGED_ATTACK : BASE_ATTACK), true);
+
             Unit::AuraEffectList const& mPeriodicCritAuras = modOwner->GetAuraEffectsByType(SPELL_AURA_ABILITY_PERIODIC_CRIT);
             for (Unit::AuraEffectList::const_iterator itr = mPeriodicCritAuras.begin(); itr != mPeriodicCritAuras.end(); ++itr)
             {
@@ -7313,7 +7318,11 @@ int32 AuraEffect::GetTotalTicks() const
     uint32 totalTicks = 1;
     if (m_amplitude)
     {
-        totalTicks = GetBase()->GetMaxDuration() / m_amplitude;
+        // the time to the next tick that a refresh carried over is one more tick (4.x)
+        int32 rolledOverDuration = GetBase()->GetRolledOverDuration();
+        totalTicks = (GetBase()->GetMaxDuration() - rolledOverDuration) / m_amplitude;
+        if (rolledOverDuration > 0)
+            ++totalTicks;
 
         if (m_spellInfo->HasAttribute(SPELL_ATTR5_EXTRA_INITIAL_PERIOD))
         {
