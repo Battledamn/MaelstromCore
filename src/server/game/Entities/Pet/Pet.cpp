@@ -649,6 +649,22 @@ void Pet::DeleteFromDB(ObjectGuid::LowType guidlow)
 void Pet::setDeathState(DeathState s, bool /*despawn = false*/)                       // overwrite virtual Creature::setDeathState and Unit::setDeathState
 {
     Creature::setDeathState(s);
+
+    // Demonic Rebirth: a summoned demon's death speeds up the next summon, at most once per its marker's 2 minutes
+    if (s == DeathState::JustDied && getPetType() == SUMMON_PET)
+        if (Unit* owner = GetOwner())
+        {
+            AuraEffect const* rebirth = owner->GetAuraEffect(88447, EFFECT_0);
+            if (!rebirth)
+                rebirth = owner->GetAuraEffect(88446, EFFECT_0);
+            if (rebirth && !owner->HasAura(89140))
+            {
+                int32 castTime = -rebirth->GetAmount();
+                owner->CastCustomSpell(owner, 88448, &castTime, nullptr, nullptr, true);
+                owner->CastSpell(owner, 89140, true);
+            }
+        }
+
     if (getDeathState() == DeathState::Corpse)
     {
         if (getPetType() == HUNTER_PET)
@@ -1251,23 +1267,36 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
                             AddAura(SPELL_HUNTER_PET_SCALING_04, this);
                             AddAura(SPELL_EARTH_ELEMENTAL_SCALING_01, this);
                             AddAura(SPELL_EARTH_ELEMENTAL_SCALING_02, this);
+                    // 4.3.4 (CPP): 40% of the warlock's health, weapon damage and attack power by level (pet_levelstats
+                    // ends at 80); the spell power comes from Warlock Pet Scaling 01, 36186-36190 are gone
                             AddAura(SPELL_EARTH_ELEMENTAL_SCALING_03, this);
                             AddAura(SPELL_EARTH_ELEMENTAL_SCALING_04, this);
                             break;
                         }
                     case NPC_INFERNAL:
                         {
-                            if (pInfo)
-                            {
-                                SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, float(pInfo->min_dmg));
-                                SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, float(pInfo->max_dmg));
-                            }
+                            uint32 health = owner->CountPctFromMaxHealth(40);
+                            SetCreateHealth(health);
+                            SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(health));
+
+                            float mod = 1.0f;
+                            if (petlevel < 70)
+                                mod = 10.0f + (petlevel - 70) / 4.0f;
+                            else if (petlevel <= 80)
+                                mod = 15.0f + (petlevel - 80) / 2.0f;
+                            else
+                                mod = 20.0f + (petlevel - 85) / 2.0f;
+                            mod = std::max(mod, 0.0f);
+
+                            float minDamage = (petlevel - (petlevel / 4)) * mod;
+                            float maxDamage = (petlevel + (petlevel / 4)) * mod;
+                            SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, minDamage);
+                            AddAura(SPELL_WARLOCK_PET_SCALING_01, this);
+                            SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, maxDamage);
+                            SetStatFlatModifier(UNIT_MOD_ATTACK_POWER, BASE_VALUE, (minDamage + maxDamage) / 4.0f * 7.0f);
+
                             AddAura(SPELL_PET_AVOIDANCE, this);
                             AddAura(SPELL_WARLOCK_PET_SCALING_05, this);
-                            AddAura(SPELL_INFERNAL_SCALING_01, this);
-                            AddAura(SPELL_INFERNAL_SCALING_02, this);
-                            AddAura(SPELL_INFERNAL_SCALING_03, this);
-                            AddAura(SPELL_INFERNAL_SCALING_04, this);
                             break;
                         }
                     case NPC_DOOMGUARD:

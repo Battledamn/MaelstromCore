@@ -3639,6 +3639,17 @@ float Unit::GetUnitBlockChance() const
     }
 }
 
+// Curse of Gul'dan (Hand of Gul'dan's area): the bonus crit chance of a warlock's demons on the enemies inside it
+static float GetCurseOfGuldanCritChance(Unit const* attacker, Unit const* victim)
+{
+    Unit const* owner = attacker->IsPet() ? attacker->GetOwner() : nullptr;
+    if (!owner || owner->getClass() != CLASS_WARLOCK)
+        return 0.0f;
+
+    AuraEffect const* curse = victim->GetAuraEffect(86000, EFFECT_0);
+    return curse ? float(curse->GetAmount()) : 0.0f;
+}
+
 float Unit::GetUnitCriticalChance(WeaponAttackType attackType, Unit const* victim) const
 {
     float crit;
@@ -3679,6 +3690,8 @@ float Unit::GetUnitCriticalChance(WeaponAttackType attackType, Unit const* victi
     {
        return GetGUID() == aurEff->GetCasterGUID();
     });
+
+    crit += GetCurseOfGuldanCritChance(this, victim);
 
     // reduce crit chance from Rating for players
     if (attackType != RANGED_ATTACK)
@@ -8316,47 +8329,30 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
                 if (victim->HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, spellProto, this))
                     AddPct(DoneTotalMod, (*i)->GetAmount());
                 break;
-            case 6917: // Death's Embrace
-            case 6926:
+            case 6917: // Death's Embrace: the target at or below rank 1's effect 2 health ($47198s3, 25%; only rank 1
+            case 6926: // has that effect, so CPP's read of each rank's own left ranks 2 and 3 without the bonus)
             case 6928:
                 {
-                    if (victim->HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, spellProto, this))
+                    if (victim->HealthBelowPct(sSpellMgr->AssertSpellInfo(47198)->Effects[EFFECT_2].CalcValue()))
                         AddPct(DoneTotalMod, (*i)->GetAmount());
                     break;
                 }
-            // Soul Siphon
+            // Soul Siphon: effect 0 for each of the warlock's Affliction effects on the target, up to effect 1 (CPP)
             case 4992:
             case 4993:
                 {
-                    // effect 1 m_amount
-                    int32 maxPercent = (*i)->GetAmount();
-                    // effect 0 m_amount
-                    int32 stepPercent = CalculateSpellDamage(this, (*i)->GetSpellInfo(), 0);
-                    // count affliction effects and calc additional damage in percentage
-                    int32 modPercent = 0;
-                    AuraApplicationMap const& victimAuras = victim->GetAppliedAuras();
-                    for (AuraApplicationMap::const_iterator itr = victimAuras.begin(); itr != victimAuras.end(); ++itr)
+                    int32 bonusPerApplication = CalculateSpellDamage(this, (*i)->GetSpellInfo(), EFFECT_0);
+                    int32 pctBonus = 0;
+                    for (auto const& [auraId, aurApp] : victim->GetAppliedAuras())
                     {
-                        Aura const* aura = itr->second->GetBase();
-                        SpellInfo const* m_spell = aura->GetSpellInfo();
-                        if (m_spell->SpellFamilyName != SPELLFAMILY_WARLOCK || !(m_spell->SpellFamilyFlags[1] & 0x0004071B || m_spell->SpellFamilyFlags[0] & 0x8044C402))
-                            continue;
-                        modPercent += stepPercent * aura->GetStackAmount();
-                        if (modPercent >= maxPercent)
-                        {
-                            modPercent = maxPercent;
-                            break;
-                        }
+                        Aura const* aura = aurApp->GetBase();
+                        if (aura->GetCasterGUID() == GetGUID() && aura->GetSpellInfo()->IsAbilityOfSkillType(SKILL_AFFLICTION))
+                            pctBonus += bonusPerApplication;
                     }
-                    AddPct(DoneTotalMod, modPercent);
+
+                    AddPct(DoneTotalMod, std::min<int32>(pctBonus, (*i)->GetAmount()));
                     break;
                 }
-            case 6916: // Death's Embrace
-            case 6925:
-            case 6927:
-                if (HasAuraState(AURA_STATE_HEALTHLESS_20_PERCENT, spellProto, this))
-                    AddPct(DoneTotalMod, (*i)->GetAmount());
-                break;
             case 5481: // Starfire Bonus
                 {
                     if (victim->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_DRUID, 0x200002, 0, 0))
@@ -8488,26 +8484,15 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
             }
             break;
         case SPELLFAMILY_WARLOCK:
-            // Fire and Brimstone
-            if (spellProto->SpellFamilyFlags[1] & 0x00020040)
-                if (victim->HasAuraState(AURA_STATE_CONFLAGRATE))
-                {
-                    AuraEffectList const& mDumyAuras = GetAuraEffectsByType(SPELL_AURA_DUMMY);
-                    for (AuraEffectList::const_iterator i = mDumyAuras.begin(); i != mDumyAuras.end(); ++i)
-                        if ((*i)->GetSpellInfo()->SpellIconID == 3173)
-                        {
-                            AddPct(DoneTotalMod, (*i)->GetAmount());
-                            break;
-                        }
-                }
-            // Drain Soul - increased damage for targets under 25 % HP
+            // 4.3.4: Fire and Brimstone is in spell_warl_incinerate and spell_warl_chaos_bolt (CPP)
+            // Drain Soul: double damage at or below effect 2's health (25%; 3.3.5a quadrupled it)
             if (spellProto->SpellFamilyFlags[0] & 0x00004000)
-                if (!victim->HealthAbovePct(25))
-                    DoneTotalMod *= 4;
-            // Shadow Bite (15% increase from each dot)
+                if (victim->HealthBelowPct(spellProto->Effects[EFFECT_2].CalcValue(this) + 1))
+                    DoneTotalMod *= 2;
+            // Shadow Bite: effect 2's share for each of the warlock's damage over time effects (30%; 3.3.5a 15%)
             if (spellProto->SpellFamilyFlags[1] & 0x00400000 && IsPet())
                 if (uint8 count = victim->GetDoTsByCaster(GetOwnerGUID()))
-                    AddPct(DoneTotalMod, 15 * count);
+                    AddPct(DoneTotalMod, spellProto->Effects[EFFECT_2].CalcValue(this) * count);
             break;
         case SPELLFAMILY_HUNTER:
             // Steady Shot
@@ -8996,6 +8981,9 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                 {
                     // Modify critical chance by victim SPELL_AURA_MOD_ATTACKER_SPELL_CRIT_CHANCE
                     // xinef: apply max and min only
+    if (caster && !spellProto->IsPositive())
+        crit_chance += GetCurseOfGuldanCritChance(caster, this);
+
                     if (HasAttackerSpellCritChanceAura())
                     {
                         crit_chance += GetMaxNegativeAuraModifierByMiscMask(SPELL_AURA_MOD_ATTACKER_SPELL_CRIT_CHANCE, schoolMask);
@@ -9102,6 +9090,13 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                                         return 100.0f;
                                 break;
                             }
+                            break;
+                        case SPELLFAMILY_WARLOCK:
+                            // Improved Searing Pain: Searing Pain on targets at or below 25% health (4.3.4, CPP)
+                            if (spellProto->SpellFamilyFlags[0] & 0x00000100)
+                                if (AuraEffect const* aurEff = caster->GetDummyAuraEffect(SPELLFAMILY_WARLOCK, 816, EFFECT_0))
+                                    if (GetHealthPct() <= 25.0f)
+                                        crit_chance += aurEff->GetAmount();
                             break;
                     }
 

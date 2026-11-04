@@ -6842,11 +6842,7 @@ void AuraEffect::HandlePeriodicHealAurasTick(Unit* target, Unit* caster) const
 
         TakenTotalMod = std::max(TakenTotalMod, 0.0f);
 
-        // the most ugly hack i made :P the other option is to change all spellvalues to float...
-        // demonic aegis
-        if (caster && GetSpellInfo()->SpellFamilyName == SPELLFAMILY_WARLOCK && (GetSpellInfo()->SpellFamilyFlags[1] & 0x20000000))
-            if (AuraEffect* aurEff = caster->GetAuraEffect(SPELL_AURA_ADD_PCT_MODIFIER, SPELLFAMILY_WARLOCK, 89, 0))
-                AddPct(TakenTotalMod, aurEff->GetAmount());
+        // 4.3.4: Demonic Aegis is a spell modifier on Demon Armor and Fel Armor (3.3.5a's Fel Armor healed over time)
 
         damage = uint32(target->CountPctFromMaxHealth(damage));
         damage = uint32(damage * TakenTotalMod);

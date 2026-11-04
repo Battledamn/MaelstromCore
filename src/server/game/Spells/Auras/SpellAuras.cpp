@@ -1705,25 +1705,13 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
             case SPELLFAMILY_WARLOCK:
                 if (!caster)
                     break;
+                // Improved Fear: Nightmare when Fear ends. By the talent's ranks: the Glyph of Fear shares its icon (98)
                 if (GetSpellInfo()->SpellFamilyFlags[1] & 0x00000400)
                 {
-                    if (AuraEffect* aurEff = caster->GetAuraEffect(SPELL_AURA_DUMMY, SPELLFAMILY_WARLOCK, 98, 0))
-                    {
-                        uint32 spellId = 0;
-                        switch (aurEff->GetId())
-                        {
-                            case 53759:
-                                spellId = 60947;
-                                break;
-                            case 53754:
-                                spellId = 60946;
-                                break;
-                            default:
-                                LOG_ERROR("spells.aura", "Aura::HandleAuraSpecificMods: Unknown rank of Improved Fear ({}) found", aurEff->GetId());
-                        }
-                        if (spellId)
-                            caster->CastSpell(target, spellId, true);
-                    }
+                    if (caster->HasAura(53759))
+                        caster->CastSpell(target, 60947, true);
+                    else if (caster->HasAura(53754))
+                        caster->CastSpell(target, 60946, true);
                 }
                 break;
             case SPELLFAMILY_PRIEST:

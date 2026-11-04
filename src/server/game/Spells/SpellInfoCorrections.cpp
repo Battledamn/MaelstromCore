@@ -1014,8 +1014,8 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->AttributesEx |= SPELL_ATTR1_NO_REDIRECTION;
     });
 
-    // Curse of Doom
-    ApplySpellFix({ 18662 }, [](SpellInfo* spellInfo)
+    // Soulburn: Seed of Corruption: an aura, so spell_warl_soulburn finds the talent by its icon (CPP)
+    ApplySpellFix({ 86664 }, [](SpellInfo* spellInfo)
     {
         // summoned doomguard duration fix
         spellInfo->DurationEntry = sSpellDurationStore.LookupEntry(6);

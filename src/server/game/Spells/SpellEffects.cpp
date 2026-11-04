@@ -381,85 +381,8 @@ void Spell::EffectSchoolDMG(SpellEffIndex effIndex)
                 }
             // 4.3.4: no warrior case. Shield Slam's damage is its attack power coefficient (no block value in
             // 4.x); Victory Rush and Shockwave compute their tooltip formulas in spell_warrior.cpp.
-            case SPELLFAMILY_WARLOCK:
-                {
-                    if (!unitCaster)
-                        break;
-
-                    // Incinerate Rank 1 & 2
-                    if ((m_spellInfo->SpellFamilyFlags[1] & 0x000040) && m_spellInfo->SpellIconID == 2128)
-                    {
-                        // Incinerate does more dmg (dmg*0.25) if the target have Immolate debuff.
-                        // Check aura state for speed but aura state set not only for Immolate spell
-                        if (unitTarget->HasAuraState(AURA_STATE_CONFLAGRATE))
-                        {
-                            if (unitTarget->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_WARLOCK, 0x4, 0, 0))
-                                damage += damage / 4;
-                        }
-                    }
-                    // Conflagrate - consumes Immolate or Shadowflame
-                    else if (m_spellInfo->TargetAuraState == AURA_STATE_CONFLAGRATE)
-                    {
-                        AuraEffect const* aura = nullptr;                // found req. aura for damage calculation
-
-                        Unit::AuraEffectList const& mPeriodic = unitTarget->GetAuraEffectsByType(SPELL_AURA_PERIODIC_DAMAGE);
-                        for (Unit::AuraEffectList::const_iterator i = mPeriodic.begin(); i != mPeriodic.end(); ++i)
-                        {
-                            // for caster applied auras only
-                            if ((*i)->GetSpellInfo()->SpellFamilyName != SPELLFAMILY_WARLOCK ||
-                                    (*i)->GetCasterGUID() != unitCaster->GetGUID())
-                                continue;
-
-                            // Immolate
-                            if ((*i)->GetSpellInfo()->SpellFamilyFlags[0] & 0x4)
-                            {
-                                aura = *i;                      // it selected always if exist
-                                break;
-                            }
-
-                            // Shadowflame
-                            if ((*i)->GetSpellInfo()->SpellFamilyFlags[2] & 0x00000002)
-                                aura = *i;                      // remember but wait possible Immolate as primary priority
-                        }
-
-                        // found Immolate or Shadowflame
-                        if (aura)
-                        {
-                            uint32 pdamage = uint32(std::max(aura->GetAmount(), 0));
-                            pdamage = unitTarget->SpellDamageBonusTaken(unitCaster, aura->GetSpellInfo(), pdamage, DOT, aura->GetBase()->GetStackAmount());
-                            uint32 pct_dir = unitCaster->CalculateSpellDamage(unitTarget, m_spellInfo, (effIndex + 1));
-                            uint8 baseTotalTicks = uint8(unitCaster->CalcSpellDuration(aura->GetSpellInfo()) / aura->GetSpellInfo()->Effects[EFFECT_0].Amplitude);
-
-                            damage += int32(CalculatePct(pdamage * baseTotalTicks, pct_dir));
-
-                            uint32 pct_dot = unitCaster->CalculateSpellDamage(unitTarget, m_spellInfo, (effIndex + 2)) / 3;
-                            m_spellValue->EffectBasePoints[1] = m_spellInfo->Effects[EFFECT_1].CalcBaseValue(int32(CalculatePct(pdamage * baseTotalTicks, pct_dot)));
-
-                            apply_direct_bonus = false;
-                            // Glyph of Conflagrate
-                            if (!unitCaster->HasAura(56235))
-                                unitTarget->RemoveAurasDueToSpell(aura->GetId(), unitCaster->GetGUID());
-
-                            break;
-                        }
-                    }
-                    // Shadow Bite
-                    else if (m_spellInfo->SpellFamilyFlags[1] & 0x400000)
-                    {
-                        if (unitCaster->IsCreature() && unitCaster->IsPet())
-                        {
-                            if (Player* owner = unitCaster->GetOwner()->ToPlayer())
-                            {
-                                if (AuraEffect* aurEff = owner->GetAuraEffect(SPELL_AURA_ADD_FLAT_MODIFIER, SPELLFAMILY_WARLOCK, 214, 0))
-                                {
-                                    int32 bp0 = aurEff->GetId() == 54037 ? 4 : 8;
-                                    unitCaster->CastCustomSpell(unitCaster, 54425, &bp0, nullptr, nullptr, true);
-                                }
-                            }
-                        }
-                    }
-                    break;
-                }
+            // SPELLFAMILY_WARLOCK: 4.3.4's Incinerate and Conflagrate are spell_warl_incinerate and spell_warl_conflagrate
+            // (CPP); 3.3.5a's Immolate bonus, consumed Immolate and Improved Felhunter are gone.
             // SPELLFAMILY_PRIEST: Improved Mind Blast's Mind Trauma is spell_pri_mind_blast (4.3.4, CPP)
             case SPELLFAMILY_DRUID:
                 {

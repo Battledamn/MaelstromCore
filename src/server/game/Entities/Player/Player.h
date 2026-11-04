@@ -2211,6 +2211,10 @@ public:
     void RewardPlayerAndGroupAtEvent(uint32 creature_id, WorldObject* pRewardSource);
     bool isHonorOrXPTarget(Unit* victim) const;
 
+    // Soulburn's spell (Seed of Corruption) until its aura is applied (4.3.4, CPP)
+    SpellInfo const* GetLastSoulburnSpell() const { return _lastSoulburnSpell; }
+    void SetLastSoulburnSpell(SpellInfo const* spellInfo) { _lastSoulburnSpell = spellInfo; }
+
     bool GetsRecruitAFriendBonus(bool forXP);
     uint8 GetGrantableLevels() { return m_grantableLevels; }
     void SetGrantableLevels(uint8 val) { m_grantableLevels = val; }
@@ -3096,6 +3100,8 @@ private:
     uint8 m_grantableLevels;
 
     bool m_needZoneUpdate;
+
+    SpellInfo const* _lastSoulburnSpell = nullptr;
 
 private:
     // internal common parts for CanStore/StoreItem functions
