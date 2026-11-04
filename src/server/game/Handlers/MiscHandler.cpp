@@ -932,6 +932,9 @@ void WorldSession::HandleSetActionButtonOpcode(WorldPacket& recv_data)
             case ACTION_BUTTON_EQSET:
                 LOG_DEBUG("network.opcode", "MISC: Added EquipmentSet {} into button {}", action, button);
                 break;
+            case ACTION_BUTTON_DROPDOWN:
+                LOG_DEBUG("network.opcode", "MISC: Added flyout {} into button {}", action, button);
+                break;
             case ACTION_BUTTON_SPELL:
                 LOG_DEBUG("network.opcode", "MISC: Added Spell {} into button {}", action, button);
                 break;
