@@ -23,7 +23,11 @@
  *   .testkit reset         the active spec's talents and specialization reset
  *   .testkit glyph <id> <1|0> [spells]  puts glyph <id> (GlyphProperties.dbc) in a slot of its type or takes it out, and the
  *                          known spells of the list on action buttons 1-5; id 0 empties every glyph slot; <2> instead checks
- *                          the glyph's modifiers: "Test kit: glyph check <id> ok|missing|fail <details>" for the addon
+ *                          the glyph's modifiers: "Test kit: glyph check <id> ok|fail <details>" for the addon
+ *   .testkit cast <spell> [triggered]  you cast it: at yourself if it is helpful, otherwise at your selection (.cast self makes the
+ *                          selection cast it at itself, so a dummy would get your Metamorphosis)
+ *   .testkit audit         every glyph of every class, no character needed: its modifiers reach a spell and the effect they
+ *                          change exists (also from the console and SOAP)
  * Used by the MaelstromClassTest addon. Not 4.3.4 behaviour, so a module (docs/AZEROTHCORE_WAY.md).
  */
 
@@ -48,6 +52,7 @@ namespace
     rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_READY = rbac::RBACPermissions(2002);
     rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_RESET = rbac::RBACPermissions(2003);
     rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_GLYPH = rbac::RBACPermissions(2004);
+    rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_AUDIT = rbac::RBACPermissions(2005);
 
     uint32 constexpr NPC_TRAINING_DUMMY = 46647;    // level 85
     uint32 constexpr SPELL_FORBEARANCE  = 25771;
@@ -55,6 +60,13 @@ namespace
     uint32 constexpr DUMMY_DESPAWN_MS   = 30 * MINUTE * IN_MILLISECONDS;
     uint8 constexpr GLYPH_BAR_BUTTONS   = 5;
     uint8 constexpr GLYPH_ALL_SLOTS_LEVEL = 75;
+
+    // The effect a glyph's modifier changes is there: a real effect, or a value only a script reads (Wild Growth's target count).
+    // A correction that removes an effect with no value (Chains of Ice's damage, before it went) does not pass.
+    bool HasTargetedEffect(SpellInfo const* info, int8 targeted)
+    {
+        return info->Effects[targeted].IsEffect() || info->Effects[targeted].BasePoints;
+    }
 
     // The glyph's modifiers on the spells the character knows: its aura is on, they reach a spell, they change its value, and the
     // effect they name is still there (a spell correction removed Chains of Ice's damage effect, whatever its glyph added to it)
@@ -92,7 +104,7 @@ namespace
 
                 if (targeted >= 0)
                 {
-                    if (info->Effects[targeted].IsEffect())
+                    if (HasTargetedEffect(info, targeted))
                         effectFound = true;
                     else
                         broken = info->SpellName[0];
@@ -170,7 +182,9 @@ public:
             { "tree",  HandleTreeCommand,  RBAC_PERM_COMMAND_TESTKIT_TREE,  Console::No },
             { "ready", HandleReadyCommand, RBAC_PERM_COMMAND_TESTKIT_READY, Console::No },
             { "reset", HandleResetCommand, RBAC_PERM_COMMAND_TESTKIT_RESET, Console::No },
-            { "glyph", HandleGlyphCommand, RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No }
+            { "glyph", HandleGlyphCommand, RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No },
+            { "cast",  HandleCastCommand,  RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No },
+            { "audit", HandleAuditCommand, RBAC_PERM_COMMAND_TESTKIT_AUDIT, Console::Yes }
         };
 
         static ChatCommandTable commandTable =
@@ -221,6 +235,87 @@ public:
         player->SendTalentsInfoData(false);
         handler->PSendSysMessage("Test kit: tree {} (talent tab {}): {} of {} talents learned at their highest rank.",
             treeNumber, talentTabId, learned, talents.size());
+        return true;
+    }
+
+    static bool HandleCastCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggered)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!spell)
+            return false;
+
+        Unit* selected = handler->getSelectedUnit();
+        Unit* target = (spell->IsPositive() || !selected) ? player : selected;
+        player->CastSpell(target, spell->Id, triggered ? TRIGGERED_FULL_MASK : TRIGGERED_NONE);
+        return true;
+    }
+
+    static bool HandleAuditCommand(ChatHandler* handler)
+    {
+        uint32 glyphs = 0;
+        uint32 modifiers = 0;
+        uint32 problems = 0;
+        for (uint32 id = 0; id < sGlyphPropertiesStore.GetNumRows(); ++id)
+        {
+            GlyphPropertiesEntry const* entry = sGlyphPropertiesStore.LookupEntry(id);
+            SpellInfo const* glyph = entry ? sSpellMgr->GetSpellInfo(entry->SpellId) : nullptr;
+            if (!glyph)
+                continue;
+
+            ++glyphs;
+            std::string const glyphName = glyph->SpellName[0];
+            for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+            {
+                SpellEffectInfo const& effect = glyph->Effects[i];
+                if (!effect.IsAura(SPELL_AURA_ADD_FLAT_MODIFIER) && !effect.IsAura(SPELL_AURA_ADD_PCT_MODIFIER))
+                    continue;
+
+                if (!effect.BasePoints)
+                    continue;
+
+                ++modifiers;
+                int32 const op = effect.MiscValue;
+                int8 const targeted = op == SPELLMOD_EFFECT1 ? 0 : (op == SPELLMOD_EFFECT2 ? 1 : (op == SPELLMOD_EFFECT3 ? 2 : -1));
+                uint32 reached = 0;
+                bool effectFound = false;
+                bool namedFound = false;
+                std::string missingOn;
+                for (uint32 spellId = 0; spellId < sSpellMgr->GetSpellInfoStoreSize(); ++spellId)
+                {
+                    SpellInfo const* info = sSpellMgr->GetSpellInfo(spellId);
+                    if (!info || info == glyph || !info->IsAffected(glyph->SpellFamilyName, effect.SpellClassMask))
+                        continue;
+
+                    ++reached;
+                    if (targeted >= 0)
+                    {
+                        // the spell the glyph is named after counts by itself: a stray match must not hide it, though a
+                        // helper of the same name may lack the effect (Water Shield's mana gain, 52128)
+                        bool const named = glyphName == std::string("Glyph of ") + info->SpellName[0];
+                        if (HasTargetedEffect(info, targeted))
+                        {
+                            effectFound = true;
+                            namedFound = namedFound || named;
+                        }
+                        else if (named || missingOn.empty())
+                            missingOn = info->SpellName[0];
+                    }
+                }
+
+                if (!reached)
+                {
+                    handler->PSendSysMessage("Audit: {} ({}) effect {}: its modifier reaches no spell", glyphName, glyph->Id, i);
+                    ++problems;
+                }
+                else if (!missingOn.empty() && (!effectFound || (glyphName == "Glyph of " + missingOn && !namedFound)))
+                {
+                    handler->PSendSysMessage("Audit: {} ({}) effect {}: changes effect {} of {}, which is missing", glyphName, glyph->Id, i, targeted, missingOn);
+                    ++problems;
+                }
+            }
+        }
+
+        handler->PSendSysMessage("Audit: {} glyphs, {} modifiers, {} problems.", glyphs, modifiers, problems);
         return true;
     }
 
