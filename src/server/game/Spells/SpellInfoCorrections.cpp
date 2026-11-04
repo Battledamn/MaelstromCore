@@ -42,16 +42,7 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     ApplySpellFix({
         467,    // Thorns (Rank 1)
-        782,    // Thorns (Rank 2)
-        1075,   // Thorns (Rank 3)
-        8914,   // Thorns (Rank 4)
-        9756,   // Thorns (Rank 5)
-        9910,   // Thorns (Rank 6)
-        26992,  // Thorns (Rank 7)
-        53307,  // Thorns (Rank 8)
-        53352,  // Explosive Shot (trigger)
         50783,  // Slam (Triggered spell)
-        20647   // Execute (Triggered spell)
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_ALWAYS_HIT;
@@ -67,12 +58,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 42533 }, [](SpellInfo* spellInfo)
     {
         spellInfo->DurationEntry = sSpellDurationStore.LookupEntry(347); // 15 min
-    });
-
-    // Headless Horseman's Mount - use the flying creature model for the flying variants
-    ApplySpellFix({ 48023, 51617 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].MiscValue = 27152;
     });
 
     // Elixir of Minor Fortitude
@@ -175,9 +160,6 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     ApplySpellFix({
         63320,  // Glyph of Life Tap
-        20335,  // Heart of the Crusader
-        20336,  // Heart of the Crusader
-        20337,  // Heart of the Crusader
         53228,  // Rapid Recuperation (Rank 1): its focus when Rapid Killing procs
         53232,  // Rapid Recuperation (Rank 2)
         }, [](SpellInfo* spellInfo)
@@ -255,7 +237,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({
         17941,  // Shadow Trance
         22008,  // Netherwind Focus
-        31834,  // Light's Grace
         34936,  // Backlash
         48108,  // Hot Streak
         51124,  // Killing Machine
@@ -293,12 +274,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].Amplitude = 3000;
     });
 
-    // Desecration Arm - 36 instead of 37 - typo?
-    ApplySpellFix({ 29809 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_7_YARDS);
-    });
-
     // Sic'em
     ApplySpellFix({ 42767 }, [](SpellInfo* spellInfo)
     {
@@ -317,11 +292,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Stances = 1 << (FORM_MOONKIN - 1);
     });
 
-    ApplySpellFix({ 48422 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Stances = 1 << (FORM_TREE - 1);
-    });
-
     // Elemental Oath
     ApplySpellFix({ 51466, 51470 }, [](SpellInfo* spellInfo)
     {
@@ -338,17 +308,9 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Natural shapeshifter
-    ApplySpellFix({ 16834, 16835 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 16834 }, [](SpellInfo* spellInfo)
     {
         spellInfo->DurationEntry = sSpellDurationStore.LookupEntry(21);
-    });
-
-    // Ebon Plague
-    ApplySpellFix({ 51735, 51734, 51726 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->SpellFamilyFlags[2] = 0x10;
-        spellInfo->Effects[EFFECT_1].ApplyAuraName = SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN;
-        spellInfo->AttributesEx3 |= SPELL_ATTR3_DOT_STACKING_RULE;
     });
 
     // Parasitic Shadowfiend Passive
@@ -399,7 +361,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Marked for Death
-    ApplySpellFix({ 53241, 53243, 53244, 53245, 53246 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 53241, 53243 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].SpellClassMask = flag96(399361, 276955137, 1);
     });
@@ -500,23 +462,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     // 3.3.5a's talents that affected these auras are gone: 20138-20140 are Protector of the Innocent in 4.3.4,
     // 20254-20256 are not in it
 
-    ApplySpellFix({
-        53379,  // Swift Retribution
-        53484,
-        53648
-        }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].SpellClassMask[0] = 0;
-        spellInfo->Effects[EFFECT_0].SpellClassMask[2] = 0x8000000;
-    });
-
-    // Sanctified Retribution
-    ApplySpellFix({ 31869 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].SpellClassMask[0] = 0;
-        spellInfo->Effects[EFFECT_0].SpellClassMask[2] = 0x8000000;
-    });
-
     // Seal of Light trigger
     ApplySpellFix({ 20167 }, [](SpellInfo* spellInfo)
     {
@@ -532,17 +477,12 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Redemption
-    ApplySpellFix({ 7328, 10322, 10324, 20772, 20773, 48949, 48950 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 7328 }, [](SpellInfo* spellInfo)
     {
         spellInfo->SpellFamilyName = SPELLFAMILY_PALADIN;
     });
 
     ApplySpellFix({
-        20184,  // Judgement of Justice
-        20185,  // Judgement of Light
-        20186,  // Judgement of Wisdom
-        20267,  // Judgement of Light (triggered heal on attacker)
-        20268,  // Judgement of Wisdom (triggered mana on attacker)
         68055   // Judgements of the Just
         }, [](SpellInfo* spellInfo)
     {
@@ -568,7 +508,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Vindication
-    ApplySpellFix({ 67, 26017}, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 26017 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].MiscValue = 0;
     });
@@ -587,7 +527,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Beacon of Light
-    ApplySpellFix({ 53652, 53653, 53654 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 53652 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_IGNORE_CASTER_MODIFIERS;
         spellInfo->AttributesEx6 &= ~SPELL_ATTR6_IGNORE_HEALTH_MODIFIERS;
@@ -628,13 +568,13 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Monstrous Bite
-    ApplySpellFix({ 54680, 55495, 55496, 55497, 55498, 55499 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 54680 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_1].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
     });
 
     // Hunter's Mark
-    ApplySpellFix({ 1130, 14323, 14324, 14325, 53338 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 1130 }, [](SpellInfo* spellInfo)
     {
         spellInfo->DmgClass = SPELL_DAMAGE_CLASS_MAGIC;
         spellInfo->AttributesEx3 |= SPELL_ATTR3_ALWAYS_HIT;
@@ -643,11 +583,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     // Explosive Trap Effect
     ApplySpellFix({
         13812, // Explosive Trap Effect (Rank 1)
-        14314, // Explosive Trap Effect (Rank 2)
-        14315, // Explosive Trap Effect (Rank 3)
-        27026, // Explosive Trap Effect (Rank 4)
-        49064, // Explosive Trap Effect (Rank 5)
-        49065  // Explosive Trap Effect (Rank 6)
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->DmgClass = SPELL_DAMAGE_CLASS_MAGIC;
@@ -655,15 +590,9 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     // Kill Command
     // Kill Command, Overpower
-    ApplySpellFix({ 34027, 37529 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 37529 }, [](SpellInfo* spellInfo)
     {
         spellInfo->ProcCharges = 0;
-    });
-
-    // Kindred Spirits, damage aura
-    ApplySpellFix({ 57458 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx4 |= SPELL_ATTR4_ALLOW_ENETRING_ARENA;
     });
 
     // Chimera Shot - Serpent trigger
@@ -673,17 +602,11 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Entrapment trigger
-    ApplySpellFix({ 19185, 64803, 64804 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 19185, 64803 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_DEST_TARGET_ENEMY);
         spellInfo->Effects[EFFECT_0].TargetB = SpellImplicitTargetInfo(TARGET_UNIT_DEST_AREA_ENEMY);
         spellInfo->AttributesEx5 |= SPELL_ATTR5_ALWAYS_AOE_LINE_OF_SIGHT;
-    });
-
-    // Improved Stings (Rank 2)
-    ApplySpellFix({ 19465 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_2].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
     });
 
     // Heart of the Phoenix (triggered)
@@ -694,7 +617,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Master of Subtlety
-    ApplySpellFix({ 31221, 31222, 31223 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 31223 }, [](SpellInfo* spellInfo)
     {
         spellInfo->SpellFamilyName = SPELLFAMILY_ROGUE;
     });
@@ -709,14 +632,13 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     ApplySpellFix({
         5171,   // Slice and Dice
-        6774    // Slice and Dice
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
     });
 
     // Envenom
-    ApplySpellFix({ 32645, 32684, 57992, 57993 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 32645 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Dispel = DISPEL_NONE;
     });
@@ -762,15 +684,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_2].Effect = 0;
     });
 
-    // Impurity
-    ApplySpellFix({ 49220, 49633, 49635, 49636, 49638 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].Effect = SPELL_EFFECT_APPLY_AURA;
-        spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_DUMMY;
-        spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
-        spellInfo->SpellFamilyName = SPELLFAMILY_DEATHKNIGHT;
-    });
-
     // Deadly Aggression (Deadly Gladiator's Death Knight Relic, item: 42620)
     ApplySpellFix({ 60549 }, [](SpellInfo* spellInfo)
     {
@@ -781,13 +694,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 49224, 49610, 49611 }, [](SpellInfo* spellInfo)
     {
         spellInfo->ProcCharges = 0;
-    });
-
-    // Wandering Plague
-    ApplySpellFix({ 50526 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx3 |= SPELL_ATTR3_IGNORE_CASTER_MODIFIERS;
-        spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
     });
 
     // Dancing Rune Weapon
@@ -817,7 +723,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Horn of Winter, stacking issues
-    ApplySpellFix({ 57330, 57623 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 57330 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_1].TargetA = 0;
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
@@ -833,13 +739,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 50463 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_CASTER_PROCS;
-    });
-
-    // Blood Gorged
-    ApplySpellFix({ 61274, 61275, 61276, 61277,61278 }, [](SpellInfo* spellInfo)
-    {
-        // ARP affect Death Strike and Rune Strike
-        spellInfo->Effects[EFFECT_0].SpellClassMask = flag96(0x1400011, 0x20000000, 0x0);
     });
 
     // Death Grip
@@ -869,7 +768,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Frost Strike
-    ApplySpellFix({ 49143, 51416, 51417, 51418, 51419, 55268 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 49143 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_COMPLETELY_BLOCKED;
     });
@@ -885,12 +784,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->CategoryRecoveryTime = 0;
         spellInfo->RecoveryTime = 0;
         spellInfo->AttributesEx6 |= SPELL_ATTR6_IGNORE_CASTER_DAMAGE_MODIFIERS;
-    });
-
-    // Improved Earth Shield
-    ApplySpellFix({ 51560, 51561 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].MiscValue = SPELLMOD_DAMAGE;
     });
 
     // Tidal Force
@@ -925,23 +818,17 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Strength of Earth totem effect
-    ApplySpellFix({ 8076, 8162, 8163, 10441, 25362, 25527, 57621, 58646 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 8076 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_1].RadiusEntry = spellInfo->Effects[EFFECT_0].RadiusEntry;
         spellInfo->Effects[EFFECT_2].RadiusEntry = spellInfo->Effects[EFFECT_0].RadiusEntry;
     });
 
     // Flametongue Totem effect
-    ApplySpellFix({ 52109, 52110, 52111, 52112, 52113, 58651, 58654, 58655 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 52109 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_2].TargetB = spellInfo->Effects[EFFECT_1].TargetB = spellInfo->Effects[EFFECT_0].TargetB = 0;
         spellInfo->Effects[EFFECT_2].TargetA = spellInfo->Effects[EFFECT_1].TargetA = spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
-    });
-
-    // Sentry Totem
-    ApplySpellFix({ 6495 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].RadiusEntry = sSpellRadiusStore.LookupEntry(0);
     });
 
     // Bind Sight (PT)
@@ -988,7 +875,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     // Shadowflame - trigger
     ApplySpellFix({
         47960,  // r1
-        61291   // r2
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx |= SPELL_ATTR1_NO_REDIRECTION;
@@ -1002,7 +888,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Everlasting Affliction
-    ApplySpellFix({ 47201, 47202, 47203, 47204, 47205 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 47201, 47202, 47203 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_1].SpellClassMask[0] |= 2; // add corruption to affected spells
     });
@@ -1021,12 +907,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_1].TargetA = spellInfo->Effects[EFFECT_0].TargetA;
         spellInfo->Effects[EFFECT_0].MiscValue = SPELLMOD_EFFECT1;
         spellInfo->Effects[EFFECT_1].MiscValue = SPELLMOD_EFFECT2;
-    });
-
-    // Rain of Fire (Doomguard)
-    ApplySpellFix({ 42227 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Speed = 0.0f;
     });
 
     // Ritual Enslavement
@@ -1163,13 +1043,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->SpellFamilyName = SPELLFAMILY_WARRIOR;
     });
 
-    // Sunder Armor - Old Ranks
-    ApplySpellFix({ 7405, 8380, 11596, 11597, 25225, 47467 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].TriggerSpell = 11971;
-        spellInfo->Effects[EFFECT_0].Effect = SPELL_EFFECT_TRIGGER_SPELL_WITH_VALUE;
-    });
-
     // Improved Spell Reflection
     ApplySpellFix({ 59725 }, [](SpellInfo* spellInfo)
     {
@@ -1292,14 +1165,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     {
         // remove creaturetargettype
         spellInfo->TargetCreatureType = 0;
-    });
-
-    // Aspect of the Viper
-    ApplySpellFix({ 34074 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_2].Effect = SPELL_EFFECT_APPLY_AURA;
-        spellInfo->Effects[EFFECT_2].TargetA = SpellImplicitTargetInfo(1);
-        spellInfo->Effects[EFFECT_2].ApplyAuraName = SPELL_AURA_DUMMY;
     });
 
     // Strength of Wrynn
@@ -1964,13 +1829,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 62619 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx |= SPELL_ATTR1_IMMUNITY_PURGES_EFFECT;
-    });
-
-    // Healthy spore summon periodic
-    ApplySpellFix({ 62566 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].Amplitude = 2000;
-        spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_PERIODIC_TRIGGER_SPELL;
     });
 
     // Brightleaf Essence trigger
@@ -3623,12 +3481,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_MOD_CHARM;
     });
 
-    // Deadly Swiftness
-    ApplySpellFix({ 31255 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].TriggerSpell = 22588;
-    });
-
     // Black Magic enchant
     ApplySpellFix({ 59630 }, [](SpellInfo* spellInfo)
     {
@@ -3654,10 +3506,6 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     ApplySpellFix({
         6789,  // Warlock - Death Coil (Rank 1)
-        17925, // Warlock - Death Coil (Rank 2)
-        17926, // Warlock - Death Coil (Rank 3)
-        27223, // Warlock - Death Coil (Rank 4)
-        47859, // Warlock - Death Coil (Rank 5)
         71838, // Drain Life - Bryntroll Normal
         71839  // Drain Life - Bryntroll Heroic
         }, [](SpellInfo* spellInfo)
@@ -3829,8 +3677,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         47476,  // Deathknight - Strangulate
         15487,  // Priest - Silence
         5211,   // Druid - Bash  - R1
-        6798,   // Druid - Bash  - R2
-        8983    // Druid - Bash  - R3
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx7 |= SPELL_ATTR7_CAN_CAUSE_INTERRUPT;
@@ -3860,12 +3706,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 16097 }, [](SpellInfo* spellInfo)
     {
         spellInfo->CastTimeEntry = sSpellCastTimesStore.LookupEntry(16);
-    });
-
-    // Sacred Cleansing
-    ApplySpellFix({ 53659 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->RangeEntry = sSpellRangeStore.LookupEntry(5); // 40yd
     });
 
     // Silithyst
@@ -3926,13 +3766,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->RangeEntry = sSpellRangeStore.LookupEntry(3); // 20y
     });
 
-    // Mortal Shots
-    ApplySpellFix({ 19485, 19487, 19488, 19489, 19490 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].SpellClassMask[0] |= 0x00004000;
-        spellInfo->Effects[EFFECT_1].Effect = 0;
-    });
-
     // Item - Death Knight T9 Melee 4P Bonus
     // Item - Hunter T9 2P Bonus
     // Item - Paladin T9 Retribution 2P Bonus (Righteous Vengeance)
@@ -3942,7 +3775,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Green Beam
-    ApplySpellFix({31628, 31630, 31631}, [](SpellInfo* spellInfo)
+    ApplySpellFix({31628, 31630, 31631 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_TARGET_ANY);
         spellInfo->MaxAffectedTargets = 1;
@@ -3950,11 +3783,6 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     ApplySpellFix({
         20271, 57774,  // Judgement of Light
-        20425,         // Judgement of Command
-        32220,         // Judgement of Blood
-        53407,         // Judgement of Justice
-        53408,         // Judgement of Wisdom
-        53725          // Judgement of the Martyr
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 &= ~SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
@@ -4060,32 +3888,10 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_CASTER_PROCS;
     });
 
-    // Rapture
-    ApplySpellFix({ 63652, 63653, 63654, 63655 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx |= SPELL_ATTR1_NO_THREAT;
-        spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
-        spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
-    });
-
     // Everlasting Affliction
     ApplySpellFix({ 47422 }, [](SpellInfo* spellInfo)
     {
         spellInfo->SchoolMask = SPELL_SCHOOL_MASK_SHADOW;
-    });
-
-    // Flametongue Weapon (Passive) (Rank 6)
-    ApplySpellFix({ 16312 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Attributes |= SPELL_ATTR0_PASSIVE;
-        spellInfo->DurationEntry = sSpellDurationStore.LookupEntry(21);
-    });
-
-    // Mana Tide Totem
-    // Cleansing Totem Effect
-    ApplySpellFix({ 39609, 52025 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->RangeEntry = sSpellRangeStore.LookupEntry(5); // 40yd
     });
 
     // Increased Totem Radius
@@ -4179,7 +3985,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Wyvern Sting DoT
-    ApplySpellFix({ 24131, 24134, 24135 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 24131 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_TARGET_ENEMY);
     });
@@ -4284,7 +4090,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
      // Cleansing Totem, Healing Stream Totem, Mana Tide Totem
-    ApplySpellFix({ 8171,52025, 52041, 52042, 52046, 52047, 52048, 52049, 52050, 58759, 58760, 58761, 39610, 39609 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 52041, 52042, 39610 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
@@ -4314,7 +4120,7 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Seed of Corruption
-    ApplySpellFix({ 27285, 47833, 47834 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 27285 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx |= SPELL_ATTR1_NO_REFLECTION;
     });
@@ -4459,13 +4265,13 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Commanding Shout
-    ApplySpellFix({ 469, 47439, 47440 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 469 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
 
     // Battle Shout
-    ApplySpellFix({ 2048, 5242, 6192, 6673, 11549, 11550, 11551, 25289, 47436 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 6673 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
@@ -4477,31 +4283,13 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     // Prayer of Fortitude
-    ApplySpellFix({ 21562, 21564, 25392, 48162 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
-    });
-
-    // Gift of the Wild
-    ApplySpellFix({ 21849, 21850, 26991, 48470, 69381 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
-    });
-
-    // Arcane Brilliance
-    ApplySpellFix({ 23028, 27127, 43002 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
-    });
-
-    // Prayer of Spirit
-    ApplySpellFix({ 27681, 32999, 48074 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 21562 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
 
     // Prayer of Shadow Protection
-    ApplySpellFix({ 27683, 39374, 48170 }, [](SpellInfo* spellInfo)
+    ApplySpellFix({ 27683 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
@@ -4520,12 +4308,6 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     // Turn the Tables
     ApplySpellFix({ 52910, 52914, 52915 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
-    });
-
-    // Judgements of the Wise
-    ApplySpellFix({ 54180 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
@@ -4550,12 +4332,6 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     // Infinite Replenishment + Wisdom
     ApplySpellFix({ 61782 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
-    });
-
-    // Renewed Hope
-    ApplySpellFix({ 63944 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
@@ -4767,12 +4543,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].RealPointsPerLevel = 0;
     });
 
-    // Mangle (Nalorakk)
-    ApplySpellFix({ 42389 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->SchoolMask = SPELL_SCHOOL_MASK_NATURE;
-    });
-
     // Event food, fixes to give correct stamina and spirit of 25% of the character level
     ApplySpellFix({ 24870 }, [](SpellInfo* spellInfo)
     {
@@ -4835,26 +4605,10 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_0].RealPointsPerLevel = 0.0f;
     });
 
-    // Life Tap
-    ApplySpellFix({ 1455, 1456, 11687, 11688, 11689, 27222, 57946 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].RealPointsPerLevel = 0.0f;
-        spellInfo->MaxLevel = 16;
-        spellInfo->BaseLevel = 6;
-        spellInfo->SpellLevel = 6;
-    });
-
     // Explosive Sheep
     ApplySpellFix({ 4074 }, [](SpellInfo* spellInfo)
     {
         spellInfo->DurationEntry = sSpellDurationStore.LookupEntry(25);
-    });
-
-    // Phase Shift
-    ApplySpellFix({ 4511 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AuraInterruptFlags &= ~AURA_INTERRUPT_FLAG_MELEE_ATTACK;
-        spellInfo->AuraInterruptFlags |= AURA_INTERRUPT_FLAG_CAST;
     });
 
     // Charge Stun
@@ -4909,32 +4663,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Attributes |= SPELL_ATTR0_ALLOW_ITEM_SPELL_IN_PVP;
         spellInfo->AttributesEx7 |= (SPELL_ATTR7_NO_ATTACK_DODGE | SPELL_ATTR7_NO_ATTACK_PARRY);
         spellInfo->SpellLevel = 0;
-    });
-
-    // Heart of the Crusader
-    ApplySpellFix({ 20335, 20336, 20337 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].Effect = SPELL_EFFECT_APPLY_AURA;
-        spellInfo->Effects[EFFECT_1].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_TARGET_ENEMY);
-        spellInfo->Effects[EFFECT_1].ApplyAuraName = SPELL_AURA_DUMMY;
-    });
-
-    // Heart of the Crusader (Rank 1)
-    ApplySpellFix({ 20335 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].TriggerSpell = 21183; // Heart of the Crusader (Rank 1)
-    });
-
-    // Heart of the Crusader (Rank 2)
-    ApplySpellFix({ 20336 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].TriggerSpell = 54498; // Heart of the Crusader (Rank 2)
-    });
-
-    // Heart of the Crusader (Rank 3)
-    ApplySpellFix({ 20337 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].TriggerSpell = 54499; // Heart of the Crusader (Rank 3)
     });
 
     // Gordok Ogre Suit

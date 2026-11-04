@@ -5047,7 +5047,7 @@ void Unit::RemoveAurasDueToSpellByDispel(uint32 spellId, uint32 dispellerSpellId
                     }
                 case SPELLFAMILY_DEATHKNIGHT:
                     {
-                        // Icy Clutch, remove with Frost Fever
+                        // Chilblains, remove with Frost Fever
                         if (aura->GetSpellInfo()->SpellFamilyFlags[1] & 0x4000000)
                         {
                             if (AuraEffect* aureff = GetAuraEffect(SPELL_AURA_MOD_DECREASE_SPEED, SPELLFAMILY_DEATHKNIGHT, 0, 0x40000, 0, casterGUID))
@@ -8359,17 +8359,6 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
                         AddPct(DoneTotalMod, (*i)->GetAmount());
                     break;
                 }
-            // Marked for Death
-            case 7598:
-            case 7599:
-            case 7600:
-            case 7601:
-            case 7602:
-                {
-                    if (victim->GetAuraEffect(SPELL_AURA_MOD_STALKED, SPELLFAMILY_HUNTER, 0x400, 0, 0))
-                        AddPct(DoneTotalMod, (*i)->GetAmount());
-                    break;
-                }
             // Dirty Deeds
             case 6427:
             case 6428:
@@ -8429,22 +8418,6 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
             }
             break;
         case SPELLFAMILY_PALADIN:
-            // Judgement of Vengeance/Judgement of Corruption
-            if ((spellProto->SpellFamilyFlags[1] & 0x400000) && spellProto->SpellIconID == 2292)
-            {
-                // Get stack of Holy Vengeance/Blood Corruption on the target added by caster
-                uint32 stacks = 0;
-                Unit::AuraEffectList const& auras = victim->GetAuraEffectsByType(SPELL_AURA_PERIODIC_DAMAGE);
-                for (Unit::AuraEffectList::const_iterator itr = auras.begin(); itr != auras.end(); ++itr)
-                    if (((*itr)->GetId() == 31803 || (*itr)->GetId() == 53742) && (*itr)->GetCasterGUID() == GetGUID())
-                    {
-                        stacks = (*itr)->GetBase()->GetStackAmount();
-                        break;
-                    }
-                // + 10% for each application of Holy Vengeance/Blood Corruption on the target
-                if (stacks)
-                    AddPct(DoneTotalMod, 10 * stacks);
-            }
             break;
         case SPELLFAMILY_DRUID:
             // Thorns
@@ -8587,12 +8560,6 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
                 {
                     AddPct(DoneTotal, aurEff->GetAmount());
                 }
-            }
-
-            // Impurity
-            if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 1986, 0))
-            {
-                AddPct(ApCoeffMod, aurEff->GetAmount());
             }
 
             // Blood Boil - bonus for diseased targets
@@ -8985,15 +8952,6 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                                         && caster->GetAuraEffect(SPELL_AURA_ABILITY_IGNORE_AURASTATE, SPELLFAMILY_MAGE, 0, 0, 0x0000000A, caster->GetGUID())))
                                     crit_chance *= (*i)->GetSpellInfo()->GetRank() + 1;
                                 break;
-                            case 7917: // Glyph of Shadowburn
-                                if (HasAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, spellProto, caster))
-                                    crit_chance += (*i)->GetAmount();
-                                break;
-                            case 7997: // Renewed Hope
-                            case 7998:
-                                if (HasAura(6788))
-                                    crit_chance += (*i)->GetAmount();
-                                break;
                             default:
                                 break;
                         }
@@ -9278,20 +9236,7 @@ float Unit::SpellPctHealingModsDone(Unit* victim, SpellInfo const* spellProto, D
                 if (victim->HealthBelowPct(50))
                     AddPct(DoneTotalMod, (*i)->GetAmount());
                 break;
-            case 7798: // Glyph of Regrowth
-                {
-                    if (victim->GetAuraEffect(SPELL_AURA_PERIODIC_HEAL, SPELLFAMILY_DRUID, 0x40, 0, 0))
-                        AddPct(DoneTotalMod, (*i)->GetAmount());
-                    break;
-                }
 
-            case 7871: // Glyph of Lesser Healing Wave
-                {
-                    // xinef: affected by any earth shield
-                    if (victim->GetAuraEffect(SPELL_AURA_DUMMY, SPELLFAMILY_SHAMAN, 0, 0x00000400, 0))
-                        AddPct(DoneTotalMod, (*i)->GetAmount());
-                    break;
-                }
             default:
                 break;
         }
@@ -9370,11 +9315,6 @@ uint32 Unit::SpellHealingBonusDone(Unit* victim, SpellInfo const* spellProto, ui
     {
         case SPELLFAMILY_DEATHKNIGHT:
         {
-            // Impurity
-            if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 1986, 0))
-            {
-                AddPct(ApCoeffMod, aurEff->GetAmount());
-            }
             break;
         }
         default:
@@ -10024,17 +9964,6 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
 
         switch ((*i)->GetMiscValue())
         {
-            // Marked for Death
-            case 7598:
-            case 7599:
-            case 7600:
-            case 7601:
-            case 7602:
-                {
-                    if (victim->GetAuraEffect(SPELL_AURA_MOD_STALKED, SPELLFAMILY_HUNTER, 0x400, 0, 0))
-                        AddPct(DoneTotalMod, (*i)->GetAmount());
-                    break;
-                }
             // Dirty Deeds
             case 6427:
             case 6428:

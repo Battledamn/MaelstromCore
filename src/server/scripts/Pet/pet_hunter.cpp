@@ -144,53 +144,6 @@ private:
     uint32 _spellTimer;
 };
 
-// -53178 - Guard Dog
-class spell_pet_guard_dog : public AuraScript
-{
-    PrepareAuraScript(spell_pet_guard_dog);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ SPELL_PET_GUARD_DOG_HAPPINESS });
-    }
-
-    bool CheckProc(ProcEventInfo& eventInfo)
-    {
-        // Growl shares family flags with other spells
-        // filter by spellIcon instead
-        SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
-        if (!spellInfo || spellInfo->SpellIconID != PET_ICON_ID_GROWL)
-            return false;
-
-        return true;
-    }
-
-    void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        PreventDefaultAction();
-
-        Unit* caster = eventInfo.GetActor();
-        caster->CastSpell(nullptr, SPELL_PET_GUARD_DOG_HAPPINESS, true, nullptr, aurEff);
-
-        Unit* target = eventInfo.GetActionTarget();
-        if (!target->CanHaveThreatList())
-            return;
-
-        SpellInfo const* procSpellInfo = eventInfo.GetSpellInfo();
-        if (!procSpellInfo)
-            return;
-
-        float addThreat = CalculatePct(static_cast<float>(procSpellInfo->Effects[EFFECT_0].CalcValue(caster)), aurEff->GetAmount());
-        target->GetThreatMgr().AddThreat(caster, addThreat, GetSpellInfo());
-    }
-
-    void Register() override
-    {
-        DoCheckProc += AuraCheckProcFn(spell_pet_guard_dog::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_pet_guard_dog::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
-    }
-};
-
 // -62764 - Silverback
 class spell_pet_silverback : public AuraScript
 {
@@ -268,7 +221,6 @@ class spell_pet_culling_the_herd : public AuraScript
 void AddSC_hunter_pet_scripts()
 {
     RegisterCreatureAI(npc_pet_hunter_snake_trap);
-    RegisterSpellScript(spell_pet_guard_dog);
     RegisterSpellScript(spell_pet_silverback);
     RegisterSpellScript(spell_pet_culling_the_herd);
 }

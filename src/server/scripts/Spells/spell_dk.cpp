@@ -99,18 +99,15 @@ enum DeathKnightSpells
     SPELL_DK_WILL_OF_THE_NECROPOLIS_REDUCTION   = 81162,
     SPELL_GEN_INTERRUPT                         = 32747,
         SPELL_DK_GLYPH_OF_SCOURGE_STRIKE            = 58642,
-    SPELL_DK_WANDERING_PLAGUE_TRIGGER           = 50526,
     SPELL_DK_GLYPH_OF_THE_GHOUL                 = 58686,
     SPELL_SHADOWMOURNE_CHAOS_BANE_DAMAGE        = 71904,
     SPELL_SHADOWMOURNE_SOUL_FRAGMENT            = 71905,
     SPELL_SHADOWMOURNE_CHAOS_BANE_BUFF          = 73422,
     SPELL_DK_ANTI_MAGIC_SHELL_TALENT            = 51052,
-    SPELL_DK_BLACK_ICE_R1                       = 49140,
     SPELL_DK_BLOOD_BOIL_TRIGGERED               = 65658,
     SPELL_DK_BLOOD_GORGED_HEAL                  = 50454,
     SPELL_DK_BLOOD_PRESENCE                     = 48263,
     SPELL_DK_CORPSE_EXPLOSION_TRIGGERED         = 43999,
-    SPELL_DK_CORPSE_EXPLOSION_VISUAL            = 51270,
     SPELL_DK_DEATH_COIL_DAMAGE                  = 47632,
     SPELL_DK_DEATH_COIL_HEAL                    = 47633,
     SPELL_DK_DEATH_STRIKE_HEAL                  = 45470,
@@ -118,12 +115,9 @@ enum DeathKnightSpells
     SPELL_DK_FROST_PRESENCE                     = 48266,
     SPELL_DK_FROST_PRESENCE_TRIGGERED           = 61261,
     SPELL_DK_GHOUL_EXPLODE                      = 47496,
-    SPELL_DK_GLYPH_OF_DISEASE                   = 63334,
-    SPELL_DK_GLYPH_OF_ICEBOUND_FORTITUDE        = 58625,
     SPELL_DK_IMPROVED_BLOOD_PRESENCE_R1         = 50365,
     SPELL_DK_IMPROVED_FROST_PRESENCE_R1         = 50384,
     SPELL_DK_IMPROVED_UNHOLY_PRESENCE_R1        = 50391,
-    SPELL_DK_IMPROVED_BLOOD_PRESENCE_HEAL       = 50475,
     SPELL_DK_IMPROVED_BLOOD_PRESENCE_TRIGGERED  = 63611,
     SPELL_DK_IMPROVED_UNHOLY_PRESENCE_TRIGGERED = 63622,
     SPELL_DK_ITEM_SIGIL_VENGEFUL_HEART          = 64962,
@@ -135,29 +129,16 @@ enum DeathKnightSpells
     SPELL_DK_SCENT_OF_BLOOD                     = 50422,
     SPELL_DK_SCOURGE_STRIKE_TRIGGERED           = 70890,
     SPELL_DK_UNHOLY_PRESENCE                    = 48265,
-    SPELL_DK_UNHOLY_PRESENCE_TRIGGERED          = 49772,
-    SPELL_DK_WILL_OF_THE_NECROPOLIS_TALENT_R1   = 49189,
     SPELL_DK_WILL_OF_THE_NECROPOLIS_AURA_R1     = 52284,
-    SPELL_DK_ICY_TALONS_TALENT_R1               = 50880,
-    SPELL_DK_CRYPT_FEVER_R1                     = 50508,
-    SPELL_DK_EBON_PLAGUE_R1                     = 51726,
     // Risen Ally
     SPELL_DK_RAISE_ALLY                         = 46619,
     SPELL_DK_THRASH                             = 47480,
     SPELL_GHOUL_FRENZY                          = 62218,
     // Proc system spells
-    SPELL_DK_ACCLIMATION_HOLY                    = 50490,
-    SPELL_DK_ACCLIMATION_FIRE                    = 50362,
-    SPELL_DK_ACCLIMATION_FROST                   = 50485,
-    SPELL_DK_ACCLIMATION_ARCANE                  = 50486,
-    SPELL_DK_ACCLIMATION_SHADOW                  = 50489,
-    SPELL_DK_ACCLIMATION_NATURE                  = 50488,
     SPELL_DK_ADVANTAGE_T10_4P_MELEE              = 70657,
     SPELL_DK_BUTCHERY_RUNIC_POWER                = 50163,
     SPELL_DK_MARK_OF_BLOOD_HEAL                  = 61607,
     SPELL_DK_UNHOLY_BLIGHT_DOT                   = 50536,
-    SPELL_DK_GLYPH_OF_UNHOLY_BLIGHT              = 63332,
-    SPELL_DK_VENDETTA_HEAL                       = 50181,
     SPELL_DK_NECROSIS_DAMAGE                     = 51460,
     SPELL_DK_RUNIC_RETURN                        = 61258,
     SPELL_DK_DEATH_COIL_R1                       = 47541,
@@ -1559,8 +1540,6 @@ class spell_dk_ghoul_explode : public SpellScript
         {
             // Corpse Explosion (Suicide)
             unitTarget->CastSpell(unitTarget, SPELL_DK_CORPSE_EXPLOSION_TRIGGERED, true);
-            // Set corpse look
-            GetCaster()->CastSpell(unitTarget, SPELL_DK_CORPSE_EXPLOSION_VISUAL, true);
         }
     }
 
@@ -1673,40 +1652,6 @@ class spell_dk_hungering_cold : public AuraScript
     {
         AfterEffectApply += AuraEffectApplyFn(spell_dk_hungering_cold::HandleApply, EFFECT_0, SPELL_AURA_MOD_STUN, AURA_EFFECT_HANDLE_REAL);
         DoCheckProc += AuraCheckProcFn(spell_dk_hungering_cold::CheckProc);
-    }
-};
-
-// 48792 - Icebound Fortitude
-class spell_dk_icebound_fortitude : public AuraScript
-{
-    PrepareAuraScript(spell_dk_icebound_fortitude);
-
-    bool Load() override
-    {
-        Unit* caster = GetCaster();
-        return caster && caster->IsPlayer();
-    }
-
-    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        if (Unit* caster = GetCaster())
-        {
-            int32 value = amount;
-
-            // Glyph of Icebound Fortitude
-            if (AuraEffect const* aurEff = caster->GetAuraEffect(SPELL_DK_GLYPH_OF_ICEBOUND_FORTITUDE, EFFECT_0))
-            {
-                int32 valMax = -aurEff->GetAmount();
-                if (value > valMax)
-                    value = valMax;
-            }
-            amount = value;
-        }
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dk_icebound_fortitude::CalculateAmount, EFFECT_2, SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN);
     }
 };
 
@@ -2667,7 +2612,6 @@ void AddSC_deathknight_spell_scripts()
     RegisterSpellScript(spell_dk_ghoul_thrash);
     RegisterSpellScript(spell_dk_howling_blast);
     RegisterSpellScript(spell_dk_hungering_cold);
-    RegisterSpellScript(spell_dk_icebound_fortitude);
     RegisterSpellScript(spell_dk_improved_presence);
     RegisterSpellScript(spell_dk_item_death_knight_t12_dps_4p_bonus);
     RegisterSpellScript(spell_dk_killing_machine);

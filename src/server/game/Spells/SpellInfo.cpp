@@ -2345,10 +2345,6 @@ SpellSpecificType SpellInfo::LoadSpellSpecific() const
                 if (SpellFamilyFlags[0] & 0x00002190)
                     return SPELL_SPECIFIC_HAND;
 
-                // Judgement of Wisdom, Judgement of Light, Judgement of Justice
-                if (Id == 20184 || Id == 20185 || Id == 20186)
-                    return SPELL_SPECIFIC_JUDGEMENT;
-
                 // only paladin auras have this (for palaldin class family)
                 if (SpellFamilyFlags[2] & 0x00000020)
                     return SPELL_SPECIFIC_AURA;

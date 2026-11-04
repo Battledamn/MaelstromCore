@@ -233,11 +233,8 @@ DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellInfo const* spellproto,
             }
         case SPELLFAMILY_PALADIN:
             {
-                // Judgement of Justice - limit duration to 10s in PvP
-                if (spellproto->SpellFamilyFlags[0] & 0x100000)
-                    return DIMINISHING_LIMITONLY;
                 // Turn Evil
-                else if ((spellproto->SpellFamilyFlags[1] & 0x804000) && spellproto->SpellIconID == 309)
+                if ((spellproto->SpellFamilyFlags[1] & 0x804000) && spellproto->SpellIconID == 309)
                     return DIMINISHING_FEAR;
                 break;
             }
@@ -253,9 +250,6 @@ DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellInfo const* spellproto,
                 // Hungering Cold (no flags)
                 if (spellproto->SpellIconID == 2797)
                     return DIMINISHING_DISORIENT;
-                // Mark of Blood
-                else if ((spellproto->SpellFamilyFlags[0] & 0x10000000) && spellproto->SpellIconID == 2285)
-                    return DIMINISHING_LIMITONLY;
                 break;
             }
         default:

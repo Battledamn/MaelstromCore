@@ -1595,13 +1595,6 @@ void AuraEffect::HandleShapeshiftBoosts(Unit* target, bool apply) const
                 if (spellInfo && spellInfo->Stances & (1 << (GetMiscValue() - 1)))
                     target->CastSpell(target, 24932, true, nullptr, this, target->GetGUID());
             }
-            // Improved Barkskin - apply/remove armor bonus due to shapeshift
-            if (player->HasTalent(63410, player->GetActiveSpec()) || player->HasTalent(63411, player->GetActiveSpec()))
-            {
-                target->RemoveAurasDueToSpell(66530);
-                if (GetMiscValue() == FORM_TRAVEL || GetMiscValue() == FORM_NONE) // "while in Travel Form or while not shapeshifted"
-                    target->CastSpell(target, 66530, true);
-            }
             // Heart of the Wild
             if (HotWSpellId)
             {
@@ -1682,16 +1675,6 @@ void AuraEffect::HandleShapeshiftBoosts(Unit* target, bool apply) const
             target->RemoveOwnedAura(spellId);
         if (spellId2)
             target->RemoveOwnedAura(spellId2);
-
-        // Improved Barkskin - apply/remove armor bonus due to shapeshift
-        if (player)
-        {
-            if (player->HasTalent(63410, player->GetActiveSpec()) || player->HasTalent(63411, player->GetActiveSpec()))
-            {
-                target->RemoveAurasDueToSpell(66530);
-                target->CastSpell(target, 66530, true);
-            }
-        }
 
         Unit::AuraEffectList const& shapeshifts = target->GetAuraEffectsByType(SPELL_AURA_MOD_SHAPESHIFT);
         AuraEffect* newAura = nullptr;
@@ -5381,29 +5364,7 @@ void AuraEffect::HandleAuraDummy(AuraApplication const* aurApp, uint8 mode, bool
                     if (caster && target->CanHaveThreatList())
                         target->AddThreat(caster, 10.0f);
                     break;
-                case 34026:   // kill command
-                    {
-                        Unit* pet = target->GetGuardianPet();
-                        if (!pet)
-                            break;
 
-                        target->CastSpell(target, 34027, true, nullptr, this);
-
-                        // set 3 stacks and 3 charges (to make all auras not disappear at once)
-                        Aura* owner_aura = target->GetAura(34027, GetCasterGUID());
-                        Aura* pet_aura  = pet->GetAura(58914, GetCasterGUID());
-                        if (owner_aura)
-                        {
-                            owner_aura->SetCharges(0);
-                            owner_aura->SetStackAmount(owner_aura->GetSpellInfo()->StackAmount);
-                            if (pet_aura)
-                            {
-                                pet_aura->SetCharges(0);
-                                pet_aura->SetStackAmount(owner_aura->GetSpellInfo()->StackAmount);
-                            }
-                        }
-                        break;
-                    }
                 case 37096:                                     // Blood Elf Illusion
                     {
                         if (caster)
@@ -6968,21 +6929,6 @@ void AuraEffect::HandlePeriodicManaLeechAuraTick(Unit* target, Unit* caster) con
 
     // remove CC auras
     target->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TAKE_DAMAGE);
-
-    // Drain Mana
-    if (m_spellInfo->SpellFamilyName == SPELLFAMILY_WARLOCK
-            && m_spellInfo->SpellFamilyFlags[0] & 0x00000010)
-    {
-        int32 manaFeedVal = 0;
-        if (AuraEffect const* aurEff = GetBase()->GetEffect(1))
-            manaFeedVal = aurEff->GetAmount();
-        // Mana Feed - Drain Mana
-        if (manaFeedVal > 0)
-        {
-            int32 feedAmount = CalculatePct(gainedAmount, manaFeedVal);
-            caster->CastCustomSpell(caster, 32554, &feedAmount, nullptr, nullptr, true, nullptr, this);
-        }
-    }
 }
 
 void AuraEffect::HandleObsModPowerAuraTick(Unit* target, Unit* caster) const

@@ -521,86 +521,6 @@ private:
 
 /* 61013 - Warlock Pet Scaling 05
    61017 - Hunter Pet Scaling 04 */
-class spell_pet_hit_expertise_scalling : public AuraScript
-{
-    PrepareAuraScript(spell_pet_hit_expertise_scalling)
-
-    int32 CalculatePercent(float hitChance, float cap, float maxChance)
-    {
-        return (hitChance / cap) * maxChance;
-    }
-
-    void CalculateHitAmount(AuraEffect const*  /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        if (Player* modOwner = GetUnitOwner()->GetSpellModOwner())
-        {
-            if (modOwner->IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
-                amount = CalculatePercent(modOwner->m_modRangedHitChance, 8.0f, 8.0f);
-            else if (modOwner->getPowerType() == POWER_MANA)
-                amount = CalculatePercent(modOwner->m_modSpellHitChance, 17.0f, 8.0f);
-            else
-                amount = CalculatePercent(modOwner->m_modMeleeHitChance, 8.0f, 8.0f);
-        }
-    }
-
-    void CalculateSpellHitAmount(AuraEffect const*  /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        if (Player* modOwner = GetUnitOwner()->GetSpellModOwner())
-        {
-            if (modOwner->IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
-                amount = CalculatePercent(modOwner->m_modRangedHitChance, 8.0f, 17.0f);
-            else if (modOwner->getPowerType() == POWER_MANA)
-                amount = CalculatePercent(modOwner->m_modSpellHitChance, 17.0f, 17.0f);
-            else
-                amount = CalculatePercent(modOwner->m_modMeleeHitChance, 8.0f, 17.0f);
-        }
-    }
-
-    void CalculateExpertiseAmount(AuraEffect const*  /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
-    {
-        if (Player* modOwner = GetUnitOwner()->GetSpellModOwner())
-        {
-            if (modOwner->IsClass(CLASS_HUNTER, CLASS_CONTEXT_STATS))
-                amount = CalculatePercent(modOwner->m_modRangedHitChance, 8.0f, 26.0f);
-            else if (modOwner->getPowerType() == POWER_MANA)
-                amount = CalculatePercent(modOwner->m_modSpellHitChance, 17.0f, 26.0f);
-            else
-                amount = CalculatePercent(modOwner->m_modMeleeHitChance, 8.0f, 26.0f);
-        }
-    }
-
-    void HandleEffectApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
-    {
-        GetUnitOwner()->ApplySpellImmune(GetId(), IMMUNITY_STATE, aurEff->GetAuraType(), true, SPELL_BLOCK_TYPE_POSITIVE);
-    }
-
-    void CalcPeriodic(AuraEffect const* /*aurEff*/, bool& isPeriodic, int32& amplitude)
-    {
-        if (!GetUnitOwner()->IsPet())
-            return;
-
-        isPeriodic = true;
-        amplitude = 3 * IN_MILLISECONDS;
-    }
-
-    void HandlePeriodic(AuraEffect const* aurEff)
-    {
-        PreventDefaultAction();
-        GetEffect(aurEff->GetEffIndex())->RecalculateAmount();
-    }
-
-    void Register() override
-    {
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pet_hit_expertise_scalling::CalculateHitAmount, EFFECT_0, SPELL_AURA_MOD_HIT_CHANCE);
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pet_hit_expertise_scalling::CalculateSpellHitAmount, EFFECT_1, SPELL_AURA_MOD_SPELL_HIT_CHANCE);
-        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pet_hit_expertise_scalling::CalculateExpertiseAmount, EFFECT_2, SPELL_AURA_MOD_EXPERTISE);
-
-        OnEffectApply += AuraEffectApplyFn(spell_pet_hit_expertise_scalling::HandleEffectApply, EFFECT_ALL, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
-        DoEffectCalcPeriodic += AuraEffectCalcPeriodicFn(spell_pet_hit_expertise_scalling::CalcPeriodic, EFFECT_ALL, SPELL_AURA_ANY);
-        OnEffectPeriodic += AuraEffectPeriodicFn(spell_pet_hit_expertise_scalling::HandlePeriodic, EFFECT_ALL, SPELL_AURA_ANY);
-    }
-};
-
 // 55475 - Grow Flower Patch
 class spell_gen_grow_flower_patch : public SpellScript
 {
@@ -2703,47 +2623,6 @@ enum DamageReductionAura
 /* 20911 - Blessing of Sanctuary
    25899 - Greater Blessing of Sanctuary
    63944 - Renewed Hope */
-class spell_gen_damage_reduction_aura : public AuraScript
-{
-    PrepareAuraScript(spell_gen_damage_reduction_aura);
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-            {
-                SPELL_DAMAGE_REDUCTION_AURA,
-                SPELL_BLESSING_OF_SANCTUARY,
-                SPELL_GREATER_BLESSING_OF_SANCTUARY,
-                SPELL_RENEWED_HOPE,
-                SPELL_VIGILANCE
-            });
-    }
-
-    void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        Unit* target = GetTarget();
-        target->CastSpell(target, SPELL_DAMAGE_REDUCTION_AURA, true);
-    }
-
-    void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        Unit* target = GetTarget();
-        if (target->HasAura(SPELL_DAMAGE_REDUCTION_AURA) && !(target->HasAura(SPELL_BLESSING_OF_SANCTUARY) ||
-                target->HasAura(SPELL_GREATER_BLESSING_OF_SANCTUARY) ||
-                target->HasAura(SPELL_RENEWED_HOPE) ||
-                target->HasAura(SPELL_VIGILANCE)))
-        {
-            target->RemoveAurasDueToSpell(SPELL_DAMAGE_REDUCTION_AURA);
-        }
-    }
-
-    void Register() override
-    {
-        OnEffectApply += AuraEffectApplyFn(spell_gen_damage_reduction_aura::OnApply, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
-        OnEffectRemove += AuraEffectRemoveFn(spell_gen_damage_reduction_aura::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
-    }
-};
-
 enum DummyTrigger
 {
     SPELL_PERSISTANT_SHIELD_TRIGGERED       = 26470,
@@ -6568,7 +6447,6 @@ void AddSC_generic_spell_scripts()
     RegisterSpellScript(spell_gen_bg_preparation);
     RegisterSpellScriptWithArgs(spell_gen_disabled_above_level, "spell_gen_disabled_above_73", 73);
     RegisterSpellScriptWithArgs(spell_gen_disabled_above_level, "spell_gen_disabled_above_70", 70);
-    RegisterSpellScript(spell_pet_hit_expertise_scalling);
     RegisterSpellScript(spell_gen_grow_flower_patch);
     RegisterSpellScript(spell_gen_rallying_cry_of_the_dragonslayer);
     RegisterSpellScript(spell_gen_disabled_above_63);
@@ -6634,7 +6512,6 @@ void AddSC_generic_spell_scripts()
     RegisterSpellScript(spell_gen_allow_cast_from_item_only);
     RegisterSpellAndAuraScriptPair(spell_gen_vehicle_scaling, spell_gen_vehicle_scaling_aura);
     RegisterSpellScript(spell_gen_oracle_wolvar_reputation);
-    RegisterSpellScript(spell_gen_damage_reduction_aura);
     RegisterSpellScript(spell_gen_dummy_trigger);
     RegisterSpellScript(spell_gen_spirit_healer_res);
     RegisterSpellScript(spell_gen_gadgetzan_transporter_backfire);
