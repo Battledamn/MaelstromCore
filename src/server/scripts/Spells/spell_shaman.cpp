@@ -119,6 +119,8 @@ enum ShamanSpells
     SPELL_SHAMAN_TOTEM_EARTHBIND_TOTEM          = 6474,
     SPELL_SHAMAN_TOTEM_EARTHEN_POWER            = 59566,
     SPELL_SHAMAN_TOTEM_HEALING_STREAM_HEAL      = 52042,
+    SPELL_SHAMAN_GLYPH_OF_HEALING_STREAM_TOTEM  = 55456,
+    SPELL_SHAMAN_ELEMENTAL_RESISTANCE           = 8185,
     SPELL_SHAMAN_TOTEMIC_MASTERY                = 38437,
     SPELL_SHAMAN_TOTEMIC_POWER_MP5              = 28824,
     SPELL_SHAMAN_TOTEMIC_POWER_SPELL_POWER      = 28825,
@@ -916,6 +918,19 @@ class spell_sha_healing_stream_totem : public SpellScript
         Unit* target = GetHitUnit();
         if (!target)
             return;
+
+        // Glyph of Healing Stream Totem: Elemental Resistance around the totem, by the tooltip's formula. Ours: CPP names it only.
+        if (Unit* owner = caster->GetOwner())
+            if (owner->HasAura(SPELL_SHAMAN_GLYPH_OF_HEALING_STREAM_TOTEM) && !caster->HasAura(SPELL_SHAMAN_ELEMENTAL_RESISTANCE))
+            {
+                int32 const level = owner->GetLevel();
+                int32 resistance = level;
+                if (level > 70)
+                    resistance += (std::min(level, 80) - 70) * 5;
+                if (level > 80)
+                    resistance += (level - 80) * 7;
+                caster->CastCustomSpell(SPELL_SHAMAN_ELEMENTAL_RESISTANCE, SPELLVALUE_BASE_POINT0, resistance, caster, true);
+            }
 
         int32 bp = GetEffectValue();
         if (Unit* owner = caster->GetOwner())
