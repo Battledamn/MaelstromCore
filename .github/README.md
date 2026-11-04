@@ -9,10 +9,9 @@ structure, conventions, modules and tools are the same, renamed and changed only
 
 ## Goal
 
-A fully working Cataclysm 4.3.4: every race and class from level 1 to 85, the whole Cataclysm world with
-its quests and phasing, the dungeons and raids, PvP and the Dungeon Finder, playing the way patch 4.3.4
-did with the unmodified 4.3.4 client. Version 1.0 is that goal reached: everything works, and only small,
-minor or visual issues remain.
+A fully working Cataclysm 4.3.4: every race and class from level 1 to 85, the Cataclysm version of Azeroth with
+its quests, professions, the dungeons and raids, PvP and the Dungeon Finder, playing the way patch 4.3.4
+did with the unmodified 4.3.4 client.
 
 ## Where it stands
 
@@ -30,7 +29,7 @@ In progress:
 
 - Class spells, one class at a time: paladin, druid, warrior, hunter, rogue, priest and mage are done and
   tested; warlock and shaman are in testing; the death knight is next.
-- Phasing, which the Goblin, Worgen and death knight starting zones wait for.
+- The Goblin, Worgen and death knight starting zones
 
 Not done yet: vehicles, pathfinding, the Guild Finder and the Dungeon Finder. The Outland, Northrend and
 older dungeons and raids still run Cataclysm data under scripts written for the WotLK versions, and do not
