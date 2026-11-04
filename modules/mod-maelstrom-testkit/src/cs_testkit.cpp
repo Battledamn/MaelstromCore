@@ -22,7 +22,8 @@
  *   .testkit ready         full health and power, no cooldowns or Forbearance, training dummies
  *   .testkit reset         the active spec's talents and specialization reset
  *   .testkit glyph <id> <1|0> [spells]  puts glyph <id> (GlyphProperties.dbc) in a slot of its type or takes it out, and the
- *                          known spells of the list on action buttons 1-5; id 0 empties every glyph slot
+ *                          known spells of the list on action buttons 1-5; id 0 empties every glyph slot; <2> instead checks
+ *                          the glyph's modifiers: "Test kit: glyph check <id> ok|missing|fail <details>" for the addon
  * Used by the MaelstromClassTest addon. Not 4.3.4 behaviour, so a module (docs/AZEROTHCORE_WAY.md).
  */
 
@@ -30,6 +31,8 @@
 #include "CommandScript.h"
 #include "DBCStores.h"
 #include "Player.h"
+#include "SpellMgr.h"
+#include "SpellAuraEffects.h"
 #include "SpellAuras.h"
 #include "SpellInfo.h"
 #include "StringConvert.h"
@@ -52,6 +55,85 @@ namespace
     uint32 constexpr DUMMY_DESPAWN_MS   = 30 * MINUTE * IN_MILLISECONDS;
     uint8 constexpr GLYPH_BAR_BUTTONS   = 5;
     uint8 constexpr GLYPH_ALL_SLOTS_LEVEL = 75;
+
+    // The glyph's modifiers on the spells the character knows: its aura is on, they reach a spell, they change its value, and the
+    // effect they name is still there (a spell correction removed Chains of Ice's damage effect, whatever its glyph added to it)
+    void CheckGlyph(ChatHandler* handler, Player* player, uint32 glyphId, GlyphPropertiesEntry const* entry)
+    {
+        Aura const* aura = player->GetAura(entry->SpellId);
+        if (!aura)
+        {
+            handler->PSendSysMessage("Test kit: glyph check {} fail its aura is not on you", glyphId);
+            return;
+        }
+
+        std::string reached;
+        std::string broken;
+        bool effectFound = false;
+        uint32 reachedCount = 0;
+        uint32 changed = 0;
+        for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+        {
+            AuraEffect const* effect = aura->GetEffect(i);
+            if (!effect || !effect->GetAmount()
+                || (effect->GetAuraType() != SPELL_AURA_ADD_FLAT_MODIFIER && effect->GetAuraType() != SPELL_AURA_ADD_PCT_MODIFIER))
+                continue;
+
+            SpellModOp const op = SpellModOp(effect->GetMiscValue());
+            int8 const targeted = op == SPELLMOD_EFFECT1 ? 0 : (op == SPELLMOD_EFFECT2 ? 1 : (op == SPELLMOD_EFFECT3 ? 2 : -1));
+            auto const look = [&](SpellInfo const* info)
+            {
+                // a class mask can also match stray spells (Glyph of Flametongue Weapon's has "Frozen Rune Weapon 5")
+                if (reachedCount < 3 && reached.find(info->SpellName[0]) == std::string::npos)
+                {
+                    reached += (reached.empty() ? "" : ", ") + std::string(info->SpellName[0]);
+                    ++reachedCount;
+                }
+
+                if (targeted >= 0)
+                {
+                    if (info->Effects[targeted].IsEffect())
+                        effectFound = true;
+                    else
+                        broken = info->SpellName[0];
+                }
+
+                int32 value = 1000;
+                player->ApplySpellMod(info->Id, op, value);
+                if (value != 1000)
+                    ++changed;
+            };
+
+            bool found = false;
+            for (auto const& [spellId, spell] : player->GetSpellMap())
+            {
+                SpellInfo const* info = sSpellMgr->GetSpellInfo(spellId);
+                if (info && spell->State != PLAYERSPELL_REMOVED && spell->Active && effect->IsAffectedOnSpell(info))
+                {
+                    look(info);
+                    found = true;
+                }
+            }
+
+            // Many glyphs change a spell that never is in a spellbook: a talent's buff (Elemental Mastery's 64701), a weapon
+            // imbue's passive or what a spell triggers (Fire Nova's 8349)
+            if (!found)
+                for (uint32 spellId = 0; spellId < sSpellMgr->GetSpellInfoStoreSize(); ++spellId)
+                    if (SpellInfo const* info = sSpellMgr->GetSpellInfo(spellId))
+                        if (effect->IsAffectedOnSpell(info))
+                            look(info);
+        }
+
+        // only when no spell it reaches has the effect (Chains of Ice before its correction went)
+        if (!broken.empty() && !effectFound)
+            handler->PSendSysMessage("Test kit: glyph check {} fail the effect it changes is missing on {}", glyphId, broken);
+        else if (reached.empty())
+            handler->PSendSysMessage("Test kit: glyph check {} fail no spell at all has what it changes", glyphId);
+        else if (!changed)
+            handler->PSendSysMessage("Test kit: glyph check {} fail it reaches {} but does not change it", glyphId, reached);
+        else
+            handler->PSendSysMessage("Test kit: glyph check {} ok {}", glyphId, reached);
+    }
 
     // as WorldSession::HandleRemoveGlyph
     void RemoveGlyphFromSlot(Player* player, uint8 slot)
@@ -165,6 +247,12 @@ public:
         {
             handler->PSendSysMessage("Test kit: no glyph {}.", glyphId);
             return false;
+        }
+
+        if (apply == 2)
+        {
+            CheckGlyph(handler, player, glyphId, entry);
+            return true;
         }
 
         // the glyph's slot if it has one; otherwise an empty slot of its type, or the first of its type
