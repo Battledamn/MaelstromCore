@@ -5712,6 +5712,7 @@ void Spell::TakeRunePower(bool didHit)
 
     Player* player = unitCaster->ToPlayer();
     m_runesState = player->GetRunesState();                 // store previous state
+    player->SetLastUsedRuneMask(0);
 
     int32 runeCost[NUM_RUNE_TYPES];                         // blood, frost, unholy, death
 
@@ -5731,6 +5732,7 @@ void Spell::TakeRunePower(bool didHit)
         {
             player->SetRuneCooldown(i, didHit ? player->GetRuneBaseCooldown(i, false) : uint32(RUNE_MISS_COOLDOWN));
             player->SetLastUsedRune(rune);
+            player->SetLastUsedRuneMask(player->GetLastUsedRuneMask() | (1 << i));
             runeCost[rune]--;
         }
     }
@@ -5749,6 +5751,7 @@ void Spell::TakeRunePower(bool didHit)
                 {
                     player->SetRuneCooldown(i, didHit ? player->GetRuneBaseCooldown(i, false) : uint32(RUNE_MISS_COOLDOWN));
                     player->SetLastUsedRune(rune);
+            player->SetLastUsedRuneMask(player->GetLastUsedRuneMask() | (1 << i));
                     runeCost[rune]--;
                     if (!loop)
                         runeCost[player->GetBaseRune(i)]--;

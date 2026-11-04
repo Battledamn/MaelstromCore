@@ -8359,34 +8359,6 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
                         AddPct(DoneTotalMod, (*i)->GetAmount());
                     break;
                 }
-            // Tundra Stalker
-            // Merciless Combat
-            case 7277:
-                {
-                    // Merciless Combat
-                    if ((*i)->GetSpellInfo()->SpellIconID == 2656)
-                    {
-                        if ((spellProto && spellProto->SpellFamilyFlags[0] & 0x2) || spellProto->SpellFamilyFlags[1] & 0x2 )
-                            if (!victim->HealthAbovePct(35))
-                                AddPct(DoneTotalMod, (*i)->GetAmount());
-                    }
-                    // Tundra Stalker
-                    else
-                    {
-                        // Frost Fever (target debuff)
-                        if (victim->HasAura(55095))
-                            AddPct(DoneTotalMod, (*i)->GetAmount());
-                        break;
-                    }
-                    break;
-                }
-            // Rage of Rivendare
-            case 7293:
-                {
-                    if (victim->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_DEATHKNIGHT, 0, 0x02000000, 0))
-                        AddPct(DoneTotalMod, (*i)->GetSpellInfo()->GetRank() * 2.0f);
-                    break;
-                }
             // Marked for Death
             case 7598:
             case 7599:
@@ -8502,15 +8474,10 @@ float Unit::SpellPctDamageModsDone(Unit* victim, SpellInfo const* spellProto, Da
                         AddPct(DoneTotalMod, aurEff->GetAmount());
             break;
         case SPELLFAMILY_DEATHKNIGHT:
-            // Improved Icy Touch
-            if (spellProto->SpellFamilyFlags[0] & 0x2)
-                if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 2721, 0))
-                    AddPct(DoneTotalMod, aurEff->GetAmount());
-
-            // Glacier Rot
-            if (spellProto->SpellFamilyFlags[0] & 0x2 || spellProto->SpellFamilyFlags[1] & 0x6)
-                if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 196, 0))
-                    if (victim->GetDiseasesByCaster(owner->GetGUID()) > 0)
+            // Merciless Combat: Icy Touch, Howling Blast, Obliterate and Frost Strike below 35% health (4.3.4)
+            if (spellProto->SpellFamilyFlags[0] & 0x2 || spellProto->SpellFamilyFlags[1] & 0x20006)
+                if (!victim->HealthAbovePct(35))
+                    if (AuraEffect const* aurEff = owner->GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 2656, EFFECT_0))
                         AddPct(DoneTotalMod, aurEff->GetAmount());
             break;
     }
@@ -10057,32 +10024,6 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
 
         switch ((*i)->GetMiscValue())
         {
-            // Tundra Stalker
-            // Merciless Combat
-            case 7277:
-                {
-                    // Merciless Combat
-                    if ((*i)->GetSpellInfo()->SpellIconID == 2656)
-                    {
-                        if (!victim->HealthAbovePct(35))
-                            AddPct(DoneTotalMod, (*i)->GetAmount());
-                    }
-                    // Tundra Stalker
-                    else
-                    {
-                        // Frost Fever (target debuff)
-                        if (victim->HasAura(55095))
-                            AddPct(DoneTotalMod, (*i)->GetAmount());
-                    }
-                    break;
-                }
-            // Rage of Rivendare
-            case 7293:
-                {
-                    if (victim->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_DEATHKNIGHT, 0, 0x02000000, 0))
-                        AddPct(DoneTotalMod, (*i)->GetSpellInfo()->GetRank() * 2.0f);
-                    break;
-                }
             // Marked for Death
             case 7598:
             case 7599:
@@ -10114,10 +10055,10 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
         switch (spellProto->SpellFamilyName)
         {
             case SPELLFAMILY_DEATHKNIGHT:
-                // Glacier Rot
-                if (spellProto->SpellFamilyFlags[0] & 0x2 || spellProto->SpellFamilyFlags[1] & 0x6)
-                    if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 196, 0))
-                        if (victim->GetDiseasesByCaster(owner->GetGUID()) > 0)
+                // Merciless Combat: Obliterate and Frost Strike below 35% health (4.3.4)
+                if (spellProto->SpellFamilyFlags[1] & 0x20004)
+                    if (!victim->HealthAbovePct(35))
+                        if (AuraEffect const* aurEff = owner->GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 2656, EFFECT_0))
                             AddPct(DoneTotalMod, aurEff->GetAmount());
                 break;
         }
@@ -12143,6 +12084,15 @@ uint32 Unit::GetPowerIndex(Powers power) const
     // build 15595 client crashes on an SMSG_POWER_UPDATE carrying power type 4.
     if (IsPet() && static_cast<Pet const*>(this)->getPetType() == HUNTER_PET)
         return GetPowerIndexByClass(power, CLASS_HUNTER);
+
+    // The other pets and guardians use their own class's slots where it has the power. The client crashes on a power
+    // field whose slot its class doesn't have: a ghoul (a rogue) keeps its energy in the first slot, not the fourth.
+    if (HasUnitTypeMask(UNIT_MASK_GUARDIAN))
+    {
+        uint32 index = GetPowerIndexByClass(power, getClass());
+        if (index != MAX_POWERS)
+            return index;
+    }
 
     // shortcut: retain other non-player slots until creature/pet powers are converted together.
     return uint32(power) < MAX_UNIT_POWER_FIELDS ? uint32(power) : uint32(MAX_POWERS);

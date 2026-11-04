@@ -3399,7 +3399,7 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
                 // Blood Strike
                 if (m_spellInfo->SpellFamilyFlags[0] & 0x400000)
                 {
-                    float disease_amt = m_spellInfo->Effects[EFFECT_2].CalcValue();
+                    float disease_amt = m_spellInfo->Effects[EFFECT_2].CalcValue() / 10.0f;
                     //Death Knight T8 Melee 4P Bonus
                     if (AuraEffect* aurEff = unitCaster->GetAuraEffectDummy(64736))
                         AddPct(disease_amt, aurEff->GetAmount());
@@ -3421,28 +3421,21 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
                             AddPct(totalDamagePercentMod, runic);
                     break;
                 }
-                // Obliterate (12.5% more damage per disease)
+                // Obliterate: half of effect 2 per disease, which stay in 4.3.4
                 if (m_spellInfo->SpellFamilyFlags[1] & 0x20000)
                 {
-                    bool consumeDiseases = true;
-                    // Annihilation
-                    if (AuraEffect const* aurEff = unitCaster->GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 2710, EFFECT_0))
-                        // Do not consume diseases if roll sucesses
-                        if (roll_chance_i(aurEff->GetAmount()))
-                            consumeDiseases = false;
-
-                    float disease_amt = m_spellInfo->Effects[EFFECT_2].CalcValue();
+                    float disease_amt = m_spellInfo->Effects[EFFECT_2].CalcValue() / 2.0f;
                     //Death Knight T8 Melee 4P Bonus
                     if (AuraEffect* aurEff = unitCaster->GetAuraEffectDummy(64736))
                         AddPct(disease_amt, aurEff->GetAmount());
 
-                    AddPct(totalDamagePercentMod, disease_amt * unitTarget->GetDiseasesByCaster(unitCaster->GetGUID(), consumeDiseases) / 2.0f);
+                    AddPct(totalDamagePercentMod, disease_amt * unitTarget->GetDiseasesByCaster(unitCaster->GetGUID()));
                     break;
                 }
                 // Blood-Caked Strike - Blood-Caked Blade
                 if (m_spellInfo->SpellIconID == 1736)
                 {
-                    AddPct(totalDamagePercentMod, unitTarget->GetDiseasesByCaster(unitCaster->GetGUID()) * 50.0f);
+                    AddPct(totalDamagePercentMod, unitTarget->GetDiseasesByCaster(unitCaster->GetGUID()) * m_spellInfo->Effects[EFFECT_0].CalcValue() / 2.0f);
                     break;
                 }
                 // Heart Strike
@@ -3456,12 +3449,6 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
                     AddPct(totalDamagePercentMod, disease_amt * unitTarget->GetDiseasesByCaster(unitCaster->GetGUID()));
                     break;
                 }
-                // Rune Strike
-                if (m_spellInfo->SpellFamilyFlags[1] & 0x20000000)
-                {
-                    spell_bonus += int32(0.15f * unitCaster->GetTotalAttackPowerValue(BASE_ATTACK));
-                }
-
                 break;
             }
     }
@@ -5912,9 +5899,9 @@ void Spell::EffectCreateTamedPet(SpellEffIndex effIndex)
     if (!pet)
         return;
 
-    // the starting pet of a new hunter (4.x, cast at character creation): defensive, like a tamed
+    // the starting pet of a new hunter (4.x, cast at character creation): on Assist, like a tamed
     // one; a new pet's charm info leaves it passive, and the owner has no pet bar to change it yet
-    pet->SetReactState(REACT_DEFENSIVE);
+    pet->SetReactState(REACT_ASSIST);
 
     // add to world
     pet->GetMap()->AddToMap(pet->ToCreature(), true);

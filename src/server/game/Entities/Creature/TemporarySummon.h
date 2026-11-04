@@ -94,6 +94,7 @@ public:
     void SetFollowAngle(float angle) { m_followAngle = angle; }
     [[nodiscard]] bool IsPetGhoul() const {return GetEntry() == 26125 /*normal ghoul*/ || GetEntry() == 30230 /*Raise Ally ghoul*/;} // Ghoul may be guardian or pet
     [[nodiscard]] bool IsGuardianPet() const;
+    [[nodiscard]] bool IsWarlockMinion() const;
     void setDeathState(DeathState s, bool despawn = false) override;                   // override virtual Unit::setDeathState
 
     std::string GetDebugInfo() const override;

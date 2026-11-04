@@ -9338,6 +9338,10 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
         return nullptr;
     }
 
+    // The load can give up with its loading state still on (a death knight's saved ghoul, for one). This pet is built
+    // below instead and would otherwise never update: stuck in its rising stun, no auras sent to the client.
+    pet->SetLoading(false);
+
     // petentry == 0 for hunter "call pet" (current pet summoned if any)
     if (!entry)
     {
@@ -9371,8 +9375,8 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
     pet->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
     pet->SetUInt32Value(UNIT_FIELD_BYTES_1, 0);
     pet->InitStatsForLevel(GetLevel());
-    // New pets start defending and assisting their owner (CPP: REACT_ASSIST, AzerothCore's Defensive).
-    pet->SetReactState(REACT_DEFENSIVE);
+    // New pets start on Assist (CPP).
+    pet->SetReactState(REACT_ASSIST);
 
     SetMinion(pet, true);
 

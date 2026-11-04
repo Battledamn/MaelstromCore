@@ -22,6 +22,7 @@
 #include "GameTime.h"
 #include "Group.h"
 #include "Log.h"
+#include "MapMgr.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
@@ -62,6 +63,9 @@ void WorldSession::HandlePetAction(WorldPacket& recvData)
     recvData >> guid1;                                     //pet guid
     recvData >> data;
     recvData >> guid2;                                     //tag guid
+    float x, y, z;
+    recvData >> x >> y >> z;                               //Move To's ground position
+    Position destination(x, y, z);
 
     uint32 spellId = UNIT_ACTION_BUTTON_ACTION(data);
     uint8 flag = UNIT_ACTION_BUTTON_TYPE(data);             //delete = 0x07 CastSpell = C1
@@ -101,7 +105,7 @@ void WorldSession::HandlePetAction(WorldPacket& recvData)
     }
 
     if (GetPlayer()->m_Controlled.size() == 1)
-        HandlePetActionHelper(pet, guid1, spellId, flag, guid2);
+        HandlePetActionHelper(pet, guid1, spellId, flag, guid2, &destination);
     else
     {
         //If a pet is dismissed, m_Controlled will change
@@ -120,7 +124,7 @@ void WorldSession::HandlePetAction(WorldPacket& recvData)
 
         for (Unit* pet : controlled)
             if (pet && pet->IsInWorld() && pet->GetMap() == _player->GetMap())
-                HandlePetActionHelper(pet, guid1, spellId, flag, guid2);
+                HandlePetActionHelper(pet, guid1, spellId, flag, guid2, &destination);
     }
 }
 
@@ -147,7 +151,8 @@ void WorldSession::HandlePetStopAttack(WorldPackets::Pet::PetStopAttack& packet)
     pet->ClearInPetCombat();
 }
 
-void WorldSession::HandlePetActionHelper(Unit* pet, ObjectGuid guid1, uint32 spellId, uint16 flag, ObjectGuid guid2)
+void WorldSession::HandlePetActionHelper(Unit* pet, ObjectGuid guid1, uint32 spellId, uint16 flag, ObjectGuid guid2,
+    Position const* destination)
 {
     CharmInfo* charmInfo = pet->GetCharmInfo();
     if (!charmInfo)
@@ -274,6 +279,40 @@ void WorldSession::HandlePetActionHelper(Unit* pet, ObjectGuid guid1, uint32 spe
                         }
                         break;
                     }
+                case COMMAND_MOVE_TO:
+                    {
+                        if (!destination || !MapMgr::IsValidMapCoord(pet->GetMapId(), destination->GetPositionX(),
+                            destination->GetPositionY(), destination->GetPositionZ()))
+                            return;
+
+                        pet->AttackStop();
+                        pet->InterruptNonMeleeSpells(false);
+                        pet->ClearInPetCombat();
+                        if (pet->ToPet())
+                            pet->ToPet()->ClearCastWhenWillAvailable();
+
+                        // It stays where it was sent: PetAI's return to the stay position does the walking and,
+                        // on arrival, the standing. A stunned or feared pet goes there once it is free again.
+                        charmInfo->SetCommandState(COMMAND_STAY);
+                        charmInfo->SetIsCommandAttack(false);
+                        charmInfo->SetIsCommandFollow(false);
+                        charmInfo->SetIsFollowing(false);
+                        charmInfo->SetIsAtStay(false);
+                        charmInfo->SetIsReturning(false);
+                        charmInfo->SetStayPosition(destination->GetPositionX(), destination->GetPositionY(),
+                            destination->GetPositionZ());
+                        charmInfo->SetForcedSpell(0);
+                        charmInfo->SetForcedTargetGUID();
+
+                        if (pet->GetMotionMaster()->GetMotionSlotType(MOTION_SLOT_CONTROLLED) == NULL_MOTION_TYPE)
+                        {
+                            charmInfo->SetIsReturning(true);
+                            pet->GetMotionMaster()->Clear(false);
+                            pet->GetMotionMaster()->MovePoint(pet->GetGUID().GetCounter(), destination->GetPositionX(),
+                                destination->GetPositionY(), destination->GetPositionZ());
+                        }
+                        break;
+                    }
                 case COMMAND_ABANDON:                       // abandon (hunter pet) or dismiss (summoned pet)
                     if (pet->GetCharmerGUID() == GetPlayer()->GetGUID())
                     {
@@ -315,6 +354,7 @@ void WorldSession::HandlePetActionHelper(Unit* pet, ObjectGuid guid1, uint32 spe
 
                 case REACT_DEFENSIVE:                       //recovery
                 case REACT_AGGRESSIVE:                      //activete
+                case REACT_ASSIST:
                     if (pet->IsCreature())
                         pet->ToCreature()->SetReactState(ReactStates(spellId));
                     else

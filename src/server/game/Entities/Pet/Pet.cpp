@@ -350,9 +350,9 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
 
     SetReactState(petInfo->ReactState);
     // Below Control Pet / Control Demon (level 10) the owner has no pet bar to change the stance, so the
-    // pet defends and assists its owner (Cataclysm's Assist; AzerothCore's Defensive does the same).
+    // pet defends and assists its owner (PetAI: below that level Assist does both).
     if (owner->IsPlayer() && !owner->ToPlayer()->CanControlPet())
-        SetReactState(REACT_DEFENSIVE);
+        SetReactState(REACT_ASSIST);
     SetCanModifyStats(true);
 
     // set current pet as current
@@ -1387,6 +1387,7 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
                             AddAura(SPELL_DK_PET_SCALING_01, this);
                             AddAura(SPELL_DK_PET_SCALING_02, this);
                             AddAura(SPELL_DK_PET_SCALING_03, this);
+                            AddAura(SPELL_DK_PET_SCALING_05, this);
                             AddAura(SPELL_NIGHT_OF_THE_DEAD_AVOIDANCE, this);
                             AddAura(SPELL_ORC_RACIAL_COMMAND_DK, this);
                             AddAura(SPELL_PET_SCALING_MASTER_03, this);
@@ -1409,6 +1410,7 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
                             AddAura(SPELL_DK_ARMY_OF_THE_DEAD_PASSIVE, this);
                             AddAura(SPELL_DK_PET_SCALING_02, this);
                             AddAura(SPELL_DK_PET_SCALING_03, this);
+                            AddAura(SPELL_DK_PET_SCALING_05, this);
                             AddAura(SPELL_DK_AVOIDANCE, this);
                             AddAura(SPELL_PET_SCALING_MASTER_06, this);
 
@@ -1458,6 +1460,7 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
             AddAura(SPELL_DK_PET_SCALING_01, this);
             AddAura(SPELL_DK_PET_SCALING_02, this);
             AddAura(SPELL_DK_PET_SCALING_03, this);
+            AddAura(SPELL_DK_PET_SCALING_05, this);
         }
 
         AddAura(SPELL_PET_SCALING_MASTER_03, this);
@@ -1902,6 +1905,10 @@ bool Pet::addSpell(uint32 spellId, ActiveStates active /*= ACT_DECIDE*/, PetSpel
     }
 
     m_spells[spellId] = newspell;
+
+    // The spells behind a pet's real buttons (a ghoul's Sweeping Claws, cast by its Claw) stay off the action bar (CPP)
+    if (spellInfo->HasAttribute(SPELL_ATTR4_NOT_IN_SPELLBOOK) && !IsWarlockMinion())
+        return true;
 
     if (spellInfo->IsPassive())
         CastSpell(this, spellId, true);

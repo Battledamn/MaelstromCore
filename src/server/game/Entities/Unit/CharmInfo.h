@@ -170,6 +170,7 @@ public:
     void SetIsReturning(bool val);
     bool IsReturning();
     void SaveStayPosition(bool atCurrentPos);
+    void SetStayPosition(float x, float y, float z);
     void GetStayPosition(float& x, float& y, float& z);
     void RemoveStayPosition();
     bool HasStayPosition();

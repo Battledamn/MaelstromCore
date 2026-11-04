@@ -463,6 +463,12 @@ void PetAI::OwnerAttackedBy(Unit* attacker)
     if (me->HasReactState(REACT_PASSIVE))
         return;
 
+    // Assist only follows the owner's attacks (CPP). An owner with no pet bar yet can't choose a stance, so that pet
+    // does both. Guardians and charmed creatures keep the one helper behaviour.
+    if (me->IsPet() && me->HasReactState(REACT_ASSIST))
+        if (Player* owner = me->GetCharmerOrOwnerPlayerOrPlayerItself(); owner && owner->CanControlPet())
+            return;
+
     // Prevent pet from disengaging from current target
     if (me->GetVictim() && me->GetVictim()->IsAlive())
         return;
@@ -484,6 +490,10 @@ void PetAI::OwnerAttacked(Unit* target)
     if (me->HasReactState(REACT_PASSIVE))
         return;
 
+    // Defensive only answers attacks on the pet or its owner (CPP); guardians and charmed creatures still help
+    if (me->IsPet() && me->HasReactState(REACT_DEFENSIVE))
+        return;
+
     // Prevent pet from disengaging from current target
     if (me->GetVictim() && me->GetVictim()->IsAlive())
         return;
@@ -499,8 +509,8 @@ Unit* PetAI::SelectNextTarget(bool allowAutoSelect) const
     // Targets are not evaluated here for being valid targets, that is done in _CanAttack()
     // The parameter: allowAutoSelect lets us disable aggressive pet auto targeting for certain situations
 
-    // Passive pets don't do next target selection
-    if (me->HasReactState(REACT_PASSIVE))
+    // Passive and assist pets don't do next target selection (CPP)
+    if (me->HasReactState(REACT_PASSIVE) || me->HasReactState(REACT_ASSIST))
         return nullptr;
 
     // Check pet attackers first so we don't drag a bunch of targets to the owner

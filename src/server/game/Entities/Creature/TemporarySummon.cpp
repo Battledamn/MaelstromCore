@@ -392,6 +392,21 @@ Unit* Minion::GetOwner() const
     return ObjectAccessor::GetUnit(*this, m_owner);
 }
 
+bool Minion::IsWarlockMinion() const
+{
+    switch (GetEntry())
+    {
+        case NPC_IMP:
+        case NPC_VOIDWALKER:
+        case NPC_SUCCUBUS:
+        case NPC_FELHUNTER:
+        case NPC_FELGUARD:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool Minion::IsGuardianPet() const
 {
     return IsPet() || (m_Properties && m_Properties->Category == SUMMON_CATEGORY_PET);

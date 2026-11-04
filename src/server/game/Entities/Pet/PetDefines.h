@@ -192,6 +192,7 @@ enum PetScalingSpells
     SPELL_DK_PET_SCALING_01             = 54566,
     SPELL_DK_PET_SCALING_02             = 51996,
     SPELL_DK_PET_SCALING_03             = 61697,
+    SPELL_DK_PET_SCALING_05             = 110474, // 4.3.4: the crit
     SPELL_DK_AVOIDANCE                  = 65220,
     SPELL_DK_ARMY_OF_THE_DEAD_PASSIVE   = 49040,
     SPELL_SUMMON_HEAL                   = 36492, // Serverside - Summon Heal

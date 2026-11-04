@@ -2639,6 +2639,9 @@ public:
     [[nodiscard]] bool IsBaseRuneSlotsOnCooldown(RuneType runeType) const;
     RuneType GetLastUsedRune() { return m_runes->lastUsedRune; }
     void SetLastUsedRune(RuneType type) { m_runes->lastUsedRune = type; }
+    // the runes the last rune spell used (4.3.4, CPP: Reaping and Blood Rites turn exactly those into death runes)
+    [[nodiscard]] uint8 GetLastUsedRuneMask() const { return m_lastUsedRuneMask; }
+    void SetLastUsedRuneMask(uint8 mask) { m_lastUsedRuneMask = mask; }
     void SetBaseRune(uint8 index, RuneType baseRune) { m_runes->runes[index].BaseRune = baseRune; }
     void SetCurrentRune(uint8 index, RuneType currentRune) { m_runes->runes[index].CurrentRune = currentRune; }
     void SetRuneCooldown(uint8 index, uint32 cooldown) { m_runes->runes[index].Cooldown = cooldown; m_runes->SetRuneState(index, (cooldown == 0)); }
@@ -3102,6 +3105,7 @@ private:
     bool m_needZoneUpdate;
 
     SpellInfo const* _lastSoulburnSpell = nullptr;
+    uint8 m_lastUsedRuneMask = 0;
 
 private:
     // internal common parts for CanStore/StoreItem functions

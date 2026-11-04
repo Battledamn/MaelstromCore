@@ -422,8 +422,47 @@ class spell_pet_dk_gargoyle_strike : public SpellScript
     }
 };
 
+// 47481 - Gnaw, 47482 - Leap, 47468 - Claw, 47484 - Huddle: the ghoul's dummies cast the real ability, the stronger one
+// while Dark Transformation lasts (CPP)
+class spell_pet_ghoul_dummy_ability : public SpellScript
+{
+    PrepareSpellScript(spell_pet_ghoul_dummy_ability);
+
+    void HandleHit(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        bool transformed = caster->HasAura(63560);
+        uint32 spellId = 0;
+        switch (GetSpellInfo()->Id)
+        {
+            case 47481: // Gnaw, Monstrous Blow
+                spellId = transformed ? 91797 : 91800;
+                break;
+            case 47482: // Leap, Shambling Rush
+                spellId = transformed ? 91802 : 91809;
+                break;
+            case 47468: // Claw, Sweeping Claws
+                spellId = transformed ? 91778 : 91776;
+                break;
+            case 47484: // Huddle, Putrid Bulwark
+                spellId = transformed ? 91837 : 91838;
+                break;
+            default:
+                return;
+        }
+
+        caster->CastSpell(GetHitUnit(), spellId, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pet_ghoul_dummy_ability::HandleHit, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
 void AddSC_deathknight_pet_scripts()
 {
+    RegisterSpellScript(spell_pet_ghoul_dummy_ability);
     RegisterCreatureAI(npc_pet_dk_ebon_gargoyle);
     RegisterCreatureAI(npc_pet_dk_ghoul);
     RegisterCreatureAI(npc_pet_dk_risen_ally);
