@@ -675,6 +675,32 @@ class spell_dk_dancing_rune_weapon : public AuraScript
 {
     PrepareAuraScript(spell_dk_dancing_rune_weapon);
 
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo(
+            {
+                SPELL_DK_ITEM_T12_BLOOD_4P_BONUS,
+                SPELL_DK_FLAMING_RUNE_WEAPON,
+                SPELL_DK_DANCING_RUNE_WEAPON_PARRY_BONUS
+            });
+    }
+
+    void HandleParryApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* target = GetTarget();
+        target->CastSpell(target, SPELL_DK_DANCING_RUNE_WEAPON_PARRY_BONUS, true, nullptr, aurEff);
+    }
+
+    void HandleParryRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* target = GetTarget();
+        if (AuraEffect const* t12Bonus = target->GetAuraEffect(SPELL_DK_ITEM_T12_BLOOD_4P_BONUS, EFFECT_0))
+            target->CastCustomSpell(SPELL_DK_FLAMING_RUNE_WEAPON, SPELLVALUE_BASE_POINT0, t12Bonus->GetAmount(), target, true,
+                nullptr, aurEff);
+
+        target->RemoveAurasDueToSpell(SPELL_DK_DANCING_RUNE_WEAPON_PARRY_BONUS);
+    }
+
     void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         Unit* caster = GetCaster();
@@ -766,6 +792,8 @@ class spell_dk_dancing_rune_weapon : public AuraScript
     void Register() override
     {
         AfterEffectApply += AuraEffectApplyFn(spell_dk_dancing_rune_weapon::HandleApply, EFFECT_2, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectApply += AuraEffectApplyFn(spell_dk_dancing_rune_weapon::HandleParryApply, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dk_dancing_rune_weapon::HandleParryRemove, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
         DoCheckProc += AuraCheckProcFn(spell_dk_dancing_rune_weapon::CheckProc);
         OnEffectProc += AuraEffectProcFn(spell_dk_dancing_rune_weapon::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
     }
@@ -793,7 +821,8 @@ class spell_dk_dancing_rune_weapon_visual : public AuraScript
     }
 };
 
-// 77606 - Dark Simulacrum: the target's next mana spell becomes usable by the death knight (a player's that costs mana)
+// 77606 - Dark Simulacrum: the target's next spell becomes usable by the death knight: a player's that costs mana, or a
+// creature's that the client's data marks as copyable (SPELL_ATTR9_ALLOW_DARK_SIMULACRUM in CPP)
 class spell_dk_dark_simulacrum : public AuraScript
 {
     PrepareAuraScript(spell_dk_dark_simulacrum);
@@ -806,8 +835,14 @@ class spell_dk_dark_simulacrum : public AuraScript
     bool CheckProc(ProcEventInfo& eventInfo)
     {
         SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
+        if (!spellInfo)
+            return false;
+
+        if (!eventInfo.GetActor()->IsPlayer())
+            return (spellInfo->AttributesEx9 & 0x00080000) != 0;
+
         Spell const* spell = eventInfo.GetProcSpell();
-        return spellInfo && spell && eventInfo.GetActor()->IsPlayer() && spellInfo->PowerType == POWER_MANA && !spell->IsTriggered();
+        return spell && spell->GetPowerCost() && spellInfo->PowerType == POWER_MANA && !spell->IsTriggered();
     }
 
     void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
