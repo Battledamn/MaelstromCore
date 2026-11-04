@@ -72,7 +72,7 @@ say so in their trailer.
 
 ## Credits
 
-MaelstromCore stands entirely on the work of others:
+MaelstromCore is built on the work of others:
 
 - **[AzerothCore](https://github.com/azerothcore/azerothcore-wotlk)** and all of its contributors: the
   core MaelstromCore is. AzerothCore was born in 2016 from SunwellCore and itself builds on
