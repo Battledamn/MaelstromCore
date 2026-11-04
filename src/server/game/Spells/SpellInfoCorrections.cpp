@@ -678,12 +678,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->RuneCostID = 442;
     });
 
-    // Chains of Ice
-    ApplySpellFix({ 45524 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_2].Effect = 0;
-    });
-
     // Deadly Aggression (Deadly Gladiator's Death Knight Relic, item: 42620)
     ApplySpellFix({ 60549 }, [](SpellInfo* spellInfo)
     {

@@ -392,6 +392,14 @@ struct npc_pet_dk_dancing_rune_weapon : public NullCreatureAI
 {
     npc_pet_dk_dancing_rune_weapon(Creature* creature) : NullCreatureAI(creature) { }
 
+    // The invisible model of its two (the first is a small infernal) and the owner's weapons (CPP's IsSummonedBy; TDB has no
+    // addon aura for the visual)
+    void IsSummonedBy(WorldObject* /*summoner*/) override
+    {
+        me->SetDisplayFromModel(1);
+        me->CastSpell(me, 53160, true);
+    }
+
     void InitializeAI() override
     {
         me->AddAura(SPELL_HUNTER_PET_SCALING_04, me);

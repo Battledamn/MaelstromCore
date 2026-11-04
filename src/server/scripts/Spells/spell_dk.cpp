@@ -612,6 +612,17 @@ class spell_dk_chains_of_ice : public SpellScript
         return ValidateSpellInfo({ SPELL_DK_FROST_FEVER, SPELL_DK_CHILBLAINS_R1, SPELL_DK_CHAINS_OF_ICE_ROOT });
     }
 
+    // With the Glyph of Chains of Ice the third effect deals the glyph's damage and 8% of attack power (tooltip); the client data
+    // has no attack power for it, and a bonus row would hit without the glyph too
+    void HandleGlyphDamage(SpellEffIndex effIndex)
+    {
+        Unit* caster = GetCaster();
+        if (AuraEffect const* glyph = caster->GetAuraEffect(58620, EFFECT_0))
+            SetEffectValue(glyph->GetAmount() + int32(0.08f * caster->GetTotalAttackPowerValue(BASE_ATTACK)));
+        else
+            PreventHitDefaultEffect(effIndex);
+    }
+
     void HandleHit(SpellEffIndex /*effIndex*/)
     {
         Unit* caster = GetCaster();
@@ -623,6 +634,7 @@ class spell_dk_chains_of_ice : public SpellScript
 
     void Register() override
     {
+        OnEffectLaunchTarget += SpellEffectFn(spell_dk_chains_of_ice::HandleGlyphDamage, EFFECT_2, SPELL_EFFECT_SCHOOL_DAMAGE);
         OnEffectHitTarget += SpellEffectFn(spell_dk_chains_of_ice::HandleHit, EFFECT_1, SPELL_EFFECT_DUMMY);
     }
 };
@@ -772,7 +784,7 @@ class spell_dk_dancing_rune_weapon : public AuraScript
 
     void Register() override
     {
-        AfterEffectApply += AuraEffectApplyFn(spell_dk_dancing_rune_weapon::HandleApply, EFFECT_2, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectApply += AuraEffectApplyFn(spell_dk_dancing_rune_weapon::HandleApply, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
         AfterEffectApply += AuraEffectApplyFn(spell_dk_dancing_rune_weapon::HandleParryApply, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
         AfterEffectRemove += AuraEffectRemoveFn(spell_dk_dancing_rune_weapon::HandleParryRemove, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
         DoCheckProc += AuraCheckProcFn(spell_dk_dancing_rune_weapon::CheckProc);
@@ -1078,6 +1090,20 @@ class spell_dk_death_grip : public SpellScript
         return 0;
     }
 
+    // Glyph of Resilient Grip: no cooldown when the target is immune. Ours: not in CPP.
+    void ResetCooldownForGlyph()
+    {
+        if (Player* player = GetCaster()->ToPlayer())
+            if (player->HasAura(59309))
+                player->RemoveSpellCooldown(GetSpellInfo()->Id, true);
+    }
+
+    void HandleImmune(SpellMissInfo missInfo)
+    {
+        if (GetSpellInfo()->Id == 49576 && (missInfo == SPELL_MISS_IMMUNE || missInfo == SPELL_MISS_IMMUNE2))
+            ResetCooldownForGlyph();
+    }
+
     void HandleBaseDummy(SpellEffIndex /*effIndex*/)
     {
         Unit* caster = GetCaster();
@@ -1129,6 +1155,7 @@ class spell_dk_death_grip : public SpellScript
         if (m_scriptSpellId == 49576) // xinef: base death grip, add pvp range restriction
         {
             OnCheckCast += SpellCheckCastFn(spell_dk_death_grip::CheckCast);
+            BeforeHit += BeforeSpellHitFn(spell_dk_death_grip::HandleImmune);
             OnEffectHitTarget += SpellEffectFn(spell_dk_death_grip::HandleBaseDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
         }
         else
@@ -2572,8 +2599,33 @@ class spell_dk_will_of_the_necropolis : public AuraScript
     }
 };
 
+// 51271 - Pillar of Frost: with the glyph also its loss of control immunity and root (90259). Ours: not in CPP.
+class spell_dk_pillar_of_frost : public AuraScript
+{
+    PrepareAuraScript(spell_dk_pillar_of_frost);
+
+    void HandleApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* target = GetTarget();
+        if (target->HasAura(58635))
+            target->CastSpell(target, 90259, true, nullptr, aurEff);
+    }
+
+    void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        GetTarget()->RemoveAurasDueToSpell(90259);
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_dk_pillar_of_frost::HandleApply, EFFECT_0, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_dk_pillar_of_frost::HandleRemove, EFFECT_0, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
 void AddSC_deathknight_spell_scripts()
 {
+    RegisterSpellScript(spell_dk_pillar_of_frost);
     RegisterSpellScript(spell_dk_advantage_t10_4p);
     RegisterSpellScript(spell_dk_anti_magic_shell_raid);
     RegisterSpellScript(spell_dk_anti_magic_shell_self);
