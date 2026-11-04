@@ -2924,73 +2924,8 @@ void Spell::EffectEnchantItemTmp(SpellEffIndex effIndex)
 
     Player* p_caster = unitCaster->ToPlayer();
 
-    // Rockbiter Weapon apply to both weapon
-    if (!itemTarget)
-        return;
-    if (m_spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN && m_spellInfo->SpellFamilyFlags[0] & 0x400000)
-    {
-        uint32 spell_id = 0;
-
-        // enchanting spell selected by calculated damage-per-sec stored in Effect[1] base value
-        // Note: damage calculated (correctly) with rounding int32(float(v)) but
-        // RW enchantments applied damage int32(float(v)+0.5), this create  0..1 difference sometime
-        switch (damage)
-        {
-            // Rank 1
-            case  2:
-                spell_id = 36744;
-                break;               //  0% [ 7% == 2, 14% == 2, 20% == 2]
-            // Rank 2
-            case  4:
-                spell_id = 36753;
-                break;               //  0% [ 7% == 4, 14% == 4]
-            case  5:
-                spell_id = 36751;
-                break;               // 20%
-            // Rank 3
-            case  6:
-                spell_id = 36754;
-                break;               //  0% [ 7% == 6, 14% == 6]
-            case  7:
-                spell_id = 36755;
-                break;               // 20%
-            // Rank 4
-            case  9:
-                spell_id = 36761;
-                break;               //  0% [ 7% == 6]
-            case 10:
-                spell_id = 36758;
-                break;               // 14%
-            case 11:
-                spell_id = 36760;
-                break;               // 20%
-            default:
-                LOG_ERROR("spells.effect", "Spell::EffectEnchantItemTmp: Damage {} not handled in S'RW", damage);
-                return;
-        }
-
-        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell_id);
-        if (!spellInfo)
-        {
-            LOG_ERROR("spells.effect", "Spell::EffectEnchantItemTmp: unknown spell id {}", spell_id);
-            return;
-        }
-
-        for (int j = BASE_ATTACK; j <= OFF_ATTACK; ++j)
-        {
-            if (Item* item = p_caster->GetWeaponForAttack(WeaponAttackType(j)))
-            {
-                if (item->IsFitToSpellRequirements(m_spellInfo))
-                {
-                    Spell* spell = new Spell(unitCaster, spellInfo, TRIGGERED_FULL_MASK);
-                    SpellCastTargets targets;
-                    targets.SetItemTarget(item);
-                    spell->prepare(&targets);
-                }
-            }
-        }
-        return;
-    }
+    // 3.3.5a's Rockbiter Weapon picked a ranked enchanting spell by damage for both weapons; 4.3.4's (8017)
+    // enchants the target weapon itself, like the other imbues
     if (!itemTarget)
         return;
 
@@ -3036,15 +2971,6 @@ void Spell::EffectEnchantItemTmp(SpellEffIndex effIndex)
             case 3595: // Frost Oil
             case 6650: // Instant Toxin
             case 38615: // Bloodboil Poison
-            // Explicitly listing Rockbiter Weapon because it isn't caught by spellfamily check
-            case 36744: // Rockbiter Weapon Rank 1
-            case 36753: // Rockbiter Weapon Rank 2
-            case 36751: // Rockbiter Weapon Rank 2
-            case 36754: // Rockbiter Weapon Rank 3
-            case 36755: // Rockbiter Weapon Rank 3
-            case 36761: // Rockbiter Weapon Rank 4
-            case 36758: // Rockbiter Weapon Rank 4
-            case 36760: // Rockbiter Weapon Rank 4
                 duration = 1800; // 30 mins
                 break;
             default:
@@ -3431,9 +3357,7 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
                 // Stormstrike
                 if (AuraEffect* aurEff = unitCaster->IsScriptOverriden(m_spellInfo, 5634))
                     unitCaster->CastSpell(unitCaster, 38430, true, nullptr, aurEff);
-                // Lava lash damage increased by Flametongue weapon
-                if (unitCaster->GetAuraEffect(SPELL_AURA_DUMMY, SPELLFAMILY_SHAMAN, 688, EFFECT_0))
-                    AddPct(totalDamagePercentMod, 25.0f);
+                // 4.3.4: Lava Lash's Flametongue bonus is in spell_sha_lava_lash (3.3.5a's 25% on icon 688)
                 break;
             }
         case SPELLFAMILY_DRUID:

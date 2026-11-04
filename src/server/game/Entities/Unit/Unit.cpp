@@ -8645,6 +8645,14 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
             break;
     }
 
+    // the Greater Fire Elemental's spells take half the shaman's fire spell power (4.3.4, CPP; the totem owns it)
+    if (GetEntry() == NPC_FIRE_ELEMENTAL && IsCreature())
+    {
+        Unit* shaman = owner->IsTotem() ? owner->GetOwner() : owner;
+        if (shaman && shaman != this)
+            DoneAdvertisedBenefit += int32(shaman->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_FIRE, true) * 0.5f);
+    }
+
     // Done fixed damage bonus auras
     DoneAdvertisedBenefit += SpellBaseDamageBonusDone(spellProto->GetSchoolMask(), true);
     // 4.3.4 (CPP): the target's flat damage taken auras (Amplify/Dampen Magic) count as spell power, with the
@@ -9324,19 +9332,8 @@ float Unit::SpellPctHealingModsDone(Unit* victim, SpellInfo const* spellProto, D
 
     switch (spellProto->SpellFamilyName)
     {
-        case SPELLFAMILY_GENERIC:
-            // Talents and glyphs for healing stream totem
-            if (spellProto->Id == 52042)
-            {
-                // Glyph of Healing Stream Totem
-                if (AuraEffect* dummy = owner->GetAuraEffect(55456, EFFECT_0))
-                    AddPct(DoneTotalMod, dummy->GetAmount());
-
-                // Healing Stream totem - Restorative Totems
-                if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_SHAMAN, 338, 1))
-                    AddPct(DoneTotalMod, aurEff->GetAmount());
-            }
-            break;
+        // 4.3.4: Healing Stream Totem's Soothing Rains is in spell_sha_healing_stream_totem; the Glyph of Healing
+        // Stream Totem gives resistance and Restorative Totems is gone (3.3.5a's 52042 bonuses)
         case SPELLFAMILY_PRIEST:
             // T9 HEALING 4P, empowered renew instant heal
             if (spellProto->Id == 63544)
@@ -9344,6 +9341,13 @@ float Unit::SpellPctHealingModsDone(Unit* victim, SpellInfo const* spellProto, D
                     AddPct(DoneTotalMod, aurEff->GetAmount());
             break;
     }
+
+    // Nature's Blessing: direct heals on an Earth Shielded target. Ours: not in CPP. By its class mask (Healing Wave,
+    // Healing Surge, Chain Heal) and Greater Healing Wave, which the mask leaves out though the tooltip says direct heals
+    if (victim && damagetype == HEAL && spellProto->SpellFamilyName == SPELLFAMILY_SHAMAN && victim->HasAura(974))
+        if (AuraEffect const* naturesBlessing = owner->GetAuraEffectOfRankedSpell(30867, EFFECT_0))
+            if (naturesBlessing->IsAffectedOnSpell(spellProto) || spellProto->SpellFamilyFlags[2] & 0x10000)
+                AddPct(DoneTotalMod, naturesBlessing->GetAmount());
 
     // SPELL_AURA_MOD_HEALING_DONE_PCT_VERSUS_TARGET_HEALTH (Deep Healing): more healing on more injured targets
     if (victim)

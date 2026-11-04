@@ -1247,32 +1247,28 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
             {
                 switch (GetEntry())
                 {
+                    // 4.3.4 (CPP): the Greater Fire and Earth Elementals have 75% of the shaman's health (the totem owns
+                    // them); their WotLK scaling auras (35665-35668, 65225-65228) are gone. The Fire Elemental's spell
+                    // power and melee bonus are in Unit::SpellDamageBonusDone and Guardian::UpdateDamagePhysical.
                     case NPC_FIRE_ELEMENTAL:
-                        {
-                            SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, float(petlevel * 3.5f - petlevel));
-                            SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, float(petlevel * 3.5f + petlevel));
-                            AddAura(SPELL_PET_AVOIDANCE, this);
-                            AddAura(SPELL_HUNTER_PET_SCALING_04, this);
-                            AddAura(SPELL_FIRE_ELEMENTAL_SCALING_01, this);
-                            AddAura(SPELL_FIRE_ELEMENTAL_SCALING_02, this);
-                            AddAura(SPELL_FIRE_ELEMENTAL_SCALING_03, this);
-                            AddAura(SPELL_FIRE_ELEMENTAL_SCALING_04, this);
-                            break;
-                        }
                     case NPC_EARTH_ELEMENTAL:
                         {
-                            SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, float(petlevel * 2.0f - petlevel));
-                            SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, float(petlevel * 2.0f + petlevel));
+                            Unit* shaman = owner->IsTotem() ? owner->GetOwner() : owner;
+                            if (shaman && shaman != this)
+                            {
+                                uint32 health = shaman->CountPctFromMaxHealth(75);
+                                SetCreateHealth(health);
+                                SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, float(health));
+                            }
+
+                            SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, float(petlevel * 4 - petlevel));
+                            SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, float(petlevel * 4 + petlevel));
                             AddAura(SPELL_PET_AVOIDANCE, this);
                             AddAura(SPELL_HUNTER_PET_SCALING_04, this);
-                            AddAura(SPELL_EARTH_ELEMENTAL_SCALING_01, this);
-                            AddAura(SPELL_EARTH_ELEMENTAL_SCALING_02, this);
-                    // 4.3.4 (CPP): 40% of the warlock's health, weapon damage and attack power by level (pet_levelstats
-                    // ends at 80); the spell power comes from Warlock Pet Scaling 01, 36186-36190 are gone
-                            AddAura(SPELL_EARTH_ELEMENTAL_SCALING_03, this);
-                            AddAura(SPELL_EARTH_ELEMENTAL_SCALING_04, this);
                             break;
                         }
+                    // 4.3.4 (CPP): 40% of the warlock's health, weapon damage and attack power by level (pet_levelstats
+                    // ends at 80); the spell power comes from Warlock Pet Scaling 01, 36186-36190 are gone
                     case NPC_INFERNAL:
                         {
                             uint32 health = owner->CountPctFromMaxHealth(40);
@@ -1291,11 +1287,11 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
                             float minDamage = (petlevel - (petlevel / 4)) * mod;
                             float maxDamage = (petlevel + (petlevel / 4)) * mod;
                             SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, minDamage);
-                            AddAura(SPELL_WARLOCK_PET_SCALING_01, this);
                             SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, maxDamage);
                             SetStatFlatModifier(UNIT_MOD_ATTACK_POWER, BASE_VALUE, (minDamage + maxDamage) / 4.0f * 7.0f);
 
                             AddAura(SPELL_PET_AVOIDANCE, this);
+                            AddAura(SPELL_WARLOCK_PET_SCALING_01, this);
                             AddAura(SPELL_WARLOCK_PET_SCALING_05, this);
                             break;
                         }
@@ -1354,12 +1350,11 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
                             SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, float(petlevel * 4.0f - petlevel));
                             SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, float(petlevel * 4.0f + petlevel));
 
+                            // 4.3.4: Feral Spirit Pet Scaling 04 for the hit; the attack power is in
+                            // Guardian::UpdateAttackPowerAndDamage (35674-35676 are gone)
                             AddAura(SPELL_PET_AVOIDANCE, this);
                             AddAura(SPELL_FERAL_SPIRIT_SPIRIT_HUNT, this);
-                            AddAura(SPELL_HUNTER_PET_SCALING_04, this);
-                            AddAura(SPELL_FERAL_SPIRIT_SCALING_01, this);
-                            AddAura(SPELL_FERAL_SPIRIT_SCALING_02, this);
-                            AddAura(SPELL_FERAL_SPIRIT_SCALING_03, this);
+                            AddAura(SPELL_FERAL_SPIRIT_SCALING_04, this);
 
                             if (owner->getRace() == RACE_ORC)
                             {

@@ -112,6 +112,12 @@ void Totem::InitSummon()
         CastSpell(this, GetSpell(1), true);
     }
 
+    // Totemic Wrath: the shaman's fire totems raise the group's spell power (4.3.4; nothing in the client data links them)
+    if (m_Properties && m_Properties->Slot == SUMMON_SLOT_TOTEM_FIRE)
+        if (Unit* owner = GetOwner())
+            if (owner->HasAura(77746))
+                CastSpell(this, 77747, true);
+
     // xinef: this is better than the script, 100% sure to work
     if (GetEntry() == SENTRY_TOTEM_ENTRY)
     {

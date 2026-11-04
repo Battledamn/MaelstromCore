@@ -1323,6 +1323,18 @@ void Guardian::UpdateAttackPowerAndDamage(bool ranged)
     else
         val = 2 * GetStat(STAT_STRENGTH) - 20.0f;
 
+    // 4.3.4 (CPP): the Spirit Wolves take half the shaman's attack power, the Glyph of Feral Spirit adds its share
+    if (GetEntry() == NPC_FERAL_SPIRIT)
+    {
+        if (Unit* shaman = GetOwner())
+        {
+            float share = 50.0f;
+            if (AuraEffect const* glyph = shaman->GetAuraEffect(SPELL_SHAMAN_GLYPH_OF_FERAL_SPIRIT, EFFECT_0))
+                share += glyph->GetAmount();
+            val += CalculatePct(shaman->GetTotalAttackPowerValue(BASE_ATTACK), share);
+        }
+    }
+
     SetStatFlatModifier(unitMod, BASE_VALUE, val);
 
     //in BASE_VALUE of UNIT_MOD_ATTACK_POWER for creatures we store data of meleeattackpower field in DB
@@ -1352,7 +1364,18 @@ void Guardian::UpdateDamagePhysical(WeaponAttackType attType)
 
     float att_speed = float(GetAttackTime(BASE_ATTACK)) / 1000.0f;
 
-    float base_value  = GetFlatModifierValue(unitMod, BASE_VALUE) + GetTotalAttackPowerValue(attType) / 14.0f * att_speed;
+    // 4.3.4 (CPP): the Greater Fire Elemental's melee adds 40% of the shaman's fire spell power (the totem owns it)
+    float bonusDamage = 0.0f;
+    if (GetEntry() == NPC_FIRE_ELEMENTAL)
+    {
+        Unit* shaman = GetOwner();
+        if (shaman && shaman->IsTotem())
+            shaman = shaman->GetOwner();
+        if (shaman && shaman->IsPlayer())
+            bonusDamage = shaman->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_FIRE) * 0.4f;
+    }
+
+    float base_value  = GetFlatModifierValue(unitMod, BASE_VALUE) + GetTotalAttackPowerValue(attType) / 14.0f * att_speed + bonusDamage;
     float base_pct    = GetPctModifierValue(unitMod, BASE_PCT);
     float total_value = GetFlatModifierValue(unitMod, TOTAL_VALUE);
     float total_pct   = GetPctModifierValue(unitMod, TOTAL_PCT);

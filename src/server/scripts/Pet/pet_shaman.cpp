@@ -29,7 +29,7 @@ enum ShamanSpells
     SPELL_SHAMAN_ANGEREDEARTH   = 36213,
     SPELL_SHAMAN_FIREBLAST      = 57984,
     SPELL_SHAMAN_FIRENOVA       = 12470,
-    SPELL_SHAMAN_FIRESHIELD     = 13377
+    SPELL_SHAMAN_FIRESHIELD     = 13376  // 4.3.4: the damage pulse itself (13377, its 3.3.5a aura, is gone; CPP)
 };
 
 enum ShamanEvents
@@ -96,10 +96,7 @@ struct npc_pet_shaman_fire_elemental : public ScriptedAI
         _events.Reset();
         _events.ScheduleEvent(EVENT_SHAMAN_FIRENOVA, 5s, 20s);
         _events.ScheduleEvent(EVENT_SHAMAN_FIREBLAST, 5s, 20s);
-        //_events.ScheduleEvent(EVENT_SHAMAN_FIRESHIELD, 0ms);
-
-        me->RemoveAurasDueToSpell(SPELL_SHAMAN_FIRESHIELD);
-        me->CastSpell(me, SPELL_SHAMAN_FIRESHIELD, true);
+        _events.ScheduleEvent(EVENT_SHAMAN_FIRESHIELD, 0ms);
     }
 
     void UpdateAI(uint32 diff) override
@@ -129,6 +126,10 @@ struct npc_pet_shaman_fire_elemental : public ScriptedAI
                 case EVENT_SHAMAN_FIREBLAST:
                     me->CastSpell(me->GetVictim(), SPELL_SHAMAN_FIREBLAST, false);
                     _events.ScheduleEvent(EVENT_SHAMAN_FIREBLAST, 4s, 8s);
+                    break;
+                case EVENT_SHAMAN_FIRESHIELD:
+                    me->CastSpell(me->GetVictim(), SPELL_SHAMAN_FIRESHIELD, true);
+                    _events.ScheduleEvent(EVENT_SHAMAN_FIRESHIELD, 2s);
                     break;
                 default:
                     break;
