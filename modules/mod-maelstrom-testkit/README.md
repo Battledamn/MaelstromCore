@@ -11,5 +11,5 @@ They are not 4.3.4 behaviour, so they live in this module, not in the core.
 
 Permissions 2000-2003 (module range, `docs/MODULARITY.md`) are linked to the Gamemaster role (197) by
 `data/sql/db-auth`; the command help is in `data/sql/db-world`. The `MaelstromClassTest` addon
-(`G:\MaelstromCore\addons`) has buttons for these commands and a panel that marks each talent green
+has buttons for these commands and a panel that marks each talent green
 once its effect has been seen in the combat log.

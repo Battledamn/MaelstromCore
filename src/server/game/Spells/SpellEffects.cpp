@@ -1799,12 +1799,6 @@ void Spell::EffectEnergize(SpellEffIndex effIndex)
         case 68082:                                         // Glyph of Seal of Command
             damage = int32(CalculatePct(unitTarget->GetCreateMana(), damage));
             break;
-        case 48542:                                         // Revitalize
-            damage = int32(CalculatePct(unitTarget->GetMaxPower(power), damage));
-            break;
-        case 71132:                                         // Glyph of Shadow Word: Pain
-            damage = int32(CalculatePct(unitTarget->GetCreateMana(), 1));  // set 1 as value, missing in dbc
-            break;
         default:
             break;
     }
@@ -3423,10 +3417,6 @@ void Spell::EffectWeaponDmg(SpellEffIndex effIndex)
             {
                 switch (m_spellInfo->Id)
                 {
-                    case 20467: // Seal of Command Unleashed
-                        spell_bonus += int32(0.08f * unitCaster->GetTotalAttackPowerValue(BASE_ATTACK));
-                        spell_bonus += int32(0.13f * unitCaster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()));
-                        break;
                     case 53385:  // Divine Storm deals normalized damage
                         normalized = true;
                         break;

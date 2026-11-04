@@ -13375,27 +13375,9 @@ uint32 Player::GetResurrectionSpellId()
         {
             switch ((*itr)->GetId())
             {
-                case 20707:
+                case 20707:                 // 4.3.4 has one rank (3.3.5a's 2-7 are gone)
                     spell_id =  3026;
-                    break;        // rank 1
-                case 20762:
-                    spell_id = 20758;
-                    break;        // rank 2
-                case 20763:
-                    spell_id = 20759;
-                    break;        // rank 3
-                case 20764:
-                    spell_id = 20760;
-                    break;        // rank 4
-                case 20765:
-                    spell_id = 20761;
-                    break;        // rank 5
-                case 27239:
-                    spell_id = 27240;
-                    break;        // rank 6
-                case 47883:
-                    spell_id = 47882;
-                    break;        // rank 7
+                    break;
                 default:
                     LOG_ERROR("entities.player", "Unhandled spell {}: S.Resurrection", (*itr)->GetId());
                     continue;

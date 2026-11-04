@@ -9057,16 +9057,8 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                                 crit_chance = 0.0f;
                             break;
                         case SPELLFAMILY_PALADIN:
-                            // Flash of light
-                            if (spellProto->SpellFamilyFlags[0] & 0x40000000)
-                            {
-                                // Sacred Shield
-                                if (AuraEffect const* aura = GetAuraEffect(58597, 1, GetGUID()))
-                                    crit_chance += aura->GetAmount();
-                                break;
-                            }
-                            // Exorcism
-                            else if (spellProto->GetCategory() == 19)
+                            // Exorcism (3.3.5a's Sacred Shield crit on Flash of Light is gone: 58597 is not in 4.3.4)
+                            if (spellProto->GetCategory() == 19)
                             {
                                 if (GetCreatureTypeMask() & CREATURE_TYPEMASK_DEMON_OR_UNDEAD)
                                     return 100.0f;
@@ -17153,13 +17145,10 @@ bool Unit::CanRestoreMana(SpellInfo const* spellInfo) const
     {
         case 16666: // Demonic Rune
         case 27869: // Dark Rune
-        case 30824: // Shamanistic Rage
         case 31786: // Spiritual Attunement
         case 31930: // Judgements of the Wise
-        case 34075: // Aspect of the Viper
         case 34720: // Thrill of the hunt
         case 47755: // Rapture
-        case 54425: // Improved Felhunter
         case 57319: // Blessing of Sanctuary
         case 63337: // Saronite Vapors (regenerate mana)
         case 63375: // Improved stormstrike

@@ -178,8 +178,8 @@ void SpellMgr::LoadSpellInfoCorrections()
         20335,  // Heart of the Crusader
         20336,  // Heart of the Crusader
         20337,  // Heart of the Crusader
-        53228,  // Rapid Killing (Rank 1)
-        53232,  // Rapid Killing (Rank 2)
+        53228,  // Rapid Recuperation (Rank 1): its focus when Rapid Killing procs
+        53232,  // Rapid Recuperation (Rank 2)
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_CAN_PROC_FROM_PROCS; // Entries were not updated after spell effect change, we have to do that manually
@@ -497,28 +497,8 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->SpellFamilyFlags[EFFECT_2] = 0x8000000;
     });
 
-    // And affecting spells
-    ApplySpellFix({
-        20138,  // Improved Devotion Aura
-        20139,
-        20140
-        }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].SpellClassMask[0] = 0;
-        spellInfo->Effects[EFFECT_1].SpellClassMask[2] = 0x2000000;
-    });
-
-    ApplySpellFix({
-        20254,  // Improved concentration aura
-        20255,
-        20256
-        }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].SpellClassMask[0] = 0;
-        spellInfo->Effects[EFFECT_1].SpellClassMask[2] = 0x4000000;
-        spellInfo->Effects[EFFECT_2].SpellClassMask[0] = 0;
-        spellInfo->Effects[EFFECT_2].SpellClassMask[2] = 0x4000000;
-    });
+    // 3.3.5a's talents that affected these auras are gone: 20138-20140 are Protector of the Innocent in 4.3.4,
+    // 20254-20256 are not in it
 
     ApplySpellFix({
         53379,  // Swift Retribution
@@ -1218,11 +1198,8 @@ void SpellMgr::LoadSpellInfoCorrections()
     });
 
     ApplySpellFix({
-        14898,  // Spiritual Healing affects prayer of mending
-        15349,
-        15354,
-        15355,
-        15356,
+        // 4.3.4: 14898 is Tome of Light (Holy Word cooldowns; with this it cut Prayer of Mending's too) and
+        // Spiritual Healing (15349-15356) and 52802/52803 are gone
         47562,  // Divine Providence affects prayer of mending
         47564,
         47565,
@@ -1230,9 +1207,7 @@ void SpellMgr::LoadSpellInfoCorrections()
         47567,
         47586,  // Twin Disciplines affects prayer of mending
         47587,
-        47588,
-        52802,
-        52803
+        47588
         }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].SpellClassMask[1] |= 0x20; // prayer of mending
