@@ -21,6 +21,8 @@
  *                          the tree as the active spec's specialization
  *   .testkit ready         full health and power, no cooldowns or Forbearance, training dummies
  *   .testkit reset         the active spec's talents and specialization reset
+ *   .testkit glyph <id> <1|0> [spells]  puts glyph <id> (GlyphProperties.dbc) in a slot of its type or takes it out, and the
+ *                          known spells of the list on action buttons 1-5; id 0 empties every glyph slot
  * Used by the MaelstromClassTest addon. Not 4.3.4 behaviour, so a module (docs/AZEROTHCORE_WAY.md).
  */
 
@@ -28,7 +30,11 @@
 #include "CommandScript.h"
 #include "DBCStores.h"
 #include "Player.h"
+#include "SpellAuras.h"
+#include "SpellInfo.h"
+#include "StringConvert.h"
 #include "TemporarySummon.h"
+#include "Tokenize.h"
 
 using namespace Acore::ChatCommands;
 
@@ -38,11 +44,36 @@ namespace
     rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_TREE  = rbac::RBACPermissions(2001);
     rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_READY = rbac::RBACPermissions(2002);
     rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_RESET = rbac::RBACPermissions(2003);
+    rbac::RBACPermissions constexpr RBAC_PERM_COMMAND_TESTKIT_GLYPH = rbac::RBACPermissions(2004);
 
     uint32 constexpr NPC_TRAINING_DUMMY = 46647;    // level 85
     uint32 constexpr SPELL_FORBEARANCE  = 25771;
     uint32 constexpr DUMMY_COUNT        = 5;        // enough for "4 or more targets" effects
     uint32 constexpr DUMMY_DESPAWN_MS   = 30 * MINUTE * IN_MILLISECONDS;
+    uint8 constexpr GLYPH_BAR_BUTTONS   = 5;
+    uint8 constexpr GLYPH_ALL_SLOTS_LEVEL = 75;
+
+    // as WorldSession::HandleRemoveGlyph
+    void RemoveGlyphFromSlot(Player* player, uint8 slot)
+    {
+        GlyphPropertiesEntry const* entry = sGlyphPropertiesStore.LookupEntry(player->GetGlyph(slot));
+        if (!entry)
+            return;
+
+        player->RemoveAurasDueToSpell(entry->SpellId);
+        Unit::AuraMap& ownedAuras = player->GetOwnedAuras();
+        for (Unit::AuraMap::iterator iter = ownedAuras.begin(); iter != ownedAuras.end();)
+        {
+            SpellInfo const* triggeredBy = iter->second->GetTriggeredByAuraSpellInfo();
+            if (triggeredBy && triggeredBy->Id == entry->SpellId)
+                player->RemoveOwnedAura(iter);
+            else
+                ++iter;
+        }
+
+        player->SendLearnPacket(entry->SpellId, false);
+        player->SetGlyph(slot, 0, true);
+    }
 }
 
 class testkit_commandscript : public CommandScript
@@ -56,7 +87,8 @@ public:
         {
             { "tree",  HandleTreeCommand,  RBAC_PERM_COMMAND_TESTKIT_TREE,  Console::No },
             { "ready", HandleReadyCommand, RBAC_PERM_COMMAND_TESTKIT_READY, Console::No },
-            { "reset", HandleResetCommand, RBAC_PERM_COMMAND_TESTKIT_RESET, Console::No }
+            { "reset", HandleResetCommand, RBAC_PERM_COMMAND_TESTKIT_RESET, Console::No },
+            { "glyph", HandleGlyphCommand, RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No }
         };
 
         static ChatCommandTable commandTable =
@@ -107,6 +139,87 @@ public:
         player->SendTalentsInfoData(false);
         handler->PSendSysMessage("Test kit: tree {} (talent tab {}): {} of {} talents learned at their highest rank.",
             treeNumber, talentTabId, learned, talents.size());
+        return true;
+    }
+
+    static bool HandleGlyphCommand(ChatHandler* handler, uint32 glyphId, uint8 apply, Tail spells)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (player->GetLevel() < GLYPH_ALL_SLOTS_LEVEL)
+        {
+            handler->SendSysMessage("Test kit: glyphs need level 75, when every slot is open.");
+            return false;
+        }
+
+        if (!glyphId)
+        {
+            for (uint8 slot = 0; slot < MAX_GLYPH_SLOT_INDEX; ++slot)
+                RemoveGlyphFromSlot(player, slot);
+            player->SendTalentsInfoData(false);
+            handler->SendSysMessage("Test kit: glyph slots emptied.");
+            return true;
+        }
+
+        GlyphPropertiesEntry const* entry = sGlyphPropertiesStore.LookupEntry(glyphId);
+        if (!entry)
+        {
+            handler->PSendSysMessage("Test kit: no glyph {}.", glyphId);
+            return false;
+        }
+
+        // the glyph's slot if it has one; otherwise an empty slot of its type, or the first of its type
+        int16 held = -1;
+        int16 empty = -1;
+        int16 first = -1;
+        for (uint8 slot = 0; slot < MAX_GLYPH_SLOT_INDEX; ++slot)
+        {
+            GlyphSlotEntry const* slotEntry = sGlyphSlotStore.LookupEntry(player->GetGlyphSlot(slot));
+            if (!slotEntry || slotEntry->TypeFlags != entry->TypeFlags)
+                continue;
+
+            if (player->GetGlyph(slot) == glyphId)
+                held = slot;
+            else if (!player->GetGlyph(slot) && empty < 0)
+                empty = slot;
+            if (first < 0)
+                first = slot;
+        }
+
+        if (apply && held < 0)
+        {
+            int16 slot = empty >= 0 ? empty : first;
+            if (slot < 0)
+            {
+                handler->PSendSysMessage("Test kit: no slot for glyph {}.", glyphId);
+                return false;
+            }
+
+            RemoveGlyphFromSlot(player, uint8(slot));
+            player->SendLearnPacket(entry->SpellId, true);
+            player->CastSpell(player, entry->SpellId, TriggerCastFlags(TRIGGERED_FULL_MASK & ~(TRIGGERED_IGNORE_SHAPESHIFT | TRIGGERED_IGNORE_CASTER_AURASTATE)));
+            player->SetGlyph(uint8(slot), glyphId, true);
+        }
+        else if (!apply && held >= 0)
+            RemoveGlyphFromSlot(player, uint8(held));
+        player->SendTalentsInfoData(false);
+
+        uint8 placed = 0;
+        if (!spells.empty())
+        {
+            for (uint8 button = 0; button < GLYPH_BAR_BUTTONS; ++button)
+                player->removeActionButton(button);
+
+            for (std::string_view token : Acore::Tokenize(spells, ' ', false))
+            {
+                Optional<uint32> spellId = Acore::StringTo<uint32>(token);
+                if (spellId && placed < GLYPH_BAR_BUTTONS && player->HasSpell(*spellId)
+                    && player->addActionButton(placed, *spellId, ACTION_BUTTON_SPELL))
+                    ++placed;
+            }
+            player->SendActionButtons(1);
+        }
+
+        handler->PSendSysMessage("Test kit: glyph {} {}, {} spells on action buttons 1-5.", glyphId, apply ? "on" : "off", placed);
         return true;
     }
 
