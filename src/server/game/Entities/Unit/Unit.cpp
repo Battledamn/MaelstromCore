@@ -8973,6 +8973,9 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
         return 0.0f;
 
     float crit_chance = doneChance;
+    if (caster && !spellProto->IsPositive())
+        crit_chance += GetCurseOfGuldanCritChance(caster, this);
+
     switch (spellProto->DmgClass)
     {
         case SPELL_DAMAGE_CLASS_MAGIC:
@@ -8981,9 +8984,6 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                 {
                     // Modify critical chance by victim SPELL_AURA_MOD_ATTACKER_SPELL_CRIT_CHANCE
                     // xinef: apply max and min only
-    if (caster && !spellProto->IsPositive())
-        crit_chance += GetCurseOfGuldanCritChance(caster, this);
-
                     if (HasAttackerSpellCritChanceAura())
                     {
                         crit_chance += GetMaxNegativeAuraModifierByMiscMask(SPELL_AURA_MOD_ATTACKER_SPELL_CRIT_CHANCE, schoolMask);
