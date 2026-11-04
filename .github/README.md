@@ -11,7 +11,7 @@ structure, conventions, modules and tools are the same, renamed and changed only
 
 A fully working Cataclysm 4.3.4: every race and class from level 1 to 85, the Cataclysm version of Azeroth with
 its quests, professions, the dungeons and raids, PvP and the Dungeon Finder, playing the way patch 4.3.4
-did with the unmodified 4.3.4 client.
+did.
 
 ## Where it stands
 
