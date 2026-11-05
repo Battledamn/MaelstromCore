@@ -26,6 +26,7 @@
  *                          the glyph's modifiers: "Test kit: glyph check <id> ok|fail <details>" for the addon
  *   .testkit cast <spell> [triggered]  you cast it: at yourself if it is helpful, otherwise at your selection (.cast self makes the
  *                          selection cast it at itself, so a dummy would get your Metamorphosis)
+ *   .testkit hp <percent>  sets your selection's health
  *   .testkit audit         every glyph of every class, no character needed: its modifiers reach a spell and the effect they
  *                          change exists (also from the console and SOAP)
  * Used by the MaelstromClassTest addon. Not 4.3.4 behaviour, so a module (docs/AZEROTHCORE_WAY.md).
@@ -184,6 +185,7 @@ public:
             { "reset", HandleResetCommand, RBAC_PERM_COMMAND_TESTKIT_RESET, Console::No },
             { "glyph", HandleGlyphCommand, RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No },
             { "cast",  HandleCastCommand,  RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No },
+            { "hp",    HandleHpCommand,    RBAC_PERM_COMMAND_TESTKIT_GLYPH, Console::No },
             { "audit", HandleAuditCommand, RBAC_PERM_COMMAND_TESTKIT_AUDIT, Console::Yes }
         };
 
@@ -235,6 +237,16 @@ public:
         player->SendTalentsInfoData(false);
         handler->PSendSysMessage("Test kit: tree {} (talent tab {}): {} of {} talents learned at their highest rank.",
             treeNumber, talentTabId, learned, talents.size());
+        return true;
+    }
+
+    static bool HandleHpCommand(ChatHandler* handler, uint8 percent)
+    {
+        Unit* selected = handler->getSelectedUnit();
+        if (!selected || percent < 1 || percent > 100)
+            return false;
+
+        selected->SetHealth(selected->CountPctFromMaxHealth(percent));
         return true;
     }
 
