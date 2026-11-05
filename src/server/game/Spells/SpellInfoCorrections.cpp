@@ -501,12 +501,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->AttributesEx7 |= SPELL_ATTR7_DONT_CAUSE_SPELL_PUSHBACK;
     });
 
-    // Seal of Command trigger
-    ApplySpellFix({ 20424 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->AttributesEx3 &= ~SPELL_ATTR3_SUPPRESS_CASTER_PROCS;
-    });
-
     // Vindication
     ApplySpellFix({ 26017 }, [](SpellInfo* spellInfo)
     {
