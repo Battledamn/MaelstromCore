@@ -1971,33 +1971,6 @@ class spell_hun_tame_beast : public SpellScript
     }
 };
 
-// Taming the Beast quests (despawn creature after dismiss)
-class spell_hun_taming_the_beast : public AuraScript
-{
-    PrepareAuraScript(spell_hun_taming_the_beast);
-
-    void HandleOnEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        if (Creature* creature = GetTarget()->ToCreature())
-        {
-            creature->GetThreatMgr().ClearAllThreat();
-            creature->GetCombatManager().EndAllCombat();
-        }
-    }
-
-    void HandleOnEffectRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-    {
-        if (Creature* creature = GetTarget()->ToCreature())
-            creature->DespawnOrUnsummon(1ms);
-    }
-
-    void Register() override
-    {
-        OnEffectApply += AuraEffectApplyFn(spell_hun_taming_the_beast::HandleOnEffectApply, EFFECT_0, SPELL_AURA_MOD_CHARM, AURA_EFFECT_HANDLE_REAL);
-        OnEffectRemove += AuraEffectRemoveFn(spell_hun_taming_the_beast::HandleOnEffectRemove, EFFECT_0, SPELL_AURA_MOD_CHARM, AURA_EFFECT_HANDLE_REAL);
-    }
-};
-
 // 53434 - Call of the Wild
 class spell_hun_target_only_pet_and_owner : public SpellScript
 {
@@ -2246,7 +2219,6 @@ void AddSC_hunter_spell_scripts()
     RegisterSpellScript(spell_hun_steady_shot);
     RegisterSpellScript(spell_hun_t9_4p_bonus);
     RegisterSpellScript(spell_hun_tame_beast);
-    RegisterSpellScript(spell_hun_taming_the_beast);
     RegisterSpellScript(spell_hun_target_only_pet_and_owner);
     RegisterSpellScript(spell_hun_thrill_of_the_hunt);
     RegisterSpellScript(spell_hun_tnt);

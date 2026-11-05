@@ -33,10 +33,6 @@
 
 enum PaladinSpells
 {
-    SPELL_PALADIN_DIVINE_PLEA                    = 54428,
-    SPELL_PALADIN_BLESSING_OF_SANCTUARY_ENERGIZE = 57319,
-
-    SPELL_PALADIN_HOLY_SHOCK_R1                  = 20473,
     SPELL_PALADIN_HOLY_SHOCK_R1_DAMAGE           = 25912,
     SPELL_PALADIN_HOLY_SHOCK_R1_HEALING          = 25914,
 
@@ -60,59 +56,16 @@ enum PaladinSpells
     SPELL_PALADIN_HAND_OF_SACRIFICE              = 6940,
     SPELL_PALADIN_DIVINE_SACRIFICE               = 64205,
 
-    SPELL_PALADIN_JUDGEMENT_DAMAGE               = 54158,
-
-    SPELL_PALADIN_GLYPH_OF_SALVATION             = 63225,
-
     SPELL_PALADIN_RIGHTEOUS_DEFENSE_TAUNT        = 31790,
 
     SPELL_PALADIN_SANCTIFIED_WRATH               = 57318,
     SPELL_PALADIN_SANCTIFIED_WRATH_TALENT_R1     = 53375,
 
-    SPELL_PALADIN_SEAL_OF_RIGHTEOUSNESS          = 25742,
-
-    SPELL_PALADIN_DEVOTION_AURA_R1               = 465,
-    SPELL_PALADIN_RETRIBUTION_AURA_R1            = 7294,
     SPELL_PALADIN_CONCENTRACTION_AURA            = 19746,
-    SPELL_PALADIN_FIRE_RESISTANCE_AURA_R1        = 19891,
-    SPELL_PALADIN_CRUSADER_AURA                  = 32223,
 
-    SPELL_PALADIN_IMPROVED_CONCENTRACTION_AURA   = 63510,
-    SPELL_PALADIN_IMPROVED_DEVOTION_AURA         = 63514,
-    SPELL_PALADIN_SANCTIFIED_RETRIBUTION_AURA    = 63531,
     SPELL_PALADIN_AURA_MASTERY_IMMUNE            = 64364,
 
-    SPELL_JUDGEMENTS_OF_THE_JUST                 = 68055,
-    SPELL_JUDGEMENT_OF_VENGEANCE_EFFECT          = 31804,
-    SPELL_HOLY_VENGEANCE                         = 31803,
-    SPELL_JUDGEMENT_OF_CORRUPTION_EFFECT         = 53733,
-
-    SPELL_GENERIC_ARENA_DAMPENING                = 74410,
-    SPELL_GENERIC_BATTLEGROUND_DAMPENING         = 74411,
-
-    // Crystalforge Raiment - Tier 5 Holy 2 Set
-    SPELL_IMPROVED_JUDGEMENT                     = 37188,
-    SPELL_IMPROVED_JUDGEMENT_ENERGIZE            = 43838,
-
-    SPELL_PALADIN_HOLY_VENGEANCE                 = 31803,
     SPELL_PALADIN_SEAL_OF_VENGEANCE_EFFECT       = 42463,
-
-};
-
-enum PaladinSpellIcons
-{
-    PALADIN_ICON_ID_RETRIBUTION_AURA             = 555,
-    PALADIN_ICON_JUDGEMENTS_OF_THE_JUST          = 3015,
-    PALADIN_ICON_JUDGEMENTS_OF_THE_WISE          = 3017,
-    PALADIN_ICON_HAMMER_OF_THE_RIGHTEOUS         = 3023,
-    PALADIN_ICON_RIGHTEOUS_VENGEANCE             = 3025,
-    PALADIN_ICON_SHEATH_OF_LIGHT                 = 3030
-};
-
-enum MiscSpellIcons
-{
-    SPELL_ICON_ID_STRENGTH_OF_WRYNN              = 1704,
-    SPELL_ICON_ID_HELLSCREAM_WARSONG             = 937
 };
 
 // Proc system triggered spell IDs
@@ -120,15 +73,9 @@ enum PaladinProcSpells
 {
     SPELL_PALADIN_JUDGEMENTS_OF_THE_WISE_MANA    = 31930,
     SPELL_PALADIN_REPLENISHMENT                  = 57669,
-    SPELL_PALADIN_SPIRITUAL_ATTUNEMENT_MANA      = 31786,
     SPELL_PALADIN_BEACON_OF_LIGHT_AURA           = 53563,
-    SPELL_PALADIN_LIGHTS_BEACON                  = 53651,
     SPELL_PALADIN_BEACON_OF_LIGHT_HL             = 53652,
-    SPELL_PALADIN_LAY_ON_HANDS_R1                = 633,
     SPELL_PALADIN_HOLY_LIGHT_R1                  = 635,
-    SPELL_PALADIN_FLASH_OF_LIGHT_R1              = 19750,
-    SPELL_PALADIN_GLYPH_OF_HOLY_LIGHT_HEAL       = 54968,
-    SPELL_PALADIN_T9_HOLY_4P_BONUS               = 67191,
     SPELL_PALADIN_ENDURING_LIGHT                 = 40471,
     SPELL_PALADIN_ENDURING_JUDGEMENT             = 40472,
     SPELL_PALADIN_HOLY_POWER_ARMOR               = 28790,
@@ -136,10 +83,8 @@ enum PaladinProcSpells
     SPELL_PALADIN_HOLY_POWER_SPELL_POWER         = 28793,
     SPELL_PALADIN_HOLY_POWER_MP5                 = 28795,
     SPELL_PALADIN_HOLY_MENDING                   = 64891,
-    SPELL_PALADIN_GLYPH_OF_DIVINITY              = 54939,
     SPELL_PALADIN_GLYPH_OF_DIVINITY_PROC         = 54986,
     SPELL_PALADIN_JUDGEMENTS_OF_THE_JUST_PROC    = 68055,
-    SPELL_PALADIN_T8_HOLY_4P_BONUS               = 64895
 };
 
 // 85285 - Sacred Shield
@@ -1266,69 +1211,6 @@ class spell_pal_judgements_of_the_just : public AuraScript
     }
 };
 
-// 63510 - Improved Concentration Aura (requires Concentration Aura on the target)
-// 63514 - Improved Devotion Aura (requires Devotion Aura on the target)
-class spell_pal_improved_aura_effect : public AuraScript
-{
-    PrepareAuraScript(spell_pal_improved_aura_effect);
-
-public:
-    spell_pal_improved_aura_effect(uint32 auraSpellId) : AuraScript(), _auraSpellId(auraSpellId) { }
-
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo({ _auraSpellId });
-    }
-
-    bool CheckAreaTarget(Unit* target)
-    {
-        return target->GetAuraOfRankedSpell(_auraSpellId, GetCasterGUID());
-    }
-
-    void Register() override
-    {
-        DoCheckAreaTarget += AuraCheckAreaTargetFn(spell_pal_improved_aura_effect::CheckAreaTarget);
-    }
-
-private:
-    uint32 _auraSpellId;
-};
-
-// 63531 - Sanctified Retribution
-// "Targets affected by any of your auras" - shared effect of Sanctified Retribution and Swift Retribution
-class spell_pal_sanctified_retribution_effect : public AuraScript
-{
-    PrepareAuraScript(spell_pal_sanctified_retribution_effect);
-
-    // 4.x merged the shadow, frost and fire resistance auras into Resistance Aura (19891)
-    bool Validate(SpellInfo const* /*spellInfo*/) override
-    {
-        return ValidateSpellInfo(
-        {
-            SPELL_PALADIN_DEVOTION_AURA_R1,
-            SPELL_PALADIN_RETRIBUTION_AURA_R1,
-            SPELL_PALADIN_CONCENTRACTION_AURA,
-            SPELL_PALADIN_FIRE_RESISTANCE_AURA_R1,
-            SPELL_PALADIN_CRUSADER_AURA
-        });
-    }
-
-    bool CheckAreaTarget(Unit* target)
-    {
-        for (uint32 auraSpellId : { SPELL_PALADIN_DEVOTION_AURA_R1, SPELL_PALADIN_RETRIBUTION_AURA_R1, SPELL_PALADIN_CONCENTRACTION_AURA,
-            SPELL_PALADIN_FIRE_RESISTANCE_AURA_R1, SPELL_PALADIN_CRUSADER_AURA })
-            if (target->GetAuraOfRankedSpell(auraSpellId, GetCasterGUID()))
-                return true;
-
-        return false;
-    }
-
-    void Register() override
-    {
-        DoCheckAreaTarget += AuraCheckAreaTargetFn(spell_pal_sanctified_retribution_effect::CheckAreaTarget);
-    }
-};
-
 // 53651 - Light's Beacon
 // Ported from The Cataclysm Preservation Project (spell_paladin.cpp at b061f46): in 4.3.4 every heal
 // of the paladin copies to the beacon target through one spell (53652), 50% of it (100% for Holy
@@ -2429,9 +2311,6 @@ void AddSC_paladin_spell_scripts()
     RegisterSpellScript(spell_pal_t3_6p_bonus);
     RegisterSpellScript(spell_pal_t8_2p_bonus);
     RegisterSpellScript(spell_pal_judgements_of_the_just);
-    RegisterSpellScriptWithArgs(spell_pal_improved_aura_effect, "spell_pal_improved_concentraction_aura_effect", SPELL_PALADIN_CONCENTRACTION_AURA);
-    RegisterSpellScriptWithArgs(spell_pal_improved_aura_effect, "spell_pal_improved_devotion_aura_effect", SPELL_PALADIN_DEVOTION_AURA_R1);
-    RegisterSpellScript(spell_pal_sanctified_retribution_effect);
     RegisterSpellScript(spell_pal_lights_beacon);
     // Cataclysm (4.3.4), from CPP
     RegisterSpellScript(spell_pal_consecration);

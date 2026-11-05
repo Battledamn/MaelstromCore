@@ -17057,8 +17057,6 @@ bool Unit::CanRestoreMana(SpellInfo const* spellInfo) const
         case 64372: // Lifebloom
         case 68285: // Improved Leader of the Pack
             return true;
-        case 54428: // Divine Plea - only with talent Guarded by the Light
-            return HasSpell(53583);
         default:
             break;
     }

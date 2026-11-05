@@ -440,25 +440,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->AuraInterruptFlags = AURA_INTERRUPT_FLAG_HITBYSPELL | AURA_INTERRUPT_FLAG_TAKE_DAMAGE;
     });
 
-    // Bleh, need to change FamilyFlags :/ (have the same as original aura - bad!)
-    ApplySpellFix({ 63510 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->SpellFamilyFlags[EFFECT_0] = 0;
-        spellInfo->SpellFamilyFlags[EFFECT_2] = 0x4000000;
-    });
-
-    ApplySpellFix({ 63514 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->SpellFamilyFlags[EFFECT_0] = 0;
-        spellInfo->SpellFamilyFlags[EFFECT_2] = 0x2000000;
-    });
-
-    ApplySpellFix({ 63531 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->SpellFamilyFlags[EFFECT_0] = 0;
-        spellInfo->SpellFamilyFlags[EFFECT_2] = 0x8000000;
-    });
-
     // 3.3.5a's talents that affected these auras are gone: 20138-20140 are Protector of the Innocent in 4.3.4,
     // 20254-20256 are not in it
 
@@ -848,12 +829,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
 
-    // Improved Succubus
-    ApplySpellFix({ 18754, 18755, 18756 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
-    });
-
     // Unstable Affliction
     ApplySpellFix({ 31117 }, [](SpellInfo* spellInfo)
     {
@@ -887,26 +862,10 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->Effects[EFFECT_1].SpellClassMask[0] |= 0x4000; // include Drain Soul
     });
 
-    // Improved Demonic Tactics
-    ApplySpellFix({ 54347, 54348, 54349 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_1].Effect = spellInfo->Effects[EFFECT_0].Effect;
-        spellInfo->Effects[EFFECT_1].ApplyAuraName = spellInfo->Effects[EFFECT_0].ApplyAuraName;
-        spellInfo->Effects[EFFECT_1].TargetA = spellInfo->Effects[EFFECT_0].TargetA;
-        spellInfo->Effects[EFFECT_0].MiscValue = SPELLMOD_EFFECT1;
-        spellInfo->Effects[EFFECT_1].MiscValue = SPELLMOD_EFFECT2;
-    });
-
     // Ritual Enslavement
     ApplySpellFix({ 22987 }, [](SpellInfo* spellInfo)
     {
         spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_MOD_CHARM;
-    });
-
-    // Magic Absorption
-    ApplySpellFix({ 29441, 29444 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->SpellLevel = 0;
     });
 
     // Living Bomb: "Limit 3 targets" (CPP; the client data has no limit)
@@ -993,12 +952,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     {
         spellInfo->Dispel = DISPEL_NONE;
         spellInfo->AttributesEx4 |= SPELL_ATTR4_CANNOT_BE_STOLEN;
-    });
-
-    // Glyph of blocking
-    ApplySpellFix({ 58375 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].TriggerSpell = 58374;
     });
 
     // Sweeping Strikes stance change
@@ -1112,12 +1065,6 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 61138, 61132, 50259 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
-    });
-
-    // Glyph of Barkskin
-    ApplySpellFix({ 63058 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_MOD_ATTACKER_MELEE_CRIT_CHANCE;
     });
 
     // Resurrection Sickness
@@ -3769,6 +3716,8 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->MaxAffectedTargets = 1;
     });
 
+    // Judgement: this core also reads the flag as no initial aggro, threat or pet attack (SpellInfo::HasInitialAggro).
+    // Procs on its hit stay off through SPELL_ATTR3_SUPPRESS_CASTER_PROCS, so clearing it costs nothing there.
     ApplySpellFix({
         20271, 57774,  // Judgement of Light
         }, [](SpellInfo* spellInfo)

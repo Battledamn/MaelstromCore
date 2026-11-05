@@ -36,7 +36,6 @@
 enum DruidSpells
 {
     SPELL_DRUID_ASTRAL_ALIGNMENT            = 90164,
-    SPELL_DRUID_BARKSKIN                    = 22812,
     SPELL_DRUID_BLOOD_IN_THE_WATER_SCRIPT   = 80863,
     SPELL_DRUID_BLOOM                       = 90159,
     SPELL_DRUID_BRUTAL_IMPACT_R1            = 16940,
