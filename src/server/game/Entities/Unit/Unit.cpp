@@ -4506,6 +4506,12 @@ void Unit::_AddAura(UnitAura* aura, Unit* caster)
         caster->GetSingleCastAuras().push_back(aura);
 
         SpellInfo const* spellInfo = aura->GetSpellInfo();
+
+        // Lifebloom in Tree of Life: any number of targets, says its tooltip. Ours. The first cast after the form
+        // ends leaves only the new one.
+        if (spellInfo->Id == 33763 && caster->HasAura(33891))
+            return;
+
         std::size_t maxOtherAuras = spellInfo->HasAttribute(SPELL_ATTR5_LIMIT_N) && spellInfo->MaxAffectedTargets > 1 ?
             spellInfo->MaxAffectedTargets - 1 : 0;
         for (std::size_t i = 0; i + maxOtherAuras < aurasSharingLimit.size(); ++i)
@@ -8939,6 +8945,13 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
                     if (AuraEffect const* glyph = caster->GetAuraEffect(55679, EFFECT_0))
                         if (GetHealthPct() <= glyph->GetSpellInfo()->Effects[EFFECT_1].CalcValue())
                             crit_chance += glyph->GetAmount();
+
+                // Renewed Hope: on a target with Weakened Soul or Grace. CPP has this in the class script list below, which
+                // the talent's dummy aura never joins. Ours.
+                if (caster && spellProto->SpellFamilyName == SPELLFAMILY_PRIEST && (HasAura(6788) || HasAura(47930)))
+                    if (AuraEffect const* renewedHope = caster->GetAuraEffectOfRankedSpell(57470, EFFECT_0))
+                        if (renewedHope->IsAffectedOnSpell(spellProto))
+                            crit_chance += renewedHope->GetAmount();
 
                 // scripted (increase crit chance ... against ... target by x%
                 if (caster)

@@ -206,12 +206,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->AttributesEx2 |= SPELL_ATTR2_IGNORE_LINE_OF_SIGHT;
     });
 
-    // Divine Storm (Damage)
-    ApplySpellFix({ 53385 }, [](SpellInfo* spellInfo)
-    {
-        spellInfo->MaxAffectedTargets = 4;
-    });
-
     // Spitfire Totem
     ApplySpellFix({ 38296 }, [](SpellInfo* spellInfo)
     {
@@ -335,14 +329,6 @@ void SpellMgr::LoadSpellInfoCorrections()
         // this is the only known exception, probably just wrong data
         spellInfo->Effects[EFFECT_0].TargetB = SpellImplicitTargetInfo(TARGET_UNIT_SRC_AREA_ALLY);
         spellInfo->Effects[EFFECT_1].TargetB = SpellImplicitTargetInfo(TARGET_UNIT_SRC_AREA_ALLY);
-    });
-
-    // Wind Shear
-    ApplySpellFix({ 57994 }, [](SpellInfo* spellInfo)
-    {
-        // improper data for EFFECT_1 in 3.3.5 DBC, but is correct in 4.x
-        spellInfo->Effects[EFFECT_1].Effect = SPELL_EFFECT_MODIFY_THREAT_PERCENT;
-        spellInfo->Effects[EFFECT_1].BasePoints = -6; // -5%
     });
 
     // Improved Devouring Plague
@@ -1065,6 +1051,39 @@ void SpellMgr::LoadSpellInfoCorrections()
     ApplySpellFix({ 61138, 61132, 50259 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesEx3 |= SPELL_ATTR3_SUPPRESS_TARGET_PROCS;
+    });
+
+    // Lifebloom (CPP): active on one target at a time. Tree of Life lifts the limit, in Unit::_AddAura
+    ApplySpellFix({ 33763 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->AttributesEx5 |= SPELL_ATTR5_LIMIT_N;
+    });
+
+    // Sanguinary Vein (CPP): the client gives it no spell family, so Gouge's script could not find it by family and icon
+    ApplySpellFix({ 79146, 79147 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->SpellFamilyName = SPELLFAMILY_ROGUE;
+    });
+
+    // Gift of the Earthmother, rank 2 (CPP): plain dummy effects in the client, unlike ranks 1 and 3, so no aura to find
+    ApplySpellFix({ 51180 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].Effect = SPELL_EFFECT_APPLY_AURA;
+        spellInfo->Effects[EFFECT_0].ApplyAuraName = SPELL_AURA_DUMMY;
+        spellInfo->Effects[EFFECT_1].Effect = SPELL_EFFECT_APPLY_AURA;
+        spellInfo->Effects[EFFECT_1].ApplyAuraName = SPELL_AURA_DUMMY;
+    });
+
+    // Fulmination (CPP): its script already applies the caster's damage bonus to the value it casts this with
+    ApplySpellFix({ 88767 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->AttributesEx3 |= SPELL_ATTR3_IGNORE_CASTER_MODIFIERS;
+    });
+
+    // Renewed Hope (CPP): the tooltip names Flash Heal, the client's class mask does not
+    ApplySpellFix({ 57470, 57472 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].SpellClassMask[0] |= 0x800;
     });
 
     // Resurrection Sickness
