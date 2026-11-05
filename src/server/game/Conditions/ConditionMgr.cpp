@@ -1331,8 +1331,11 @@ void ConditionMgr::LoadConditions(bool isReload)
                 valid = addToLootTemplate(cond, LootTemplates_Spell.GetLootForConditionFill(cond->SourceGroup));
                 break;
             case CONDITION_SOURCE_TYPE_PHASE:
-                valid = addToPhases(cond);
-                break;
+            {
+                addToPhases(cond);
+                ++count;
+                continue; // do not add to AllocatedMemoryStore to avoid double-deleting
+            }
             case CONDITION_SOURCE_TYPE_GOSSIP_MENU:
                 valid = addToGossipMenus(cond);
                 break;
