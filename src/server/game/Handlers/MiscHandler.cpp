@@ -1512,7 +1512,8 @@ void WorldSession::HandleMoveFlagChangeOpcode(WorldPacket& recv_data)
 
     OpcodeClient opcode = static_cast<OpcodeClient>(recv_data.GetOpcode());
 
-    if (opcode == CMSG_MOVE_WATER_WALK_ACK || opcode == CMSG_MOVE_SET_CAN_FLY_ACK)
+    if (opcode == CMSG_MOVE_WATER_WALK_ACK || opcode == CMSG_MOVE_SET_CAN_FLY_ACK || opcode == CMSG_MOVE_HOVER_ACK ||
+        opcode == CMSG_MOVE_FEATHER_FALL_ACK || opcode == CMSG_MOVE_GRAVITY_DISABLE_ACK || opcode == CMSG_MOVE_GRAVITY_ENABLE_ACK)
     {
         uint32 counter;
         MovementInfo movementInfo;

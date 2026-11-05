@@ -12278,10 +12278,13 @@ void Player::SendInitialPacketsAfterAddToMap()
     if (HasAuraType(SPELL_AURA_FEATHER_FALL))
     {
         uint32 const counter = GetSession()->GetOrderCounter();
-        setCompoundState << uint8(2 + GetPackGUID().size() + 4);
+        WorldPacket part(SMSG_MOVE_FEATHER_FALL);
+        MovementInfo info;
+        info.guid = GetGUID();
+        WorldPackets::Movement::WriteGroundMovement(part, info, WorldPackets::Movement::GetMovementFlagSequence(part.GetOpcode()), counter);
+        setCompoundState << uint8(2 + part.size());
         setCompoundState << uint16(SMSG_MOVE_FEATHER_FALL);
-        setCompoundState << GetPackGUID();
-        setCompoundState << uint32(counter);
+        setCompoundState.append(part.contents(), part.wpos());
         GetSession()->IncrementOrderCounter();
     }
 
@@ -12291,10 +12294,13 @@ void Player::SendInitialPacketsAfterAddToMap()
     if (HasAuraType(SPELL_AURA_HOVER))
     {
         uint32 const counter = GetSession()->GetOrderCounter();
-        setCompoundState << uint8(2 + GetPackGUID().size() + 4);
+        WorldPacket part(SMSG_MOVE_SET_HOVER);
+        MovementInfo info;
+        info.guid = GetGUID();
+        WorldPackets::Movement::WriteGroundMovement(part, info, WorldPackets::Movement::GetMovementFlagSequence(part.GetOpcode()), counter);
+        setCompoundState << uint8(2 + part.size());
         setCompoundState << uint16(SMSG_MOVE_SET_HOVER);
-        setCompoundState << GetPackGUID();
-        setCompoundState << uint32(counter);
+        setCompoundState.append(part.contents(), part.wpos());
         GetSession()->IncrementOrderCounter();
     }
 

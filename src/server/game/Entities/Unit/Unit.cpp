@@ -16268,8 +16268,10 @@ void Unit::SetDisableGravity(bool enable)
             uint32 const counter = player->GetSession()->GetOrderCounter();
 
             WorldPacket data(enable ? SMSG_MOVE_GRAVITY_DISABLE : SMSG_MOVE_GRAVITY_ENABLE, GetPackGUID().size() + 4);
-            data << GetPackGUID();
-            data << counter;
+            MovementInfo info;
+            info.guid = GetGUID();
+            WorldPackets::Movement::WriteGroundMovement(data, info,
+                WorldPackets::Movement::GetMovementFlagSequence(data.GetOpcode()), counter);
             player->GetSession()->SendPacket(&data);
             player->GetSession()->IncrementOrderCounter();
             return;
@@ -16367,9 +16369,10 @@ void Unit::SetFeatherFall(bool enable)
             uint32 const counter = player->GetSession()->GetOrderCounter();
 
             WorldPacket data(enable ? SMSG_MOVE_FEATHER_FALL : SMSG_MOVE_NORMAL_FALL, GetPackGUID().size() + 4);
-
-            data << GetPackGUID();
-            data << counter;
+            MovementInfo info;
+            info.guid = GetGUID();
+            WorldPackets::Movement::WriteGroundMovement(data, info,
+                WorldPackets::Movement::GetMovementFlagSequence(data.GetOpcode()), counter);
             player->SendDirectMessage(&data);
             player->GetSession()->IncrementOrderCounter();
 
@@ -16426,8 +16429,10 @@ void Unit::SetHover(bool enable)
 
             uint32 const counter = player->GetSession()->GetOrderCounter();
 
-            data << GetPackGUID();
-            data << counter;
+            MovementInfo info;
+            info.guid = GetGUID();
+            WorldPackets::Movement::WriteGroundMovement(data, info,
+                WorldPackets::Movement::GetMovementFlagSequence(data.GetOpcode()), counter);
             player->SendDirectMessage(&data);
             player->GetSession()->IncrementOrderCounter();
             return;
