@@ -1683,6 +1683,11 @@ class spell_pri_shadow_word_death : public SpellScript
         if (!target || caster == target)
             return;
 
+        // Glyph of Spirit Tap: mana over time after a kill that gives experience or honor. Ours: not in CPP.
+        if (!target->IsAlive() && caster->HasAura(63237))
+            if (Player* player = caster->ToPlayer(); player && player->isHonorOrXPTarget(target))
+                caster->CastSpell(caster, 81301, true);
+
         if (AuraEffect const* glyph = caster->GetDummyAuraEffect(SPELLFAMILY_PRIEST, PRIEST_ICON_ID_GLYPH_OF_SHADOW_WORD_DEATH, EFFECT_0))
             if (_launchHealthPct <= glyph->GetAmount() && target->IsAlive() && !caster->HasAura(SPELL_PRIEST_GLYPH_OF_SHADOW_WORD_DEATH))
             {
@@ -2223,8 +2228,28 @@ class spell_pri_t10_heal_2p_bonus : public AuraScript
     }
 };
 
+// 90785 - Glyph of Power Word: Barrier: the barrier's pulse of more healing taken, only for a priest with the glyph (the
+// barrier creature casts it, so the client data's spell cannot ask for the glyph). Ours: not in CPP.
+class spell_pri_glyph_of_power_word_barrier : public SpellScript
+{
+    PrepareSpellScript(spell_pri_glyph_of_power_word_barrier);
+
+    void FilterTargets(std::list<WorldObject*>& targets)
+    {
+        Unit* priest = GetCaster()->GetOwner();
+        if (!priest || !priest->HasAura(55689))
+            targets.clear();
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pri_glyph_of_power_word_barrier::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ALLY);
+    }
+};
+
 void AddSC_priest_spell_scripts()
 {
+    RegisterSpellScript(spell_pri_glyph_of_power_word_barrier);
     RegisterSpellScript(spell_pri_archangel);
     RegisterSpellScript(spell_pri_atonement);
     RegisterSpellScript(spell_pri_atonement_heal);

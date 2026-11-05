@@ -14659,6 +14659,9 @@ void Player::HandleFall(MovementInfo const& movementInfo)
     {
         //Safe fall, fall height reduction
         int32 safe_fall = GetTotalAuraModifier(SPELL_AURA_SAFE_FALL);
+        // Glyph of Path of Frost: the client data has no number; about a Safe Fall's. Ours: not in CPP.
+        if (HasAura(3714) && HasAura(59307))
+            safe_fall += 30;
 
         float damageperc = FALL_DMG_EQU_SLOPE * (z_diff - safe_fall) + FALL_DMG_EQU_INTERCEPT;
         uint32 original_health = GetHealth(), final_damage = 0;

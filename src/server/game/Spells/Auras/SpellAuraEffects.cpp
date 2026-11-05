@@ -7243,7 +7243,13 @@ void AuraEffect::HandleRaidProcFromChargeWithValueAuraProc(AuraApplication* aurA
         }
     }
 
-    target->CastCustomSpell(target, SPELL_PRAYER_OF_MENDING_HEAL, &value, nullptr, nullptr, true, nullptr, this, GetCasterGUID());
+    // Glyph of Prayer of Mending: the first charge heals for more. Ours: not in CPP.
+    int32 heal = value;
+    if (Unit* priest = GetCaster())
+        if (AuraEffect const* glyph = priest->GetAuraEffect(55685, EFFECT_0))
+            if (jumps >= int32(GetSpellInfo()->ProcCharges) - 1)
+                AddPct(heal, glyph->GetAmount());
+    target->CastCustomSpell(target, SPELL_PRAYER_OF_MENDING_HEAL, &heal, nullptr, nullptr, true, nullptr, this, GetCasterGUID());
 }
 
 int32 AuraEffect::GetTotalTicks() const

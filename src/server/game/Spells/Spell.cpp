@@ -6179,7 +6179,9 @@ SpellCastResult Spell::CheckCast(bool strict, uint32* /*param1*/, uint32* /*para
                 return SPELL_FAILED_NOT_BEHIND;
 
             // Target must be facing you
-            if (m_spellInfo->HasAttribute(SPELL_ATTR0_CU_REQ_TARGET_FACING_CASTER) && !target->HasInArc(static_cast<float>(M_PI), unitCaster))
+            // Glyph of Gouge (1776): no need for the target to face you. Ours: not in CPP.
+            if (m_spellInfo->HasAttribute(SPELL_ATTR0_CU_REQ_TARGET_FACING_CASTER) && !target->HasInArc(static_cast<float>(M_PI), unitCaster)
+                && !(m_spellInfo->Id == 1776 && unitCaster->HasAura(56809)))
                 return SPELL_FAILED_NOT_INFRONT;
 
             // Ignore LOS for gameobject casts: one has no collision height, so the ray would start on its floor

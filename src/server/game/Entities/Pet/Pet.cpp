@@ -1147,6 +1147,10 @@ bool Guardian::InitStatsForLevel(uint8 petlevel)
 
     // scale
     SetObjectScale(GetNativeObjectScale());
+    // Glyph of Lesser Proportion: the client data has no number. Ours: not in CPP.
+    if (IsPet() && ToPet()->getPetType() == HUNTER_PET)
+        if (Unit* owner = GetOwner(); owner && owner->HasAura(57870))
+            SetObjectScale(GetObjectScale() * 0.85f);
 
     // Resistance
     // xinef: hunter pets should not inherit template resistances

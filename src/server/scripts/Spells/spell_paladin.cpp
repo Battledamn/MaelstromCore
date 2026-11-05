@@ -2366,8 +2366,38 @@ class spell_pal_blessed_life : public AuraScript
     }
 };
 
+// 2812 - Holy Wrath: the stun (effect 1) only on demons and undead, and elementals and dragonkin with the Glyph of Holy Wrath.
+// Ours: the client data has no limit on it, and CPP no script.
+class spell_pal_holy_wrath : public SpellScript
+{
+    PrepareSpellScript(spell_pal_holy_wrath);
+
+    void FilterStun(std::list<WorldObject*>& targets)
+    {
+        bool const glyph = GetCaster()->HasAura(56420);
+        targets.remove_if([glyph](WorldObject* object)
+        {
+            Unit* unit = object->ToUnit();
+            if (!unit)
+                return true;
+
+            uint32 const type = unit->GetCreatureType();
+            if (type == CREATURE_TYPE_DEMON || type == CREATURE_TYPE_UNDEAD)
+                return false;
+
+            return !(glyph && (type == CREATURE_TYPE_ELEMENTAL || type == CREATURE_TYPE_DRAGONKIN));
+        });
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_pal_holy_wrath::FilterStun, EFFECT_1, TARGET_UNIT_SRC_AREA_ENEMY);
+    }
+};
+
 void AddSC_paladin_spell_scripts()
 {
+    RegisterSpellScript(spell_pal_holy_wrath);
     RegisterSpellScript(spell_pal_divine_purpose);
     RegisterSpellScript(spell_pal_sacred_shield);
     RegisterSpellScript(spell_pal_ardent_defender);

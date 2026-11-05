@@ -864,7 +864,12 @@ class spell_warl_drain_soul : public AuraScript
         if (Unit* caster = GetCaster())
             if (Player* player = caster->ToPlayer())
                 if (player->isHonorOrXPTarget(GetTarget()))
+                {
                     caster->CastSpell(caster, SPELL_WARLOCK_SOUL_SHARD_ENERGIZE, true);
+                    // Glyph of Drain Soul: the mana back. Ours: not in CPP.
+                    if (caster->HasAura(58070))
+                        caster->CastSpell(caster, 58068, true);
+                }
     }
 
     void Register() override
@@ -2435,8 +2440,71 @@ private:
     uint32 _stunTimer = 0;
 };
 
+// 17877 - Shadowburn: the Glyph of Shadowburn resets the cooldown when it fails to kill a target at or below the glyph's
+// health, once per marker's duration (as the Glyph of Shadow Word: Death). Ours: not in CPP.
+class spell_warl_shadowburn_glyph : public SpellScript
+{
+    PrepareSpellScript(spell_warl_shadowburn_glyph);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ 56229, 91001 });
+    }
+
+    void RememberHealth(SpellEffIndex /*effIndex*/)
+    {
+        _healthPct = GetHitUnit()->GetHealthPct();
+    }
+
+    void HandleGlyph()
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+        if (!target || !target->IsAlive() || caster->HasAura(91001))
+            return;
+
+        if (AuraEffect const* glyph = caster->GetAuraEffect(56229, EFFECT_0))
+            if (_healthPct <= glyph->GetAmount())
+            {
+                if (Player* player = caster->ToPlayer())
+                    player->RemoveSpellCooldown(GetSpellInfo()->Id, true);
+                caster->CastSpell(caster, 91001, true); // cooldown marker
+            }
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_warl_shadowburn_glyph::RememberHealth, EFFECT_1, SPELL_EFFECT_SCHOOL_DAMAGE);
+        AfterHit += SpellHitFn(spell_warl_shadowburn_glyph::HandleGlyph);
+    }
+
+private:
+    float _healthPct = 100.0f;
+};
+
+// 25228 - Soul Link: the Glyph of Soul Link shares more of the damage. Ours: not in CPP.
+class spell_warl_soul_link : public AuraScript
+{
+    PrepareAuraScript(spell_warl_soul_link);
+
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& canBeRecalculated)
+    {
+        canBeRecalculated = false;
+        if (Unit* caster = GetCaster())
+            if (AuraEffect const* glyph = caster->GetAuraEffect(63312, EFFECT_0))
+                amount += glyph->GetAmount();
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_warl_soul_link::CalculateAmount, EFFECT_0, SPELL_AURA_SPLIT_DAMAGE_PCT);
+    }
+};
+
 void AddSC_warlock_spell_scripts()
 {
+    RegisterSpellScript(spell_warl_soul_link);
+    RegisterSpellScript(spell_warl_shadowburn_glyph);
     RegisterCreatureAI(npc_warl_hand_of_guldan);
     RegisterSpellScript(spell_warl_aftermath);
     RegisterSpellScript(spell_warl_bane_of_doom);

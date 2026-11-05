@@ -1935,8 +1935,72 @@ class spell_rog_venomous_wounds : public AuraScript
     }
 };
 
+// 1766 - Kick: the Glyph of Kick takes time off the cooldown when it interrupts a spell. The cast is read at launch, before
+// Spell::EffectInterruptCast ends it. Ours: not in CPP.
+class spell_rog_kick : public SpellScript
+{
+    PrepareSpellScript(spell_rog_kick);
+
+    void RememberCast(SpellEffIndex /*effIndex*/)
+    {
+        if (Unit* target = GetHitUnit())
+        {
+            _generic = target->GetCurrentSpell(CURRENT_GENERIC_SPELL);
+            _channeled = target->GetCurrentSpell(CURRENT_CHANNELED_SPELL);
+        }
+    }
+
+    void HandleAfterHit()
+    {
+        Unit* target = GetHitUnit();
+        Player* player = GetCaster()->ToPlayer();
+        if (!target || !player)
+            return;
+
+        bool interrupted = (_generic && target->GetCurrentSpell(CURRENT_GENERIC_SPELL) != _generic)
+            || (_channeled && target->GetCurrentSpell(CURRENT_CHANNELED_SPELL) != _channeled);
+        if (interrupted)
+            if (AuraEffect const* glyph = player->GetAuraEffect(56805, EFFECT_1))
+                player->ModifySpellCooldown(GetSpellInfo()->Id, -glyph->GetAmount());
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_rog_kick::RememberCast, EFFECT_0, SPELL_EFFECT_INTERRUPT_CAST);
+        AfterHit += SpellHitFn(spell_rog_kick::HandleAfterHit);
+    }
+
+private:
+    Spell const* _generic = nullptr;
+    Spell const* _channeled = nullptr;
+};
+
+// 2094 - Blind: the Glyph of Blind removes damage over time effects from the target. Ours: not in CPP.
+class spell_rog_blind : public AuraScript
+{
+    PrepareAuraScript(spell_rog_blind);
+
+    void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (!caster || !caster->HasAura(91299))
+            return;
+
+        GetTarget()->RemoveAurasByType(SPELL_AURA_PERIODIC_DAMAGE);
+        GetTarget()->RemoveAurasByType(SPELL_AURA_PERIODIC_DAMAGE_PERCENT);
+        GetTarget()->RemoveAurasByType(SPELL_AURA_PERIODIC_LEECH);
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_rog_blind::HandleApply, EFFECT_1, SPELL_AURA_MOD_CONFUSE, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
 void AddSC_rogue_spell_scripts()
 {
+    RegisterSpellScript(spell_rog_blind);
+    RegisterSpellScript(spell_rog_kick);
     RegisterSpellScript(spell_rog_bandits_guile);
     RegisterSpellScript(spell_rog_blade_flurry);
     RegisterSpellScript(spell_rog_cheat_death);

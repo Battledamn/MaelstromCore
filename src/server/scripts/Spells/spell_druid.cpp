@@ -2579,8 +2579,19 @@ class spell_dru_maul : public SpellScript
         SetEffectValue(int32(35 + GetCaster()->GetTotalAttackPowerValue(BASE_ATTACK) * 0.19f - 1));
     }
 
+    // Glyph of Maul: its modifier adds the target, its third effect is that target's share of the damage. Ours: not in CPP.
+    void HandleGlyphTarget(SpellEffIndex /*effIndex*/)
+    {
+        if (GetHitUnit() == GetExplTargetUnit())
+            return;
+
+        if (AuraEffect const* glyph = GetCaster()->GetAuraEffect(54811, EFFECT_1))
+            SetHitDamage(CalculatePct(GetHitDamage(), glyph->GetSpellInfo()->Effects[EFFECT_2].CalcValue()));
+    }
+
     void Register() override
     {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_maul::HandleGlyphTarget, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
         OnEffectLaunchTarget += SpellEffectFn(spell_dru_maul::HandleDamage, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
     }
 };
@@ -3214,8 +3225,66 @@ class spell_dru_wild_mushroom_detonate : public SpellScript
     }
 };
 
+// 78674 - Starsurge: the Glyph of Starsurge shortens Starfall's cooldown when it deals damage. Ours: not in CPP.
+class spell_dru_starsurge : public SpellScript
+{
+    PrepareSpellScript(spell_dru_starsurge);
+
+    void HandleGlyph(SpellEffIndex /*effIndex*/)
+    {
+        if (Player* player = GetCaster()->ToPlayer())
+            if (AuraEffect const* glyph = player->GetAuraEffect(62971, EFFECT_0))
+                player->ModifySpellCooldown(48505, -glyph->GetAmount() * IN_MILLISECONDS);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_dru_starsurge::HandleGlyph, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+    }
+};
+
+// 5185 - Healing Touch: the Glyph of Healing Touch shortens Nature's Swiftness' cooldown. Ours: not in CPP.
+class spell_dru_healing_touch : public SpellScript
+{
+    PrepareSpellScript(spell_dru_healing_touch);
+
+    void HandleAfterCast()
+    {
+        if (Player* player = GetCaster()->ToPlayer())
+            if (AuraEffect const* glyph = player->GetAuraEffect(54825, EFFECT_0))
+                player->ModifySpellCooldown(17116, -glyph->GetAmount() * IN_MILLISECONDS);
+    }
+
+    void Register() override
+    {
+        AfterCast += SpellCastFn(spell_dru_healing_touch::HandleAfterCast);
+    }
+};
+
+// 16914 - Hurricane: its slow's value is 0 in the client data; the Glyph of Hurricane gives it. Ours: not in CPP.
+class spell_dru_hurricane : public AuraScript
+{
+    PrepareAuraScript(spell_dru_hurricane);
+
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& canBeRecalculated)
+    {
+        canBeRecalculated = false;
+        if (Unit* caster = GetCaster())
+            if (AuraEffect const* glyph = caster->GetAuraEffect(54831, EFFECT_0))
+                amount = glyph->GetAmount();
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_dru_hurricane::CalculateAmount, EFFECT_0, SPELL_AURA_MOD_DECREASE_SPEED);
+    }
+};
+
 void AddSC_druid_spell_scripts()
 {
+    RegisterSpellScript(spell_dru_healing_touch);
+    RegisterSpellScript(spell_dru_hurricane);
+    RegisterSpellScript(spell_dru_starsurge);
     RegisterSpellScript(spell_dru_t10_balance_4p_bonus);
     RegisterSpellScript(spell_dru_nurturing_instinct);
     RegisterSpellScript(spell_dru_feral_swiftness);

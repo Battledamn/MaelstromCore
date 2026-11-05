@@ -2156,8 +2156,47 @@ class spell_hun_wyvern_sting : public AuraScript
     }
 };
 
+// 5116 - Concussive Shot: the limit on the target's run speed (effect 1) only with the Glyph of Concussive Shot. Ours: not in CPP.
+class spell_hun_concussive_shot : public AuraScript
+{
+    PrepareAuraScript(spell_hun_concussive_shot);
+
+    void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& canBeRecalculated)
+    {
+        canBeRecalculated = false;
+        Unit* caster = GetCaster();
+        if (!caster || !caster->HasAura(56851))
+            amount = 0;
+    }
+
+    void Register() override
+    {
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_hun_concussive_shot::CalculateAmount, EFFECT_1, SPELL_AURA_USE_NORMAL_MOVEMENT_SPEED);
+    }
+};
+
+// 34477 - Misdirection: the Glyph of Misdirection resets the cooldown when it goes on your pet. Ours: not in CPP.
+class spell_hun_misdirection_glyph : public SpellScript
+{
+    PrepareSpellScript(spell_hun_misdirection_glyph);
+
+    void HandleAfterHit()
+    {
+        Player* player = GetCaster()->ToPlayer();
+        if (player && player->HasAura(56829) && GetHitUnit() && GetHitUnit() == player->GetPet())
+            player->RemoveSpellCooldown(GetSpellInfo()->Id, true);
+    }
+
+    void Register() override
+    {
+        AfterHit += SpellHitFn(spell_hun_misdirection_glyph::HandleAfterHit);
+    }
+};
+
 void AddSC_hunter_spell_scripts()
 {
+    RegisterSpellScript(spell_hun_concussive_shot);
+    RegisterSpellScript(spell_hun_misdirection_glyph);
     RegisterSpellScript(spell_hun_ancient_hysteria);
     RegisterSpellScript(spell_hun_bestial_wrath);
     RegisterSpellScript(spell_hun_camouflage);

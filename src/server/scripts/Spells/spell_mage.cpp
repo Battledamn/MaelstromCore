@@ -841,7 +841,12 @@ class spell_mage_ice_barrier : public AuraScript
     {
         canBeRecalculated = false;
         if (Unit* caster = GetCaster())
+        {
             amount += int32(0.87f * caster->SpellBaseHealingBonusDone(GetSpellInfo()->GetSchoolMask()));
+            // Glyph of Ice Barrier. Ours: not in CPP.
+            if (AuraEffect const* glyph = caster->GetAuraEffect(63095, EFFECT_0))
+                AddPct(amount, glyph->GetAmount());
+        }
     }
 
     void AfterRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
@@ -1942,8 +1947,36 @@ class spell_mage_pet_scaling_05 : public AuraScript
     }
 };
 
+// 122 - Frost Nova: its one charge goes with the first hit. The Glyph of Frost Nova lets the target take its share of its maximum
+// health first: the data has no base amount for "additional", so that share is the whole allowance. Ours: not in CPP.
+class spell_mage_frost_nova : public AuraScript
+{
+    PrepareAuraScript(spell_mage_frost_nova);
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        Unit* caster = GetCaster();
+        DamageInfo* damage = eventInfo.GetDamageInfo();
+        AuraEffect const* glyph = caster ? caster->GetAuraEffect(56376, EFFECT_0) : nullptr;
+        if (!glyph || !damage)
+            return true;
+
+        _taken += damage->GetDamage();
+        return _taken > GetTarget()->CountPctFromMaxHealth(glyph->GetAmount());
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_mage_frost_nova::CheckProc);
+    }
+
+private:
+    uint32 _taken = 0;
+};
+
 void AddSC_mage_spell_scripts()
 {
+    RegisterSpellScript(spell_mage_frost_nova);
     RegisterSpellScript(spell_mage_arcane_blast);
     RegisterSpellScript(spell_mage_arcane_missiles_trigger);
     RegisterSpellScript(spell_mage_arcane_potency);

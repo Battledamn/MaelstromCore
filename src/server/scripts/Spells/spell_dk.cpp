@@ -1235,6 +1235,13 @@ class spell_dk_death_strike : public SpellScript
             AddPct(heal, improved->GetAmount());
 
         heal = std::max(heal, int32(caster->CountPctFromMaxHealth(GetEffectValue())));
+        // Glyph of Dark Succor: after a kill, at least its share of health outside Blood Presence. Ours: not in CPP.
+        if (AuraEffect const* succor = caster->GetAuraEffect(101568, EFFECT_0))
+            if (!caster->HasAura(SPELL_DK_BLOOD_PRESENCE))
+            {
+                heal = std::max(heal, int32(caster->CountPctFromMaxHealth(succor->GetAmount())));
+                caster->RemoveAurasDueToSpell(101568);
+            }
         caster->CastCustomSpell(SPELL_DK_DEATH_STRIKE_HEAL, SPELLVALUE_BASE_POINT0, heal, caster, true);
     }
 
@@ -2405,8 +2412,33 @@ class spell_dk_strangulate : public SpellScript
             caster->CastSpell(target, SPELL_GEN_INTERRUPT, true);
     }
 
+    // Glyph of Strangulate: longer on a target that is casting, read before the hit interrupts it. Ours: not in CPP.
+    void RememberCast(SpellEffIndex /*effIndex*/)
+    {
+        if (Unit* target = GetHitUnit())
+            _wasCasting = target->IsNonMeleeSpellCast(false);
+    }
+
+    void HandleGlyph()
+    {
+        Unit* target = GetHitUnit();
+        AuraEffect const* glyph = GetCaster()->GetAuraEffect(58618, EFFECT_0);
+        if (!target || !glyph || !_wasCasting)
+            return;
+
+        if (Aura* aura = target->GetAura(GetSpellInfo()->Id, GetCaster()->GetGUID()))
+        {
+            aura->SetMaxDuration(aura->GetMaxDuration() + glyph->GetAmount());
+            aura->SetDuration(aura->GetDuration() + glyph->GetAmount());
+        }
+    }
+
+    bool _wasCasting = false;
+
     void Register() override
     {
+        OnEffectLaunchTarget += SpellEffectFn(spell_dk_strangulate::RememberCast, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
+        AfterHit += SpellHitFn(spell_dk_strangulate::HandleGlyph);
         OnEffectHitTarget += SpellEffectFn(spell_dk_strangulate::HandleCreatureInterrupt, EFFECT_0, SPELL_EFFECT_APPLY_AURA);
     }
 };

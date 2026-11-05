@@ -1310,8 +1310,35 @@ private:
     uint8 _hitTargets = 0;
 };
 
+// 5246 - Intimidating Shout: with the Glyph of Intimidating Shout the feared tremble in place. Ours: not in CPP.
+class spell_warr_intimidating_shout_glyph : public AuraScript
+{
+    PrepareAuraScript(spell_warr_intimidating_shout_glyph);
+
+    void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (caster && caster->HasAura(63327))
+            GetTarget()->SetControlled(true, UNIT_STATE_ROOT);
+    }
+
+    void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (caster && caster->HasAura(63327))
+            GetTarget()->SetControlled(false, UNIT_STATE_ROOT);
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_warr_intimidating_shout_glyph::HandleApply, EFFECT_1, SPELL_AURA_MOD_FEAR, AURA_EFFECT_HANDLE_REAL);
+        AfterEffectRemove += AuraEffectRemoveFn(spell_warr_intimidating_shout_glyph::HandleRemove, EFFECT_1, SPELL_AURA_MOD_FEAR, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
 void AddSC_warrior_spell_scripts()
 {
+    RegisterSpellScript(spell_warr_intimidating_shout_glyph);
     RegisterSpellScript(spell_warr_blood_craze);
     RegisterSpellScript(spell_warr_bloodthirst);
     RegisterSpellScript(spell_warr_bloodthirst_heal);

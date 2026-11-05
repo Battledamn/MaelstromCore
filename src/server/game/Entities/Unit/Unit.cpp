@@ -8934,6 +8934,12 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
 
                     Unit::ApplyResilience(this, &crit_chance, nullptr, false, CR_CRIT_TAKEN_SPELL);
                 }
+                // Glyph of Flash Heal: more critical chance on a target at or below the glyph's health
+                if (caster && spellProto->SpellFamilyName == SPELLFAMILY_PRIEST && (spellProto->SpellFamilyFlags[0] & 0x800))
+                    if (AuraEffect const* glyph = caster->GetAuraEffect(55679, EFFECT_0))
+                        if (GetHealthPct() <= glyph->GetSpellInfo()->Effects[EFFECT_1].CalcValue())
+                            crit_chance += glyph->GetAmount();
+
                 // scripted (increase crit chance ... against ... target by x%
                 if (caster)
                 {
@@ -15156,6 +15162,14 @@ uint32 Unit::GetCombatRatingDamageReduction(CombatRating cr, float rate, float c
 
 uint32 Unit::GetModelForForm(ShapeshiftForm form, uint32 spellId)
 {
+    // Glyph of the Arctic Wolf (CPP)
+    if (form == FORM_GHOSTWOLF && HasAura(58135))
+        return 27312;
+
+    // Glyph of the Treant: the old Tree of Life model. Ours: not in CPP.
+    if (form == FORM_TREE && HasAura(95212))
+        return 864;
+
     // Hardcoded cases
     switch (spellId)
     {
