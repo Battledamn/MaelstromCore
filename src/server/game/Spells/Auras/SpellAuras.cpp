@@ -1695,6 +1695,9 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                     target->RemoveAurasWithFamily(SPELLFAMILY_ROGUE, 0x800, 0, 0, ObjectGuid::Empty);
                     target->RemoveAurasDueToSpell(18461);
                 }
+                // Sprint: the Glyph of Blurred Speed's water walk lasts 15 s in the client data, Sprint only 8 s
+                if (GetSpellInfo()->SpellFamilyFlags[0] & 0x40 && GetSpellInfo()->GetCategory() == 44)
+                    target->RemoveAurasDueToSpell(61922);
                 break;
             case SPELLFAMILY_SHAMAN:
             {
