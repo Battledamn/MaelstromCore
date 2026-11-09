@@ -2462,7 +2462,7 @@ bool WorldObject::CanDetect(WorldObject const* obj, bool ignoreStealth, bool che
 
 bool WorldObject::CanDetectInvisibilityOf(WorldObject const* obj) const
 {
-    uint32 mask = obj->m_invisibility.GetFlags() & m_invisibilityDetect.GetFlags();
+    uint64 mask = obj->m_invisibility.GetFlags() & m_invisibilityDetect.GetFlags();
     // xinef: include invisible flags of caster in the mask, 2 invisible objects should be able to detect eachother
     mask |= obj->m_invisibility.GetFlags() & m_invisibility.GetFlags();
 
@@ -2496,7 +2496,7 @@ bool WorldObject::CanDetectInvisibilityOf(WorldObject const* obj) const
 
         if (!isPermInvisibleCreature)
         {
-            uint32 objMask = m_invisibility.GetFlags() & obj->m_invisibilityDetect.GetFlags();
+            uint64 objMask = m_invisibility.GetFlags() & obj->m_invisibilityDetect.GetFlags();
             // xinef: include invisible flags of caster in the mask, 2 invisible objects should be able to detect eachother
             objMask |= m_invisibility.GetFlags() & obj->m_invisibility.GetFlags();
             if (objMask != m_invisibility.GetFlags())
