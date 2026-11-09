@@ -958,6 +958,10 @@ void WorldSession::HandleSetActiveMoverOpcode(WorldPacket& recvData)
         if (_player->m_mover->GetGUID() != guid)
             LOG_ERROR("network.opcode", "HandleSetActiveMoverOpcode: incorrect mover guid: mover is {} and should be {}",
                 guid.ToString(), _player->m_mover->GetGUID().ToString());
+
+        // The client sends this once it has the world loaded (after logging in or a loading screen): the area's auras
+        // are checked again, so one a script kept off while it loaded is applied now, as on walking into the area
+        _player->UpdateAreaDependentAuras(_player->GetAreaId());
     }
 }
 
