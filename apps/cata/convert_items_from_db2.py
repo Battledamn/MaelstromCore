@@ -169,8 +169,7 @@ def to_sql(rows, build, derived=False, insert_only=False):
     columns = list(rows[0]) + ["VerifiedBuild"]
     ids = ",".join(str(row["entry"]) for row in rows)
     lines = [f"-- Also reset to default: {RESET_NOTE}. Apply only to ids not already in item_template.",
-             f"-- {'Derived: ' + ', '.join(DERIVED) + '. ' if derived else 'Not derived (no --dbc-dir): '
-                  + ', '.join(DERIVED) + '. '}"
+             "-- " + ("Derived: " if derived else "Not derived (no --dbc-dir): ") + ", ".join(DERIVED) + ". "
              f"Left at schema default: {', '.join(UNRESOLVED)}",
              "START TRANSACTION;",
              *([] if insert_only else [f"DELETE FROM `item_template` WHERE `entry` IN ({ids});"]),
