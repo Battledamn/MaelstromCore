@@ -4890,6 +4890,51 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->DmgClass = SPELL_DAMAGE_CLASS_MAGIC;
     });
 
+    // A Bazillion Macaroons?! (Kezan): the summon of the boulder caster (70473) and its fiery boulder (70472) aim at
+    // TARGET_DEST_NEARBY_ENTRY within a range of 0, where nothing is found and the cast is dropped; the burning boulder
+    // (70097) at TARGET_DEST_CHANNEL_CASTER, which a plain cast has none of. The scripts give all three their
+    // destination: the caster at Gallywix or a sky anchor, 70472 the caster's own spot, 70097 a point in town.
+    ApplySpellFix({ 70097, 70472, 70473 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_DEST_DEST);
+        spellInfo->RangeEntry = sSpellRangeStore.LookupEntry(13); // anywhere
+    });
+
+    // Hobart's Ingenious Cap of Mook Foolery (Kezan, Waltz Right In): an area aura of Gallywix's Villa that makes the
+    // player a vehicle. Saved and restored at login it set the vehicle up while the client was still loading, and the
+    // mook silhouette in its seat stood idle; it comes back with the area instead, as on entering the villa.
+    ApplySpellFix({ 67435 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->AttributesCu |= SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED;
+    });
+
+    // 447: Gasbot Gas Stream (Kezan): one channel into the Gasbot's four Gas Targets, its passengers. Its target type
+    // 105 (TrinityCore's TARGET_UNIT_CASTER_AND_PASSENGERS) has no handler here and the stream hit nothing: it takes the
+    // units within 5 yards instead, a condition (13) keeping them to the Gas Targets (37599).
+    ApplySpellFix({ 70256 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_SRC_AREA_ENTRY);
+        spellInfo->Effects[EFFECT_0].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_5_YARDS);
+        // Gasbot walks into the house while it streams the gas: the channel neither holds nor is broken by its movement
+        spellInfo->AttributesEx5 |= SPELL_ATTR5_ALLOW_ACTION_DURING_CHANNEL;
+        spellInfo->ChannelInterruptFlags = 0;
+    });
+
+    // 447: Summon Gasbot (Kezan): behind its control panel, between the panel and the headquarters (retail), not where
+    // the player stands; the spot is in spell_target_position
+    ApplySpellFix({ 70252 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_DEST_DB);
+    });
+
+    // Honk Horn (Kezan's Hot Rod): the horn sound goes to TARGET_UNIT_TARGET_PASSENGER, a passenger of the cast's
+    // unit target, but the car casts it from its action bar with no target, so the cast found no one and the
+    // horn stayed silent. Its driver hears it.
+    ApplySpellFix({ 66298 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_PASSENGER_0);
+    });
+
     for (uint32 i = 0; i < GetSpellInfoStoreSize(); ++i)
     {
         SpellInfo* spellInfo = mSpellInfoMap[i];
