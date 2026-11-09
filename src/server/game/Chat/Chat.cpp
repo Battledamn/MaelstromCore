@@ -346,6 +346,13 @@ std::size_t ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg chatType, La
 
     if (chatType == CHAT_MSG_ACHIEVEMENT || chatType == CHAT_MSG_GUILD_ACHIEVEMENT)
         data << uint32(achievementId);
+    else if (chatType == CHAT_MSG_RAID_BOSS_WHISPER || chatType == CHAT_MSG_RAID_BOSS_EMOTE)
+    {
+        // 4.3.4: the center-screen alert's display time in seconds (0: the client's default of 10) and whether
+        // to keep it out of the chat frame. Without them the client dropped every boss emote and boss whisper.
+        data << float(0.0f);
+        data << uint8(0);
+    }
 
     return receiverGUIDPos;
 }
