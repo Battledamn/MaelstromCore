@@ -1537,7 +1537,7 @@ void Creature::SelectLevel(bool changelevel)
     float healthmod = _GetHealthMod(rank);
 
     uint32 basehp = std::max<uint32>(1, stats->GenerateHealth(cInfo));
-    uint32 health = uint32(basehp * healthmod);
+    uint32 health = uint32(std::min<double>(double(basehp) * healthmod, std::numeric_limits<uint32>::max()));
 
     SetCreateHealth(health);
     SetMaxHealth(health);

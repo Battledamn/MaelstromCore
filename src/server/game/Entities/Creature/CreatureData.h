@@ -25,6 +25,8 @@
 #include "SpawnData.h"
 #include "Unit.h"
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <list>
 
 #define MAX_AGGRO_RESET_TIME 10 // in seconds
@@ -322,7 +324,10 @@ struct CreatureBaseStats
 
     uint32 GenerateHealth(CreatureTemplate const* info) const
     {
-        return uint32(std::ceil(BaseHealth[CreatureStatExpansion(info->expansion)] * info->ModHealth));
+        // TDB 434 gives its unkillable scripted bosses (Kezan's and Cataclysm's Deathwings) a health modifier of
+        // 1,000,000,000; past uint32 the conversion wraps and the creature spawned dead, so it is capped
+        double health = std::ceil(double(BaseHealth[CreatureStatExpansion(info->expansion)]) * info->ModHealth);
+        return uint32(std::min<double>(health, std::numeric_limits<uint32>::max()));
     }
 
     uint32 GenerateMana(CreatureTemplate const* info) const
