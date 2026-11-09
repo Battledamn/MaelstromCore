@@ -121,6 +121,26 @@ void WorldSession::HandleQuestgiverAcceptQuestOpcode(WorldPacket& recvData)
 
     Object* object = ObjectAccessor::GetObjectByTypeMask(*_player, guid, TYPEMASK_UNIT | TYPEMASK_GAMEOBJECT | TYPEMASK_ITEM | TYPEMASK_PLAYER);
 
+    // The follow-up of a pop-up turn-in is offered by the player (see HandleQuestgiverChooseRewardOpcode): it is
+    // accepted when it is the next quest in chain of a pop-up quest the player has turned in
+    if (object == _player)
+    {
+        Quest const* offered = sObjectMgr->GetQuestTemplate(questId);
+        bool chained = false;
+        if (offered)
+            for (int32 prev : offered->prevQuests)
+                if (Quest const* prevQuest = sObjectMgr->GetQuestTemplate(std::abs(prev)))
+                    chained |= prev > 0 && prevQuest->IsAutoComplete() && prevQuest->GetNextQuestInChain() == questId
+                        && _player->GetQuestRewardStatus(prevQuest->GetQuestId());
+
+        if (chained)
+        {
+            if (_player->CanTakeQuest(offered, true) && _player->CanAddQuest(offered, true))
+                _player->AddQuestAndCheckCompletion(offered, _player);
+            return;
+        }
+    }
+
     // no or incorrect quest giver
     if (!object || object == _player || (!object->IsPlayer() && !object->hasQuest(questId)) ||
             (object->IsPlayer() && !object->ToPlayer()->CanShareQuest(questId)))
@@ -227,7 +247,8 @@ void WorldSession::HandleQuestgiverQueryQuestOpcode(WorldPacket& recvData)
         if (quest->IsAutoAccept() && _player->CanAddQuest(quest, true))
             _player->AddQuestAndCheckCompletion(quest, object);
 
-        if (quest->IsAutoComplete() || !quest->GetQuestMethod())
+        // A 4.3.4 pop-up quest (QUEST_FLAGS_AUTOCOMPLETE) offered by a giver that does not end it shows its details
+        if ((quest->IsAutoComplete() && object->hasInvolvedQuest(questId)) || !quest->GetQuestMethod())
             _player->PlayerTalkClass->SendQuestGiverRequestItems(quest, object->GetGUID(), _player->CanCompleteQuest(quest->GetQuestId()), true);
         else
             _player->PlayerTalkClass->SendQuestGiverQuestDetails(quest, object->GetGUID(), true);
@@ -262,12 +283,17 @@ void WorldSession::HandleQuestgiverChooseRewardOpcode(WorldPacket& recvData)
 
     LOG_DEBUG("network", "WORLD: Received CMSG_QUESTGIVER_CHOOSE_REWARD npc {}, quest = {}, reward = {}", guid.ToString(), questId, reward);
 
-    Object* object = ObjectAccessor::GetObjectByTypeMask(*_player, guid, TYPEMASK_UNIT | TYPEMASK_GAMEOBJECT);
-    if (!object || !object->hasInvolvedQuest(questId))
+    // A 4.3.4 pop-up turn-in (QUEST_FLAGS_AUTOCOMPLETE, "Click to complete") has the player as its giver
+    Quest const* remoteQuest = sObjectMgr->GetQuestTemplate(questId);
+    bool const remote = guid == _player->GetGUID() && remoteQuest && remoteQuest->IsAutoComplete()
+        && _player->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE;
+
+    Object* object = remote ? _player : ObjectAccessor::GetObjectByTypeMask(*_player, guid, TYPEMASK_UNIT | TYPEMASK_GAMEOBJECT);
+    if (!remote && (!object || !object->hasInvolvedQuest(questId)))
         return;
 
     // some kind of WPE protection
-    if (!_player->CanInteractWithQuestGiver(object))
+    if (!remote && !_player->CanInteractWithQuestGiver(object))
         return;
 
     if (Quest const* quest = sObjectMgr->GetQuestTemplate(questId))
@@ -341,6 +367,15 @@ void WorldSession::HandleQuestgiverChooseRewardOpcode(WorldPacket& recvData)
 
                             questGiver->AI()->QuestReward(_player, quest, reward);
                         }
+                        break;
+                    }
+                case TYPEID_PLAYER:
+                    {
+                        // A pop-up turn-in offers its follow-up on the spot (Necessary Roughness, then Fourth and
+                        // Goal, which has no NPC giver)
+                        if (Quest const* nextQuest = sObjectMgr->GetQuestTemplate(quest->GetNextQuestInChain()))
+                            if (_player->CanTakeQuest(nextQuest, false))
+                                _player->PlayerTalkClass->SendQuestGiverQuestDetails(nextQuest, _player->GetGUID(), true);
                         break;
                     }
                 default:
@@ -487,6 +522,15 @@ void WorldSession::HandleQuestgiverCompleteQuest(WorldPacket& recvData)
 
     LOG_DEBUG("network", "WORLD: Received CMSG_QUESTGIVER_COMPLETE_QUEST npc {}, quest = {}, fromScript = {}",
         guid.ToString(), questId, fromScript);
+
+    // "Click to complete" on a 4.3.4 pop-up turn-in (QUEST_FLAGS_AUTOCOMPLETE) names the player, not an NPC
+    if (Quest const* quest = sObjectMgr->GetQuestTemplate(questId))
+        if ((fromScript || guid == _player->GetGUID()) && quest->IsAutoComplete())
+        {
+            if (_player->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE && _player->CanRewardQuest(quest, false))
+                _player->PlayerTalkClass->SendQuestGiverOfferReward(quest, _player->GetGUID(), true);
+            return;
+        }
 
     Object* object = ObjectAccessor::GetObjectByTypeMask(*_player, guid, TYPEMASK_UNIT | TYPEMASK_GAMEOBJECT);
     if (!object || !object->hasInvolvedQuest(questId))

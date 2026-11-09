@@ -32,6 +32,7 @@
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
 #include "WorldSession.h"
+#include <algorithm>
 
 /*********************************************************/
 /***                    QUEST SYSTEM                   ***/
@@ -90,9 +91,16 @@ void Player::PrepareQuestMenu(ObjectGuid guid)
         if (!CanTakeQuest(quest, false))
             continue;
 
-        if (quest->IsAutoComplete() && (!quest->IsRepeatable() || quest->IsDaily() || quest->IsWeekly() || quest->IsMonthly()))
+        // 4.3.4 sets QUEST_FLAGS_AUTOCOMPLETE on quests that pop up their own turn-in (Necessary Roughness).
+        // Listed as "complete now", the client answers with CMSG_QUESTGIVER_COMPLETE_QUEST, which only the
+        // quest's ender accepts, so a giver that does not end the quest offers it like any other.
+        bool const endsHere = std::any_of(objectQIR.first, objectQIR.second,
+            [quest_id](QuestRelations::value_type const& relation) { return relation.second == quest_id; });
+        bool const autoComplete = quest->IsAutoComplete() && endsHere;
+
+        if (autoComplete && (!quest->IsRepeatable() || quest->IsDaily() || quest->IsWeekly() || quest->IsMonthly()))
             qm.AddMenuItem(quest_id, 0);
-        else if (quest->IsAutoComplete())
+        else if (autoComplete)
             qm.AddMenuItem(quest_id, 4);
         else if (GetQuestStatus(quest_id) == QUEST_STATUS_NONE)
             qm.AddMenuItem(quest_id, 2);
@@ -144,7 +152,7 @@ void Player::SendPreparedQuest(ObjectGuid guid)
                 if (quest->IsAutoAccept() && CanAddQuest(quest, true) && CanTakeQuest(quest, true))
                     AddQuestAndCheckCompletion(quest, object);
 
-                if (quest->IsAutoComplete() || !quest->GetQuestMethod())
+                if ((quest->IsAutoComplete() && object->hasInvolvedQuest(questId)) || !quest->GetQuestMethod())
                     PlayerTalkClass->SendQuestGiverRequestItems(quest, guid, CanCompleteRepeatableQuest(quest), true);
                 else
                     PlayerTalkClass->SendQuestGiverQuestDetails(quest, guid, true);
