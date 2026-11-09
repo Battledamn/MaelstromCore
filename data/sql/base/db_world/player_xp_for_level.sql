@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -112,7 +112,12 @@ INSERT INTO `player_xp_for_level` VALUES
 (76,1620700),
 (77,1637400),
 (78,1653900),
-(79,1670800);
+(79,1670800),
+(80,1686300),
+(81,2121500),
+(82,4004000),
+(83,5203400),
+(84,9165100);
 /*!40000 ALTER TABLE `player_xp_for_level` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -124,4 +129,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:21
+-- Dump completed

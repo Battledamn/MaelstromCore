@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -36,14 +36,12 @@ LOCK TABLES `quest_mail_sender` WRITE;
 INSERT INTO `quest_mail_sender` VALUES
 (8729,11811),
 (10588,18166),
-(10966,22818),
-(10967,22817),
 (12067,2708),
 (12085,5885),
 (12422,27102),
 (12711,28930),
-(13959,33533),
-(13960,33532);
+(28879,33533),
+(28880,33532);
 /*!40000 ALTER TABLE `quest_mail_sender` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -55,4 +53,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:26
+-- Dump completed

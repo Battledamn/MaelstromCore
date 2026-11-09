@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -65,26 +65,11 @@ INSERT INTO `spell_pet_auras` VALUES
 (23825,0,1863,23836),
 (23825,0,17252,35706),
 (28757,0,0,28758),
-(34453,1,0,68361),
-(34454,1,0,68361),
-(34455,0,0,75593),
-(34459,0,0,75446),
 (34460,0,0,75447),
-(35029,0,0,35060),
-(35030,0,0,35061),
 (35691,0,0,35696),
 (35692,0,0,35696),
 (35693,0,0,35696),
-(56314,0,0,57447),
-(56314,1,0,57485),
-(56315,0,0,57452),
-(56315,1,0,57484),
-(56316,0,0,57453),
-(56316,1,0,57483),
-(56317,0,0,57457),
-(56317,1,0,57482),
-(56318,0,0,57458),
-(56318,1,0,57475);
+(47236,0,0,53646);
 /*!40000 ALTER TABLE `spell_pet_auras` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -96,4 +81,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:39
+-- Dump completed

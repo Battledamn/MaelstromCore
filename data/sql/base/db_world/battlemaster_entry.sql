@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -156,7 +156,11 @@ INSERT INTO `battlemaster_entry` VALUES
 (34952,30),
 (34953,30),
 (34955,32),
+(34973,32),
+(34983,32),
+(34985,32),
 (34986,1),
+(34987,32),
 (34988,1),
 (34989,1),
 (34991,1),
@@ -179,7 +183,28 @@ INSERT INTO `battlemaster_entry` VALUES
 (35026,30),
 (35027,30),
 (37298,1),
-(37413,1);
+(37413,1),
+(40413,32),
+(44000,120),
+(44004,120),
+(44012,108),
+(44013,108),
+(44059,108),
+(44060,120),
+(50546,108),
+(50548,108),
+(50549,108),
+(50550,108),
+(50551,108),
+(50552,108),
+(50553,108),
+(50668,120),
+(50670,120),
+(50674,120),
+(50676,120),
+(50678,120),
+(50683,120),
+(50684,120);
 /*!40000 ALTER TABLE `battlemaster_entry` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -191,4 +216,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:39:32
+-- Dump completed

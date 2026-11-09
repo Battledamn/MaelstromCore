@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -55,7 +55,7 @@ INSERT INTO `spell_enchant_proc_data` VALUES
 (912,0,6,0,0),
 (1667,0,8.8,0,0),
 (1668,0,8.8,0,0),
-(1894,0,1.7,0,0),
+(1894,0,3,0,0),
 (1898,0,6,0,0),
 (1899,0,1,0,0),
 (1900,0,1,0,0),
@@ -63,13 +63,13 @@ INSERT INTO `spell_enchant_proc_data` VALUES
 (2641,0,8.53,0,0),
 (2644,0,21.43,0,0),
 (2673,0,1,0,0),
-(2675,0,1,0,2),
-(3225,0,1,0,1),
+(2675,0,1,0,0),
+(3225,0,1,0,0),
 (3239,0,3,0,0),
 (3241,0,3,0,0),
 (3251,0,3,0,0),
 (3273,0,3,0,0),
-(3368,0,2,0,0),
+(3368,0,1,0,0),
 (3369,0,1,0,0),
 (3768,0,8.53,0,0),
 (3769,0,8.53,0,0),
@@ -79,7 +79,9 @@ INSERT INTO `spell_enchant_proc_data` VALUES
 (3783,0,8.8,0,0),
 (3784,0,8.8,0,0),
 (3789,0,1,0,0),
-(3869,0,1,0,0);
+(3869,0,1,0,0),
+(4098,0,1,0,0),
+(4099,0,1,0,0);
 /*!40000 ALTER TABLE `spell_enchant_proc_data` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -91,4 +93,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:37
+-- Dump completed

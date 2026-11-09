@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -40,16 +40,17 @@ CREATE TABLE `creature_movement_override` (
 LOCK TABLES `creature_movement_override` WRITE;
 /*!40000 ALTER TABLE `creature_movement_override` DISABLE KEYS */;
 INSERT INTO `creature_movement_override` VALUES
-(106339,1,1,2,0,0,0,NULL),
-(106340,1,1,2,0,0,0,NULL),
-(117664,1,0,1,0,0,0,NULL),
-(117670,1,0,1,0,0,0,NULL),
-(117671,1,0,1,0,0,0,NULL),
-(117672,1,0,1,0,0,0,NULL),
-(117677,1,0,1,0,0,0,NULL),
-(125724,1,1,2,0,0,0,NULL),
-(130896,1,0,1,0,0,0,NULL),
-(1971380,1,1,2,0,0,0,NULL);
+(10074081,NULL,NULL,1,NULL,NULL,NULL,NULL),
+(10074082,NULL,NULL,1,NULL,NULL,NULL,NULL),
+(10106339,1,1,2,0,0,0,NULL),
+(10106340,1,1,2,0,0,0,NULL),
+(10117664,1,0,1,0,0,0,NULL),
+(10117670,1,0,1,0,0,0,NULL),
+(10117671,1,0,1,0,0,0,NULL),
+(10117672,1,0,1,0,0,0,NULL),
+(10117677,1,0,1,0,0,0,NULL),
+(10125946,1,1,2,0,0,0,NULL),
+(10130896,1,0,1,0,0,0,NULL);
 /*!40000 ALTER TABLE `creature_movement_override` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -61,4 +62,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:39:40
+-- Dump completed

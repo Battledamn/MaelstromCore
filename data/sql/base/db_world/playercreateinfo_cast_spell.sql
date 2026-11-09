@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -36,7 +36,25 @@ LOCK TABLES `playercreateinfo_cast_spell` WRITE;
 /*!40000 ALTER TABLE `playercreateinfo_cast_spell` DISABLE KEYS */;
 INSERT INTO `playercreateinfo_cast_spell` VALUES
 (0,32,48266,'Death Knight - Blood Presence'),
-(0,1,2457,'Warrior - Battle Stance');
+(0,1,2457,'Warrior - Battle Stance'),
+(1,4,79597,'Human - Hunter - Young Wolf'),
+(2,4,79598,'Orc - Hunter - Young Boar'),
+(4,4,79593,'Dwarf - Hunter - Young Boar'),
+(8,4,79602,'Night Elf - Hunter - Young Boar'),
+(16,4,79600,'Undead - Hunter - Young Widow'),
+(32,4,79603,'Tauren - Hunter - Young Tallstrider'),
+(128,4,79599,'Troll - Hunter - Young Raptor'),
+(256,4,79595,'Goblin - Hunter - Young Crab'),
+(512,4,79594,'Blood Elf - Hunter - Young Dragonhawk'),
+(1024,4,79601,'Draenei - Hunter - Young Moth'),
+(2097152,4,79596,'Worgen - Hunter - Young Mastiff'),
+(0,256,688,'Warlock - Summon Imp'),
+(64,256,80653,'Warlock - Gnome - Irradiated Aura'),
+(64,128,80653,'Mage - Gnome - Irradiated Aura'),
+(64,16,80653,'Priest - Gnome - Irradiated Aura'),
+(64,8,80653,'Rogue - Gnome - Irradiated Aura'),
+(64,1,80653,'Warrior - Gnome - Irradiated Aura'),
+(128,1503,71033,'Troll - Calm of the Novice');
 /*!40000 ALTER TABLE `playercreateinfo_cast_spell` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -48,4 +66,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:21
+-- Dump completed

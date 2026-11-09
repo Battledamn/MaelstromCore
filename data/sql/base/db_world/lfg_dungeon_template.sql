@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -53,6 +53,8 @@ INSERT INTO `lfg_dungeon_template` VALUES
 (163,'Scarlet Monastery - Armory',1610.83,-323.433,18.6738,6.28022,0),
 (164,'Scarlet Monastery - Cathedral',855.683,1321.5,18.6709,0.001747,0),
 (165,'Scarlet Monastery - Library',255.346,-209.09,18.6773,6.26656,0),
+(216,'Gundrak',1882.32,631.027,176.696,3.14159,0),
+(217,'Gundrak',1882.32,631.027,176.696,3.14159,0),
 (272,'Maraudon - Purple Crystals',752.91,-616.53,-33.11,1.37,0),
 (273,'Maraudon - Pristine Waters',495.702,17.3372,-96.3128,3.11854,0),
 (274,'Stratholme - Service Entrance',3593.15,-3646.56,138.5,5.33,0),
@@ -72,4 +74,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:10
+-- Dump completed

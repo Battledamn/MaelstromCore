@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -43,11 +43,13 @@ INSERT INTO `player_race_stats` VALUES
 (3,5,-4,1,-1,-1),
 (4,-4,4,0,0,0),
 (5,-1,-2,0,-2,5),
-(6,5,-4,1,-4,2),
+(6,5,-4,1,-4,3),
 (7,-5,2,0,3,0),
 (8,1,2,0,-4,1),
+(9,-3,2,0,3,-2),
 (10,-3,2,0,3,-2),
-(11,1,-3,0,0,2);
+(11,1,-3,0,0,2),
+(22,3,2,0,-4,-1);
 /*!40000 ALTER TABLE `player_race_stats` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -59,4 +61,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:20
+-- Dump completed

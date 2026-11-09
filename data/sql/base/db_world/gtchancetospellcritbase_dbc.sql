@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -33,18 +33,6 @@ CREATE TABLE `gtchancetospellcritbase_dbc` (
 
 LOCK TABLES `gtchancetospellcritbase_dbc` WRITE;
 /*!40000 ALTER TABLE `gtchancetospellcritbase_dbc` DISABLE KEYS */;
-INSERT INTO `gtchancetospellcritbase_dbc` VALUES
-(0,0),
-(1,0.033355),
-(2,0.03602),
-(3,0),
-(4,0.012375),
-(5,0),
-(6,0.02201),
-(7,0.009075),
-(8,0.017),
-(9,0.2),
-(10,0.018515);
 /*!40000 ALTER TABLE `gtchancetospellcritbase_dbc` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -56,4 +44,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:02
+-- Dump completed

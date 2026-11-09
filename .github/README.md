@@ -85,12 +85,18 @@ MaelstromCore is built on the work of others:
   and **TrinityCore**: much of the 4.3.4 behaviour is ported from their code; each ported change carries
   its original author.
 - **TrinityDB (TDB 434)**: the Cataclysm world data.
+- **[MaNGOS Three's world database](https://github.com/mangosthree/database)**, based upon the work of
+  [getmangos.eu](https://www.getmangos.eu/): creature spawns TDB 434 lacks, such as quest givers that
+  moved in Cataclysm.
 
 ## License
 
 - The MaelstromCore source code is released under the
   [GNU GPL v2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html), like AzerothCore's
   ([LICENSE](../LICENSE)).
+- World data taken from MaNGOS Three's world database is copyright of the MaNGOS authors and stays under
+  [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/): it may not be used commercially,
+  and copies or changes of it must keep that license. The files that hold it say so in their header.
 
 MaelstromCore is not an official Blizzard Entertainment product and is not affiliated with or endorsed
 by World of Warcraft or Blizzard Entertainment. It is a project for testing and learning; it does not

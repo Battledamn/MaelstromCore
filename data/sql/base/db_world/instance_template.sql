@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -116,11 +116,29 @@ INSERT INTO `instance_template` VALUES
 (628,0,'',1),
 (631,0,'instance_icecrown_citadel',1),
 (632,0,'instance_forge_of_souls',0),
+(643,0,'',0),
+(644,1,'',0),
+(645,0,'',0),
 (649,571,'instance_trial_of_the_crusader',0),
 (650,571,'instance_trial_of_the_champion',0),
+(657,1,'',0),
 (658,0,'instance_pit_of_saron',1),
 (668,0,'instance_halls_of_reflection',1),
-(724,0,'instance_ruby_sanctum',1);
+(669,0,'',0),
+(670,0,'',0),
+(671,0,'',0),
+(720,1,'',1),
+(724,0,'instance_ruby_sanctum',1),
+(725,0,'',0),
+(734,1,'',0),
+(754,1,'',0),
+(755,1,'',1),
+(757,732,'',0),
+(859,0,'',1),
+(938,1,'',1),
+(939,1,'',1),
+(940,1,'',1),
+(967,1,'',1);
 /*!40000 ALTER TABLE `instance_template` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -132,4 +150,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:40:04
+-- Dump completed

@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -38,10 +38,15 @@ INSERT INTO `command` VALUES
 ('account',0,'Syntax: .account\r\n\r\nDisplay the access level of your account and the email adress if you possess the necessary permissions.'),
 ('account 2fa',0,'Syntax: .account 2fa <setup/remove>'),
 ('account 2fa remove',0,'Syntax: .account 2fa remove <token>\nDisables two-factor authentication for this account, if enabled.'),
-('account 2fa setup',0,'Syntax: .account 2fa setup\nSets up two-factor authentication for this account.'),
+('account 2fa setup',0,'Syntax: .account 2fa setup <token>\nSets up two-factor authentication for this account.\nRun .account 2fa setup 1 to get your 2FA key, then confirm with .account 2fa setup <token>.'),
 ('account addon',1,'Syntax: .account addon #addon\nSet expansion addon level allowed. Addon values: 0 - normal, 1 - tbc, 2 - wotlk.'),
 ('account create',4,'Syntax: .account create $account $password $email\r\n\r\nCreate account and set password to it.\r\n$email is optional, can be left blank.'),
 ('account delete',4,'Syntax: .account delete $account\r\n\r\nDelete account with all characters.'),
+('account flag',2,'Syntax: .account flag $subcommand\nType .account flag to see the list of possible subcommands or .help account flag $subcommand to see info on subcommands.'),
+('account flag add',3,'Syntax: .account flag add $account $flag\nSets an AccountFlag on $account. $flag is a symbolic name in either its full form (e.g. ACCOUNT_FLAG_TRIAL) or short form (e.g. TRIAL). ACCOUNT_FLAG_GM is managed automatically and cannot be changed manually.'),
+('account flag list',2,'Syntax: .account flag list [$account]\nLists every AccountFlag currently set on $account. Defaults to your own account when no argument is given.'),
+('account flag remove',3,'Syntax: .account flag remove $account $flag\nClears an AccountFlag on $account. $flag is a symbolic name in either its full form (e.g. ACCOUNT_FLAG_TRIAL) or short form (e.g. TRIAL). ACCOUNT_FLAG_GM is managed automatically and cannot be changed manually.'),
+('account info',2,'Syntax: .account info [$account]\nDisplays account level information for $account, given either as an account name or an account id. Defaults to the account of the selected player, or your own account when nothing is selected.'),
 ('account lock country',0,'Syntax: .account lock country [on|off]\nAllow login from account only from current used Country or remove this requirement.'),
 ('account lock ip',0,'Syntax: .account lock ip [on|off]\nAllow login from account only from current used IP or remove this requirement.'),
 ('account onlinelist',4,'Syntax: .account onlinelist\r\n\r\nShow list of online accounts.'),
@@ -51,7 +56,7 @@ INSERT INTO `command` VALUES
 ('account set 2fa',0,'Syntax: .account set 2fa <account> <secret/off>\nProvide a base32 encoded secret to setup two-factor authentication for the account.\nSpecify \'off\' to disable two-factor authentication for the account.'),
 ('account set addon',2,'Syntax: .account set addon [$account] #addon\r\n\r\nSet user (possible targeted) expansion addon level allowed. Addon values: 0 - normal, 1 - tbc, 2 - wotlk.'),
 ('account set email',3,'Syntax: .account set email $account $email $email_confirmation\nAdd or change an email to the account.'),
-('account set gmlevel',3,'Syntax: .account set gmlevel [$account] #level [#realmid]\r\n\r\nSet the security level for targeted player (can\'t be used at self) or for account $name to a level of #level on the realm #realmID.\r\n\r\n#level may range from 0 to 3.\r\n\r\n#reamID may be -1 for all realms.'),
+('account set gmlevel',3,'Syntax: .account set gmlevel [$account] #level #realmID\r\n\r\nSet the security level for targeted player (can\'t be used at self) or for an account name ($account) to a level of #level on the realm #realmID.\r\n\r\n#level may range from 0 to 3.\r\n\r\n#realmID may be -1 for all realms.'),
 ('account set password',3,'Syntax: .account set password $account $password $password\r\n\r\nSet password for account.'),
 ('achievement',2,'Syntax: .achievement $subcommand\nType .achievement to see the list of possible subcommands or .help achievement $subcommand to see info on subcommands'),
 ('achievement add',2,'Syntax: .achievement add $achievement\nAdd an achievement to the targeted player.\n$achievement: can be either achievement id or achievement link'),
@@ -198,7 +203,7 @@ INSERT INTO `command` VALUES
 ('debug threat',3,'Syntax: .debug threat\nReturns the threat list of a given creature.'),
 ('debug threatinfo',3,'Syntax: .debug threatinfo\nDisplays various debug information about the target\'s threat state, modifiers, redirects and similar.'),
 ('debug unitstate',3,'Syntax: .debug unitstate [#unitstate]\n\nSets the unit state for the selected unit or displays current unit and react state.'),
-('debug update',3,'Syntax: .debug update #index #value\nSets the unsigned 32-bit integer value of the target at the given index to the given bit.'),
+('debug update',3,'Syntax: .debug update #index [#value]\n\nUSE WITH CAUTION, CAN CRASH THE SERVER\n\nReads or writes the raw 32-bit update field at #index on the selected unit. With no #value, prints the current value; with #value, sets it. Writing an invalid value can crash the server.\nValid #index are the *_FIELD enums in src/server/game/Entities/Object/Updates/UpdateFields.h (UNIT_FIELD_* for creatures, PLAYER_FIELD_* for players).'),
 ('debug uws',3,'Syntax: .debug uws #variable #value\nSends a worldstate update for the given variable to the given value.'),
 ('debug visibilitydata',3,'Syntax: .debug visibilitydata\n\nDisplays debug information related to object visibility around the player.'),
 ('debug zonestats',1,'.debug zonestats [$playerName]\nDisplays the amount of players in the player\'s current zone.'),
@@ -279,6 +284,7 @@ INSERT INTO `command` VALUES
 ('gps',1,'Syntax: .gps [$name|$shift-link]\r\n\r\nDisplay the position information for a selected character or creature (also if player name $name provided then for named player, or if creature/gameobject shift-link provided then pointed creature/gameobject if it loaded). Position information includes X, Y, Z, and orientation, map Id and zone Id'),
 ('group',2,'Syntax: .group $subcommand\nType .group to see the list of possible subcommands or .help group $subcommand to see info on subcommands'),
 ('group disband',2,'Syntax: .group disband [$characterName]\n\nDisbands the given character\'s group.'),
+('group invites',2,'Syntax: .group invites on|off\r\nEnable/disable accepting group invites.'),
 ('group join',2,'Syntax: .group join $AnyCharacterNameFromGroup [$CharacterName] \r\nAdds to group of player $AnyCharacterNameFromGroup player $CharacterName (or selected).'),
 ('group leader',2,'Syntax: .group leader [$characterName]\n\nSets the given character as his group\'s leader.'),
 ('group list',2,'Syntax: .group list [$CharacterName] \r\nLists all the members of the group/party the player is in.'),
@@ -306,7 +312,7 @@ INSERT INTO `command` VALUES
 ('instance savedata',3,'Syntax: .instance savedata\r\n  Save the InstanceData for the current player\'s map to the DB.'),
 ('instance setbossstate',2,'Syntax: .instance setbossstate $bossId $encounterState [$Name]\r\nSets the EncounterState for the given boss id to a new value. EncounterStates range from 0 to 5.\r\nIf no character name is provided, the current map will be used as target.'),
 ('instance stats',1,'Syntax: .instance stats\n\nShows statistics about instances.'),
-('instance unbind',2,'Syntax: .instance unbind <mapid|all> [difficulty]\r\n  Clear all/some of player\'s binds'),
+('instance unbind',2,'Syntax: .instance unbind <mapid|all> [difficulty] [$playername]\nClear all or some instance binds of the selected player, yourself, or the named character, online or offline. The map the character is on keeps its bind. From the console the name is required.'),
 ('inventory',1,'Syntax: .inventory $subcommand \nType .inventory to see the list of possible subcommands or .help inventory $subcommand to see info on subcommands'),
 ('inventory count',1,'Syntax: .inventory count $playerName or $plaerGuid \nCount free slots in bags divided into different bag types.'),
 ('item move',2,'Syntax: .itemmove #sourceslotid #destinationslotid\r\n\r\nMove an item from slots #sourceslotid to #destinationslotid in your inventory\r\n\r\nNot yet implemented'),
@@ -379,6 +385,7 @@ INSERT INTO `command` VALUES
 ('modify',2,'Syntax: .modify $subcommand\nType .modify to see the list of possible subcommands or .help modify $subcommand to see info on subcommands'),
 ('modify arenapoints',2,'Syntax: .modify arenapoints #value\r\nAdd $amount arena points to the selected player.'),
 ('modify bit',2,'Syntax: .modify bit #field #bit\r\n\r\nToggle the #bit bit of the #field field for the selected player. If no player is selected, modify your character.'),
+('modify currency',2,'Syntax: .modify currency #currencyId #amount\n\nAdd #amount of a currency (CurrencyTypes.dbc id, e.g. 395 Justice Points, 384-401 archaeology fragments) to the selected player, or to yourself with no player selected. The amount is what the client shows; it can be negative, and the currency\'s cap applies.'),
 ('modify drunk',2,'Syntax: .modify drunk #value\r\n Set drunk level to #value (0..100). Value 0 remove drunk state, 100 is max drunked state.'),
 ('modify energy',2,'Syntax: .modify energy #energy\r\n\r\nModify the energy of the selected player. If no player is selected, modify your energy.'),
 ('modify faction',3,'Syntax: .modify faction #factionid #flagid #npcflagid #dynamicflagid\r\n\r\nModify the faction and flags of the selected creature. Without arguments, display the faction and flags of the selected creature.'),
@@ -446,6 +453,7 @@ INSERT INTO `command` VALUES
 ('npc set phase',3,'Syntax: .npc set phase #phasemask\r\n\r\nSelected unit or pet phasemask changed to #phasemask with related world vision update for players. In creature case state saved to DB and persistent. In pet case change active until in game phase changed for owner, owner re-login, or GM-mode enable/disable..'),
 ('npc set spawntime',3,'Syntax: .npc set spawntime #time\r\nAdjust spawntime of selected creature to #time.\n#time: use a timestring like \"10m30s\".'),
 ('npc set wanderdistance',3,'Syntax: .npc set wanderdistance #dist\r\n\r\nAdjust wander distance of selected creature to dist.'),
+('npc showloot',2,'Syntax: .npc showloot\nShows the loot generated on the selected creature\'s corpse.'),
 ('npc spawngroup',3,'Syntax: .npc spawngroup #groupId\r\nSpawns all creatures in the given spawn group.'),
 ('npc tame',2,'Syntax: .npc tame\nCreates a player pet of the targeted creature.'),
 ('npc textemote',2,'Syntax: .npc textemote #emoteid\r\n\r\nMake the selected creature to do textemote with an emote of id #emoteid.'),
@@ -646,11 +654,12 @@ INSERT INTO `command` VALUES
 ('server set closed',4,'Syntax: server set closed on/off\r\n\r\nSets whether the world accepts new client connectsions.'),
 ('server set loglevel',4,'Syntax: .server set loglevel $facility $name $loglevel. $facility can take the values: appender (a) or logger (l). $loglevel can take the values: disabled (0),\n trace (1),\n debug (2),\n info (3),\n warn (4),\n error (5) or fatal (6)'),
 ('server set motd',3,'Syntax: .server set motd Optional($realmId) Optional($locale) $MOTD\r \r Set server Message of the day for the specified $realmId.\r If $realmId is not provided it will update for the current realm. \r Use $realmId -1 to set motd for all realms. If $locale is not provided enUS will be used.'),
+('server set security',4,'Syntax: .server set security $level\r\n\r\nSets the minimum account security level (0 = player, 1 = moderator, 2 = gamemaster, 3 = administrator) allowed to log into the current realm. Updates realmlist.allowedSecurityLevel and applies immediately.'),
 ('server shutdown',3,'Syntax: .server shutdown #delay [#exit_code]\r\nShut the server down after #delay. Use #exit_code or 0 as program exit code.\n#delay: use a timestring like \"1h15m30s\".'),
 ('server shutdown cancel',3,'Syntax: .server shutdown cancel\r\n\r\nCancel the restart/shutdown timer if any.'),
 ('setskill',2,'Syntax: .setskill #skill #level [#max]\r\n\r\nSet a skill of id #skill with a current skill value of #level and a maximum value of #max (or equal current maximum if not provide) for the selected character. If no character is selected, you learn the skill.'),
 ('settings',1,'Syntax: .settings $subcommand\nType .setting to see the list of all available commands.'),
-('settings announcer',1,'Syntax: .settings announcer <type> <on/off>.\nDisables receiving announcements. Valid announcement types are: \'autobroadcast\', \'arena\' and \'bg\''),
+('settings announcer',1,'Syntax: .settings announcer <type> <on/off>.\nDisables receiving announcements. Valid announcement types are: \'autobroadcast\', \'arena\', \'bg\', \'pvpstart\' and \'pvpall\''),
 ('showarea',2,'Syntax: .showarea #areaid\r\n\r\nReveal the area of #areaid to the selected character. If no character is selected, reveal this area to you.'),
 ('skirmish',3,'Syntax: .skirmish [arena] [XvX] [Nick1] [Nick2] ... [NickN]\n[arena] can be \"all\" or comma-separated list of possible arenas (NA, BE, RL, DS, RV).\n[XvX] can be 1v1, 2v2, 3v3, 5v5. After [XvX] specify enough nicknames for that mode.'),
 ('spect',0,'Syntax: .spect $subcommand\nType .spect to see the list of possible subcommands or .help spect $subcommand to see info on subcommands.'),
@@ -674,6 +683,13 @@ INSERT INTO `command` VALUES
 ('teleport name npc guid',2,'Syntax: .teleport name id #playername #creatureSpawnId\nTeleport the given character to creature with spawn id #creatureSpawnId. Character can be offline.'),
 ('teleport name npc id',2,'Syntax: .teleport name id #playername #creatureId\nTeleport the given character to first found creature with id #creatureId. Character can be offline.'),
 ('teleport name npc name',2,'Syntax: .teleport name id #playername #creatureName\nTeleport the given character to first found creature with name (must match exactly) #creatureName. Character can be offline.'),
+('testkit',2,'Syntax: .testkit $subcommand\nClass test helpers (mod-maelstrom-testkit): tree, ready, reset.'),
+('testkit audit',2,'Syntax: .testkit audit\nChecks every glyph of every class: its modifiers reach a spell and the effect they change exists.'),
+('testkit cast',2,'Syntax: .testkit cast #spell [triggered]\nYou cast it: at yourself if it is helpful, otherwise at your selection.'),
+('testkit glyph',2,'Syntax: .testkit glyph #id #apply [#spell ...]\nPuts glyph #id (GlyphProperties.dbc) in a slot of its type (#apply 1) or takes it out (0), and the known spells of the list on action buttons 1-5. #id 0 empties every glyph slot.'),
+('testkit ready',2,'Syntax: .testkit ready\nFull health and power, no cooldowns or Forbearance, and five training dummies in front of you.'),
+('testkit reset',2,'Syntax: .testkit reset\nResets the active spec\'s talents and specialization.'),
+('testkit tree',2,'Syntax: .testkit tree #number\nLearns every talent of talent tree #number (1-3, the talent window\'s tabs from the left) at its highest rank and makes it the active spec\'s specialization.'),
 ('ticket',2,'Syntax: .ticket $subcommand\nType .ticket to see the list of possible subcommands or .help ticket $subcommand to see info on subcommands'),
 ('ticket assign',2,'Usage: .ticket assign $ticketid $gmname.\r\nAssigns the specified ticket to the specified Game Master.'),
 ('ticket close',2,'Usage: .ticket close $ticketid.\r\nCloses the specified ticket. Does not delete permanently.'),
@@ -729,7 +745,7 @@ INSERT INTO `command` VALUES
 ('wp add',3,'Syntax: .wp add\r\n\r\nAdd a waypoint for the selected creature at your current position.'),
 ('wp event',3,'Syntax: .wp event $subcommand\nType .path event to see the list of possible subcommands or .help path event $subcommand to see info on subcommands.'),
 ('wp load',3,'Syntax: .wp load $pathid\nLoad pathid number for selected creature. Creature must have no waypoint data.'),
-('wp modify',3,'Syntax: '),
+('wp modify',3,'Syntax: .wp modify $option [$value]\nChange the selected waypoint (show the path with .wp show on and target a waypoint first).\ndel - delete the waypoint\nmove - move the waypoint to your position\ndelay $milliseconds - wait time at the waypoint\naction $id - waypoint_scripts id to run at the waypoint\naction_chance $percent - chance to run that action\nmove_type $type - 0 walk, 1 run, 2 land, 3 takeoff'),
 ('wp reload',3,'Syntax: .wp reload $pathid\nLoad path changes ingame - IMPORTANT: must be applied first for new paths before .wp load #pathid '),
 ('wp show',3,'Syntax: .wp show $option\nOptions:\non $pathid (or selected creature with loaded path) - Show path\noff - Hide path\ninfo $selected_waypoint - Show info for selected waypoint.'),
 ('wp unload',3,'Syntax: .wp unload\nUnload path for selected creature.'),
@@ -745,4 +761,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:39:36
+-- Dump completed

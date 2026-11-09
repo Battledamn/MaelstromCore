@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.3, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.9, for Win64 (x86_64)
 --
--- Host: localhost    Database: acore_world
+-- Host: 127.0.0.1    Database: acore_world_cata
 -- ------------------------------------------------------
--- Server version	8.4.3
+-- Server version	8.4.9
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -8823,7 +8823,7 @@ INSERT INTO `broadcast_text` VALUES
 (10239,0,'How many of our Lieutenants are alive, Vanndar?','How many of our Lieutenants are alive, Vanndar?',0,0,0,0,0,0,0,0,1,18019),
 (10240,0,'$950w, soldier.','',0,0,0,0,0,0,0,0,1,18019),
 (10241,0,'How many Frostwolf Officers are alive, Vanndar?','How many Frostwolf Officers are alive, Vanndar?',0,0,0,0,0,0,0,0,1,18019),
-(10242,0,'$966w Frostwolf Commander(s) and $964w Frostwolf Lieutenant(s),\n soldier.','',1,0,0,0,0,0,0,0,1,18019),
+(10242,0,'$966w Frostwolf Commander(s) and $964w Frostwolf Lieutenant(s), soldier.','',1,0,0,0,0,0,0,0,1,18019),
 (10243,0,'Soldiers of Stormpike, your General is under attack! I require aid! Come! Come! Slay these mangy Frostwolf dogs.','',0,0,0,0,0,0,0,0,1,18019),
 (10245,0,'Stormpike filth! In my keep?! Slay them all!','',0,0,0,0,0,0,0,0,1,18019),
 (10249,1,'Hmmm... Where is my fishing hook? Oh, there it is.','',16,0,0,0,0,0,0,0,1,18019),
@@ -19790,7 +19790,7 @@ INSERT INTO `broadcast_text` VALUES
 (21528,0,'I\'m ready for Mount Hyjal, Jimmy. Teleport me!','I\'m ready for Mount Hyjal, Jimmy. Teleport me!',0,0,0,0,0,0,0,0,1,18019),
 (21529,0,'We\'re currently focus testing The Black Temple. You must have at least HONORED reputation with the Violet Eye to participate.$B$BThat\'s the reputation you gain while doing Karazhan.','',396,396,0,0,0,0,0,0,1,18019),
 (21530,0,'I wish to purchase the key to the Black Temple and some phat lewtz.','I wish to purchase the key to the Black Temple and some phat lewtz.',0,0,0,0,0,0,0,0,1,18019),
-(21531,0,'Now that you have your Black Temple key (Medallion of Karabor),\n I can teleport you directly to the Black Temple. Just tell me when you are ready.','',1,0,0,0,0,0,0,0,1,18019),
+(21531,0,'Now that you have your Black Temple key (Medallion of Karabor), I can teleport you directly to the Black Temple. Just tell me when you are ready.','',1,0,0,0,0,0,0,0,1,18019),
 (21532,0,'I\'m ready to go to the Black Temple, Johnny.','I\'m ready to go to the Black Temple, Johnny.',0,0,0,0,0,0,0,0,1,18019),
 (21533,0,'Welcome friend! What would you like to see?','',396,0,0,1,0,0,0,0,1,18019),
 (21534,0,'Greetings $G brother:sister;. How can we be of service?','',396,0,0,1,0,0,0,0,1,18019),
@@ -46036,7 +46036,7 @@ INSERT INTO `broadcast_text` VALUES
 (48370,0,'Your death will tell a different story!','',0,0,0,0,0,0,0,0,1,18019),
 (48371,0,'You\'re accused of being a demon in disguise, Navarax... if that\'s even your real name!','You\'re accused of being a demon in disguise, Navarax... if that\'s even your real name!',0,0,0,0,0,0,0,0,1,18019),
 (48372,0,'I\'d like to challenge your magma lord to a fight.','I\'d like to challenge your magma lord to a fight.',0,0,0,0,0,0,0,0,1,18019),
-(48373,0,'Yes, my child?','',0,0,0,0,0,0,0,0,1,18019),
+(48373,0,'Yes, my child?','',0,0,0,0,0,0,0,0,1,19342),
 (48374,0,'It\'s a good thing I showed up when I did!$b$bI\'m guessing we haven\'t seen the last of that Schnottz fellow.','',0,0,0,0,0,0,0,396,1,18019),
 (48375,0,'Alright boys, we got a challenger!  Time to show the general what our little captive can do!','',0,0,0,0,0,0,0,22,1,18019),
 (48376,0,'Nooo!  My baby...','',0,0,0,0,0,0,0,18,1,18019),
@@ -57541,7 +57541,7 @@ INSERT INTO `broadcast_text` VALUES
 (60337,0,'We will save him, Suna. I promise.','',0,0,0,0,0,0,30596,0,1,18019),
 (60338,0,'And the greatest losses.','',0,0,0,0,0,0,0,0,1,18019),
 (60339,0,'You throw caution to the wind.','',0,0,0,0,0,0,0,0,1,18019),
-(60340,0,'What happened to Linï¿½ it was no oneï¿½s fault.','',0,0,0,0,0,0,0,0,1,18019),
+(60340,0,'What happened to Lin� it was no one�s fault.','',0,0,0,0,0,0,0,0,1,18019),
 (60341,0,'He is gone. We must all move on.','',0,0,0,0,0,0,0,0,1,18019),
 (60342,0,'I\'m heading to the wound. Try to keep these beasts off of me.','I\'m heading to the wound. Try to keep these beasts off of me.',0,0,0,0,0,0,0,396,1,18019),
 (60343,0,'You\'re a life-saver. I\'ll do everything I can to heal the wound.','You\'re a life-saver. I\'ll do everything I can to heal the wound.',0,0,0,0,0,0,0,396,1,18019),
@@ -62685,7 +62685,7 @@ INSERT INTO `broadcast_text` VALUES
 (65537,0,'|TInterface\\Icons\\inv_elemental_primal_air.blp:20|tMing the Cunning summons a |cFFFF0000|Hspell:119981|h[Whirling Dervish]|h|r!','',0,0,0,0,0,0,0,15,1,18019),
 (65538,0,'|TInterface\\Icons\\spell_druid_ursolsvortex.blp:20|tMing the Cunning creates a |cFFFF0000|Hspell:120099|h[Magnetic Field]|h|r!','',0,0,0,0,0,0,0,15,1,18019),
 (65539,0,'|TInterface\\Icons\\ability_warrior_savageblow.blp:20|tHaiyan the Unstoppable strikes |cFFFF0000$n|r with a |cFFFF0000|Hspell:123655|h[Traumatic Blow]|h|r!','',0,0,0,0,0,0,0,15,1,18019),
-(65540,0,'We are all here. This is a historic moment, $n. My dying wife envisioned a city of light beyond these gatesï¿½ What do you think we will find?','',6,0,0,0,0,0,0,0,1,18019),
+(65540,0,'We are all here. This is a historic moment, $n. My dying wife envisioned a city of light beyond these gates� What do you think we will find?','',6,0,0,0,0,0,0,0,1,18019),
 (65541,0,'Haiyan the Unstoppable struck you with a |cFFFF0000|Hspell:123655|h[Traumatic Blow]|h|r! Healing abilities used on you will be less efficient while the effect persists!','',0,0,0,0,0,0,0,15,1,18019),
 (65542,0,'There\'s only one way to find out...','There\'s only one way to find out...',5,0,0,0,0,0,0,0,1,18019),
 (65543,0,'|TInterface\\Icons\\spell_fire_meteorstorm.blp:20|tHaiyan the Unstoppable targets |cFFFF0000$n|r with a |cFFFF0000|Hspell:120195|h[Meteor]|h|r!','',0,0,0,0,0,0,0,15,1,18019),
@@ -62947,7 +62947,7 @@ INSERT INTO `broadcast_text` VALUES
 (65800,0,'','That\'s NOT going to happen.',0,0,0,0,0,0,0,0,1,18019),
 (65801,0,'','Destroy them!',0,0,0,0,0,0,0,0,1,18019),
 (65802,0,'','They are falling! Don\'t stop now!',0,0,0,0,0,0,0,0,1,18019),
-(65803,0,'','Good work! Youï¿½re quite a fighter.',0,0,0,0,0,0,0,0,1,18019),
+(65803,0,'','Good work! You�re quite a fighter.',0,0,0,0,0,0,0,0,1,18019),
 (65804,0,'','I love the feeling after a good fight.',0,0,0,0,0,0,0,0,1,18019),
 (65805,0,'','Let\'s celebrate!',0,0,0,0,0,0,0,0,1,18019),
 (65806,0,'Keep them back!  They will not delve into our secrets!','',0,0,0,0,0,0,0,0,1,18019),
@@ -73104,4 +73104,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-01 22:39:32
+-- Dump completed
