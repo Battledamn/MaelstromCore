@@ -84,6 +84,7 @@ void AddSC_dustwallow_marsh();
 void AddSC_felwood();
 void AddSC_feralas();
 void AddSC_zone_kezan();
+void AddSC_zone_lost_isles();
 void AddSC_moonglade();
 void AddSC_mulgore();
 void AddSC_orgrimmar();
@@ -169,6 +170,7 @@ void AddKalimdorScripts()
     AddSC_felwood();
     AddSC_feralas();
     AddSC_zone_kezan();
+    AddSC_zone_lost_isles();
     AddSC_moonglade();
     AddSC_mulgore();
     AddSC_orgrimmar();
