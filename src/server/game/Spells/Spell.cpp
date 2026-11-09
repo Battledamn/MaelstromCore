@@ -4586,6 +4586,19 @@ void Spell::SendSpellCooldown()
         return;
 
     _player->AddSpellAndCategoryCooldowns(m_spellInfo, m_CastItem ? m_CastItem->GetEntry() : 0, this);
+
+    // A temporary spell (an override bar's, e.g. Life of the Party's party spells) is not one the client was told it
+    // learned, so the client does not start its cooldown itself; it is sent, as for vehicle spells above
+    if (m_spellInfo->RecoveryTime && !m_CastItem)
+    {
+        PlayerSpellMap::const_iterator itr = _player->GetSpellMap().find(m_spellInfo->Id);
+        if (itr != _player->GetSpellMap().end() && itr->second->State == PLAYERSPELL_TEMPORARY)
+        {
+            WorldPacket data;
+            _player->BuildCooldownPacket(data, 0, m_spellInfo->Id, m_spellInfo->RecoveryTime);
+            _player->SendDirectMessage(&data);
+        }
+    }
 }
 
 void Spell::update(uint32 difftime)

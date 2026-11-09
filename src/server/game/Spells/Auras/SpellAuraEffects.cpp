@@ -6019,7 +6019,9 @@ void AuraEffect::HandleAuraOverrideSpells(AuraApplication const* aurApp, uint8 m
         if (OverrideSpellDataEntry const* overrideSpells = sOverrideSpellDataStore.LookupEntry(overrideId))
             for (uint8 i = 0; i < MAX_OVERRIDE_SPELL; ++i)
                 if (uint32 spellId = overrideSpells->spellId[i])
-                    target->_addSpell(spellId, SPEC_MASK_ALL, true);
+                    // Silently, as CPP's AddTemporarySpell: they show on the override bar (PLAYER_FIELD_BYTES2).
+                    // A learned-spell packet made the 4.3.4 client put them on the player's own bars too.
+                    target->_addSpell(spellId, SPEC_MASK_ALL, true, false, false);
     }
     else
     {
