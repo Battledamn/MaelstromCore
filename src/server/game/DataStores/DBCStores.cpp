@@ -490,8 +490,13 @@ void LoadDBCStores(std::string const& dataPath)
     }
 
     // fill data
+    // 4.3.4's MapDifficulty.dbc has no row for Eastern Kingdoms, though every other continent has one
+    sMapDifficultyMap[MAKE_PAIR32(0, 0)] = MapDifficulty(0, 0, false);
     for (MapDifficultyEntry const* entry : sMapDifficultyStore)
         sMapDifficultyMap[MAKE_PAIR32(entry->MapId, entry->Difficulty)] = MapDifficulty(entry->resetTime, entry->maxPlayers, entry->areaTriggerText[0] != '\0');
+
+    // Scarlet Monastery's heroic row is wrong: the instance has no heroic mode
+    sMapDifficultyMap.erase(MAKE_PAIR32(189, 1));
 
     for (PvPDifficultyEntry const* entry : sPvPDifficultyStore)
         if (entry->bracketId > MAX_BATTLEGROUND_BRACKETS)
