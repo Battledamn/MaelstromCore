@@ -124,7 +124,9 @@ void Pet::AddToWorld()
 
 void Pet::RemoveFromWorld()
 {
-    if (Unit* owner = GetOwner())
+    // By guid, not m_owner: at logout the player is deleted before the map removes its pet, so the cached
+    // pointer can be dangling here (a crash on logout with a hunter pet, 2026-11-07).
+    if (Player* owner = ObjectAccessor::FindPlayer(GetOwnerGUID()))
         owner->UnregisterPhaseSummon(this);
 
     ///- Remove the pet from the accessor
