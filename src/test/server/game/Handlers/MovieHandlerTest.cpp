@@ -24,6 +24,15 @@
 #include "WorldPacket.h"
 #include <gtest/gtest.h>
 
+// unitTarget and effectHandleMode are protected in our Spell; the test reaches them through a subclass.
+class MovieTestSpell : public Spell
+{
+public:
+    using Spell::Spell;
+    using Spell::unitTarget;
+    using Spell::effectHandleMode;
+};
+
 class MovieHandlerTest : public IntegrationTestFixture
 {
 protected:
@@ -60,7 +69,7 @@ TEST_F(MovieHandlerTest, MovieSpellRequiresAClientMovieEntry)
         .WithEffect(EFFECT_0, SPELL_EFFECT_PLAY_MOVIE)
         .WithEffectMiscValue(EFFECT_0, testMovieId)
         .BuildUnique();
-    Spell spell(player, spellInfo.get(), TRIGGERED_FULL_MASK);
+    MovieTestSpell spell(player, spellInfo.get(), TRIGGERED_FULL_MASK);
     spell.unitTarget = player;
     spell.effectHandleMode = SPELL_EFFECT_HANDLE_HIT_TARGET;
 

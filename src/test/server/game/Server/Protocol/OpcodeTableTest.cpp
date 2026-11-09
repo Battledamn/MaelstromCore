@@ -181,7 +181,9 @@ TEST(OpcodeTableTest, DispatchesCompleteMovie)
     EXPECT_EQ(uint16(CMSG_COMPLETE_MOVIE), 0x4136);
     EXPECT_EQ(uint16(SMSG_TRIGGER_MOVIE), 0x4625);
 
-    OpcodeTable table;
+    // On the heap: the table is too large for the default 1 MB stack on Windows.
+    auto tableStorage = std::make_unique<OpcodeTable>();
+    OpcodeTable& table = *tableStorage;
     table.Initialize();
 
     ClientOpcodeHandler const* completeMovie = table[CMSG_COMPLETE_MOVIE];

@@ -405,6 +405,9 @@ TEST(MovementPacketsTest, EverySpeedTypeHasCataSequencesThatCarryTheSpeed)
             EXPECT_EQ(read.guid, info.guid) << opcodes.Ack;
             EXPECT_EQ(MovementUpdate(read), MovementUpdate(info)) << opcodes.Ack << " " << fixture;
         }
+    }
+}
+
 TEST(MovementPacketsTest, ReadsVehicleControlMovementAndExtraElements)
 {
     using namespace WorldPackets::Movement;
@@ -426,7 +429,7 @@ TEST(MovementPacketsTest, ReadsVehicleControlMovementAndExtraElements)
         ExtraMovementStatusElement extra(GetChangeSeatsExtraSequence());
         MovementInfo info;
         ReadGroundMovement(packet, info, GetMovementSequence(CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE),
-            nullptr, &extra);
+            nullptr, nullptr, &extra);
         EXPECT_EQ(info.guid, ObjectGuid(uint64(0x01020304)));
         EXPECT_FLOAT_EQ(info.pos.GetPositionX(), 1.0f);
         EXPECT_FLOAT_EQ(info.pos.GetPositionY(), 2.0f);
@@ -443,7 +446,7 @@ TEST(MovementPacketsTest, ReadsVehicleControlMovementAndExtraElements)
         ExtraMovementStatusElement extra(GetChangeSeatsExtraSequence());
         MovementInfo info;
         ReadGroundMovement(packet, info, GetMovementSequence(CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE),
-            nullptr, &extra);
+            nullptr, nullptr, &extra);
         EXPECT_EQ(info.guid, ObjectGuid(uint64(0x0010000000000001)));
         EXPECT_EQ(extra.Data.guid, ObjectGuid(uint64(0x0010000000000001)));
         EXPECT_EQ(extra.Data.byteData, -1);
@@ -456,7 +459,7 @@ TEST(MovementPacketsTest, ReadsVehicleControlMovementAndExtraElements)
         ExtraMovementStatusElement extra(GetChangeSeatsExtraSequence());
         MovementInfo info;
         EXPECT_THROW(ReadGroundMovement(packet, info, GetMovementSequence(CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE),
-            nullptr, &extra), ByteBufferException);
+            nullptr, nullptr, &extra), ByteBufferException);
     }
 }
 
