@@ -119,14 +119,14 @@ struct M2Track
 struct M2Camera
 {
     uint32_t type;                  // 0: portrait, 1: characterinfo; -1: else (flyby etc.); referenced backwards in the lookup table.
-    float fov;                      // No radians, no degrees. Multiply by 35 to get degrees.
-    float far_clip;
+    float far_clip;                 // 4.3.4: the field of view is no longer a float here but fovdata, a track at the end
     float near_clip;
     M2Track positions;              // How the camera's position moves. Should be 3*3 floats.
     G3D::Vector3 position_base;
     M2Track target_positions;       // How the target moves. Should be 3*3 floats.
     G3D::Vector3 target_position_base;
     M2Track rolldata;               // The camera can have some roll-effect. Its 0 to 2*Pi.
+    M2Track fovdata;                // FoV for this segment (4.3.4, as CPP)
 };
 #pragma pack(pop)
 
