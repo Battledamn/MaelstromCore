@@ -42,16 +42,17 @@ struct EnchStoreItem
 typedef std::vector<EnchStoreItem> EnchStoreList;
 typedef std::unordered_map<uint32, EnchStoreList> EnchantmentStore;
 
-static EnchantmentStore RandomItemEnch;
+static EnchantmentStore RandomItemEnch[MAX_ITEM_RANDOM_ENCHANT_TYPES];
 
 void LoadRandomEnchantmentsTable()
 {
     uint32 oldMSTime = getMSTime();
 
-    RandomItemEnch.clear();                                 // for reload case
+    for (EnchantmentStore& store : RandomItemEnch)          // for reload case
+        store.clear();
 
-    //                                                 0      1      2
-    QueryResult result = WorldDatabase.Query("SELECT entry, ench, chance FROM item_enchantment_template");
+    //                                                 0      1     2      3
+    QueryResult result = WorldDatabase.Query("SELECT entry, type, ench, chance FROM item_enchantment_template");
 
     if (result)
     {
@@ -62,11 +63,18 @@ void LoadRandomEnchantmentsTable()
             Field* fields = result->Fetch();
 
             uint32 entry = fields[0].Get<uint32>();
-            uint32 ench = fields[1].Get<uint32>();
-            float chance = fields[2].Get<float>();
+            uint8 type = fields[1].Get<uint8>();
+            uint32 ench = fields[2].Get<uint32>();
+            float chance = fields[3].Get<float>();
+
+            if (type >= MAX_ITEM_RANDOM_ENCHANT_TYPES)
+            {
+                LOG_ERROR("sql.sql", "Table `item_enchantment_template` entry {} ench {} has unknown type {}, skipped.", entry, ench, type);
+                continue;
+            }
 
             if (chance > 0.000001f && chance <= 100.0f)
-                RandomItemEnch[entry].push_back(EnchStoreItem(ench, chance));
+                RandomItemEnch[type][entry].push_back(EnchStoreItem(ench, chance));
 
             ++count;
         } while (result->NextRow());
@@ -81,7 +89,7 @@ void LoadRandomEnchantmentsTable()
     }
 }
 
-uint32 GetItemEnchantMod(int32 entry)
+uint32 GetItemEnchantMod(int32 entry, ItemRandomEnchantType type)
 {
     if (!entry)
         return 0;
@@ -89,10 +97,11 @@ uint32 GetItemEnchantMod(int32 entry)
     if (entry == -1)
         return 0;
 
-    EnchantmentStore::const_iterator tab = RandomItemEnch.find(entry);
-    if (tab == RandomItemEnch.end())
+    EnchantmentStore const& store = RandomItemEnch[type];
+    EnchantmentStore::const_iterator tab = store.find(entry);
+    if (tab == store.end())
     {
-        LOG_ERROR("sql.sql", "Item RandomProperty / RandomSuffix id #{} used in `item_template` but it does not have records in `item_enchantment_template` table.", entry);
+        LOG_ERROR("sql.sql", "Item {} id #{} used in `item_template` but it does not have records in `item_enchantment_template` table.", type == ITEM_RANDOM_ENCHANT_SUFFIX ? "RandomSuffix" : "RandomProperty", entry);
         return 0;
     }
 

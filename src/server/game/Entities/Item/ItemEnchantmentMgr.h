@@ -20,7 +20,15 @@
 
 #include "Common.h"
 
+// `item_enchantment_template`.`type`: 4.3.4 uses the same entry ids for both kinds, each with its own rows
+enum ItemRandomEnchantType : uint8
+{
+    ITEM_RANDOM_ENCHANT_PROPERTY  = 0, // item_template.RandomProperty, ench is an ItemRandomProperties.dbc id
+    ITEM_RANDOM_ENCHANT_SUFFIX    = 1, // item_template.RandomSuffix, ench is an ItemRandomSuffix.dbc id
+    MAX_ITEM_RANDOM_ENCHANT_TYPES = 2
+};
+
 void LoadRandomEnchantmentsTable();
-uint32 GetItemEnchantMod(int32 entry);
+uint32 GetItemEnchantMod(int32 entry, ItemRandomEnchantType type);
 uint32 GenerateEnchSuffixFactor(uint32 item_id);
 #endif
