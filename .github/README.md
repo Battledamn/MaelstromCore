@@ -85,6 +85,9 @@ MaelstromCore is built on the work of others:
   and **TrinityCore**: much of the 4.3.4 behaviour is ported from their code; each ported change carries
   its original author.
 - **TrinityDB (TDB 434)**: the Cataclysm world data.
+- **[ArkCORE-NG](https://github.com/Arkania/ArkCORE-NG)** by the Arkania team (gpn39f, ladel and others):
+  the Goblin start's scripts for Kezan and the Lost Isles, ported from its code, and the Lost Isles'
+  creature placement, paths and movement and Life Savings' route from its world database (GPL-2.0).
 - **[MaNGOS Three's world database](https://github.com/mangosthree/database)**, based upon the work of
   [getmangos.eu](https://www.getmangos.eu/): creature spawns TDB 434 lacks, such as quest givers that
   moved in Cataclysm.
