@@ -274,6 +274,20 @@ std::size_t ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg chatType, La
                                     std::string const& senderName /*= ""*/, std::string const& receiverName /*= ""*/,
                                     uint32 achievementId /*= 0*/, bool gmMessage /*= false*/, std::string const& channelName /*= ""*/)
 {
+    // 4.3.4 sends an addon message's prefix as its own string after the receiver guid, and only the payload as the
+    // message; the callers still pass WotLK's "prefix\tpayload", split here. Without it the client read the prefix
+    // out of the message length and dropped every addon message the server sent.
+    std::string_view addonPrefix;
+    if (language == LANG_ADDON)
+    {
+        std::size_t const tab = message.find('\t');
+        if (tab != std::string_view::npos)
+        {
+            addonPrefix = message.substr(0, tab);
+            message = message.substr(tab + 1);
+        }
+    }
+
     std::size_t receiverGUIDPos = 0;
     data.Initialize(!gmMessage ? SMSG_MESSAGECHAT : SMSG_GM_MESSAGECHAT);
     data << uint8(chatType);
@@ -299,12 +313,16 @@ std::size_t ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg chatType, La
                 data << uint32(receiverName.length() + 1);
                 data << receiverName;
             }
+            if (language == LANG_ADDON)
+                data << addonPrefix;
             break;
         case CHAT_MSG_WHISPER_FOREIGN:
             data << uint32(senderName.length() + 1);
             data << senderName;
             receiverGUIDPos = data.wpos();
             data << receiverGUID;
+            if (language == LANG_ADDON)
+                data << addonPrefix;
             break;
         case CHAT_MSG_BG_SYSTEM_NEUTRAL:
         case CHAT_MSG_BG_SYSTEM_ALLIANCE:
@@ -316,11 +334,15 @@ std::size_t ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg chatType, La
                 data << uint32(receiverName.length() + 1);
                 data << receiverName;
             }
+            if (language == LANG_ADDON)
+                data << addonPrefix;
             break;
         case CHAT_MSG_ACHIEVEMENT:
         case CHAT_MSG_GUILD_ACHIEVEMENT:
             receiverGUIDPos = data.wpos();
             data << receiverGUID;
+            if (language == LANG_ADDON)
+                data << addonPrefix;
             break;
         default:
             if (gmMessage)
@@ -337,6 +359,8 @@ std::size_t ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg chatType, La
 
             receiverGUIDPos = data.wpos();
             data << receiverGUID;
+            if (language == LANG_ADDON)
+                data << addonPrefix;
             break;
     }
 
