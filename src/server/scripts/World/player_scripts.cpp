@@ -63,7 +63,44 @@ public:
     }
 };
 
+enum LearnJudgementCredit
+{
+    SPELL_JUDGEMENT             = 20271,
+    NPC_LEARN_JUDGEMENT_CREDIT  = 44420
+};
+
+// Paladin starter quests ("Learn Spell: Judgement") credit 44420 when Judgement is learned,
+// or on accept when it was learned before the quest was taken.
+class player_learn_judgement_credit : public PlayerScript
+{
+public:
+    player_learn_judgement_credit() : PlayerScript("player_learn_judgement_credit",
+        { PLAYERHOOK_ON_LEARN_SPELL, PLAYERHOOK_ON_PLAYER_QUEST_ACCEPT }) { }
+
+    void OnPlayerLearnSpell(Player* player, uint32 spellId) override
+    {
+        if (spellId == SPELL_JUDGEMENT)
+            player->KilledMonsterCredit(NPC_LEARN_JUDGEMENT_CREDIT);
+    }
+
+    void OnPlayerQuestAccept(Player* player, Quest const* quest) override
+    {
+        if (!player->HasSpell(SPELL_JUDGEMENT))
+            return;
+
+        for (int32 required : quest->RequiredNpcOrGo)
+        {
+            if (required == NPC_LEARN_JUDGEMENT_CREDIT)
+            {
+                player->KilledMonsterCredit(NPC_LEARN_JUDGEMENT_CREDIT);
+                return;
+            }
+        }
+    }
+};
+
 void AddSC_player_scripts()
 {
     new QuestApprenticeAnglerPlayerScript();
+    new player_learn_judgement_credit();
 }

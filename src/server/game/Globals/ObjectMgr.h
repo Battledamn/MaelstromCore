@@ -53,8 +53,8 @@ struct PlayerLevelInfo;
 // DB2 table hashes the client names in CMSG_DB_QUERY_BULK and SMSG_DB_REPLY
 enum ItemDB2Hash : uint32
 {
-    ITEM_DB2_HASH        = 0x919BE54E,   // Item.db2
-    ITEM_SPARSE_DB2_HASH = 0x50238EC2    // Item-sparse.db2
+    ITEM_DB2_HASH        = 0x50238EC2,   // Item.db2
+    ITEM_SPARSE_DB2_HASH = 0x919BE54E    // Item-sparse.db2
 };
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push, N), also any gcc version not support it at some platform
